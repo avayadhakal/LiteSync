@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>LiteSync</title>
+  <link rel="stylesheet" href="/css/app.css" />
+</head>
+<body>
+  <header>
+    <h1>LiteSync</h1>
+    <div>
+      <span id="whoami" style="color: var(--text-dim); margin-right: 12px;"></span>
+      <button id="logout-btn">Log out</button>
+    </div>
+  </header>
+
+  <div class="panes">
+    <section class="pane" id="source-pane">
+      <div class="pane-header">
+        <span>Source</span>
+        <span class="pane-path" id="source-path"></span>
+      </div>
+      <div class="pane-body" id="source-body"></div>
+    </section>
+    <section class="pane" id="dest-pane">
+      <div class="pane-header">
+        <span>Destination</span>
+        <span class="pane-path" id="dest-path"></span>
+      </div>
+      <div class="pane-body" id="dest-body"></div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <label><input type="checkbox" id="delete-checkbox" /> Delete source files after successful copy</label>
+    <span class="spacer"></span>
+    <span id="selection-count" style="color: var(--text-dim);"></span>
+    <button id="transfer-btn" class="primary" disabled>Transfer</button>
+  </div>
+
+  <div class="history">
+    <h2>Transfer History</h2>
+    <table>
+      <thead>
+        <tr><th>Started</th><th>Source(s)</th><th>Destination</th><th>Status</th></tr>
+      </thead>
+      <tbody id="history-body"></tbody>
+    </table>
+    <div class="log-view hidden" id="log-view"></div>
+  </div>
+
+  <div class="modal-backdrop hidden" id="confirm-modal">
+    <div class="modal">
+      <h2>Are you sure you want to transfer the selected items?</h2>
+      <ul id="confirm-list"></ul>
+      <div>Destination: <span id="confirm-dest" style="color: var(--text-dim);"></span></div>
+      <div class="actions">
+        <button id="confirm-cancel">Cancel</button>
+        <button id="confirm-ok" class="primary">Transfer</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>

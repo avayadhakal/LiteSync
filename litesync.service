@@ -1,0 +1,21 @@
+[Unit]
+Description=LiteSync file transfer web app
+After=network.target
+
+[Service]
+Type=simple
+User=litesync
+Group=litesync
+WorkingDirectory=/opt/litesync
+Environment=LITESYNC_CONFIG=/opt/litesync/config.yaml
+ExecStart=/opt/litesync/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+# Add /opt/litesync/data plus every path listed under allowed_roots in
+# config.yaml. ProtectSystem=strict makes everything else read-only.
+ReadWritePaths=/opt/litesync/data
+
+[Install]
+WantedBy=multi-user.target

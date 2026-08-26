@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>LiteSync — Login</title>
+  <link rel="stylesheet" href="/css/app.css" />
+</head>
+<body>
+  <div class="login-wrap">
+    <form class="login-card" id="login-form">
+      <h1>LiteSync</h1>
+      <label for="username">Username</label>
+      <input id="username" name="username" type="text" autocomplete="username" required />
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" required />
+      <div class="error-text" id="error"></div>
+      <button type="submit" class="primary">Log in</button>
+    </form>
+  </div>
+  <script>
+    const form = document.getElementById('login-form');
+    const errorEl = document.getElementById('error');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorEl.textContent = '';
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      try {
+        const res = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password }),
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          errorEl.textContent = body.detail || 'Login failed';
+          return;
+        }
+        window.location.href = '/';
+      } catch (err) {
+        errorEl.textContent = 'Network error';
+      }
+    });
+  </script>
+</body>
+</html>

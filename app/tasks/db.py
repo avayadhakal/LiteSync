@@ -125,3 +125,9 @@ def list_running_tasks() -> list[dict]:
     with _connect() as conn:
         rows = conn.execute("SELECT * FROM tasks WHERE status IN ('queued', 'running')").fetchall()
     return [_row_to_dict(r) for r in rows]
+
+
+def delete_task(task_id: str) -> None:
+    with _lock, _connect() as conn:
+        conn.execute("DELETE FROM tasks WHERE task_id=?", (task_id,))
+

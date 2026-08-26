@@ -26,6 +26,7 @@
       <div class="pane-header">
         <span>Destination</span>
         <span class="pane-path" id="dest-path"></span>
+        <button id="new-folder-btn" class="icon-btn" title="New Folder">📁+ New Folder</button>
       </div>
       <div class="pane-body" id="dest-body"></div>
     </section>
@@ -39,15 +40,23 @@
   </div>
 
   <div class="history">
-    <h2>Transfer History</h2>
-    <table>
+    <div class="tabs-bar">
+      <button class="tab-btn active" id="tab-active-btn">Active Transfers</button>
+      <button class="tab-btn" id="tab-history-btn">Transfer History</button>
+      <span class="spacer" style="flex: 1;"></span>
+      <button class="btn-sm btn-danger hidden" id="clear-history-btn">Clear All</button>
+    </div>
+    <div id="active-transfers-container" class="cards-container"></div>
+    <table id="history-table" class="hidden">
       <thead>
-        <tr><th>Started</th><th>Source(s)</th><th>Destination</th><th>Status</th></tr>
+        <tr><th>Started</th><th>Source(s)</th><th>Destination</th><th>Status</th><th style="width: 80px; text-align: right;">Actions</th></tr>
       </thead>
       <tbody id="history-body"></tbody>
     </table>
-    <div class="log-view hidden" id="log-view"></div>
   </div>
+
+
+
 
   <div class="modal-backdrop hidden" id="confirm-modal">
     <div class="modal">

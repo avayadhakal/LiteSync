@@ -26,6 +26,11 @@ def _kill_session(settings: Settings, session: str) -> None:
     subprocess.run([*_tmux_base(settings), "kill-session", "-t", session], capture_output=True)
 
 
+def kill_task_session(settings: Settings, session: str) -> None:
+    _kill_session(settings, session)
+
+
+
 def build_rsync_argv(sources: list[str], destination: str, delete_source: bool) -> list[str]:
     argv = ["rsync", "-avh", "--progress", "--partial", "--inplace"]
     if delete_source:

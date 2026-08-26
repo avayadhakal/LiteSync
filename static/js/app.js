@@ -4,6 +4,9 @@
     source: { path: null, entries: [] },
     dest: { path: null, entries: [] },
     selection: new Set(), // absolute paths selected in the source pane
+    historyTab: 'active', // 'active' | 'history'
+    tasks: [],
+    activeTaskId: null,
   };
 
   const el = (id) => document.getElementById(id);
@@ -25,8 +28,6 @@
   }
 
   function escapeHtml(s) {
-    // Also escapes quotes, since callers interpolate this into attribute
-    // values (e.g. title="...") as well as text content.
     return String(s)
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
@@ -125,6 +126,28 @@
     el('transfer-btn').disabled = !(count > 0 && state.dest.path);
   }
 
+  async function handleNewFolder() {
+    if (!state.dest.path) {
+      alert('Please select a destination folder first.');
+      return;
+    }
+    const folderName = prompt('Enter new folder name:');
+    if (!folderName || !folderName.trim()) return;
+
+    try {
+      await api('/api/mkdir', {
+        method: 'POST',
+        body: JSON.stringify({
+          path: state.dest.path,
+          name: folderName.trim(),
+        }),
+      });
+      await loadPane('dest', state.dest.path);
+    } catch (err) {
+      alert(`Failed to create folder: ${err.message}`);
+    }
+  }
+
   // --- Transfer flow ---
 
   function openConfirmModal() {
@@ -159,8 +182,12 @@
     }
     state.selection.clear();
     updateSelectionUI();
+    setHistoryTab('active');
+    // Auto-refresh destination pane on start
+    if (state.dest.path) {
+      await loadPane('dest', state.dest.path);
+    }
     await loadHistory();
-    streamTask(result.task_id);
   }
 
   // --- History / log streaming ---
@@ -169,50 +196,289 @@
     return `<span class="badge ${status}">${status}</span>`;
   }
 
+  function getPrimaryTitle(sources) {
+    let first = '';
+    if (Array.isArray(sources) && sources.length > 0) {
+      first = sources[0];
+    } else if (typeof sources === 'string' && sources.trim()) {
+      first = sources.split(',')[0].trim();
+    }
+    if (!first) return 'Transfer';
+    const trimmed = first.replace(/\/+$/, '');
+    const parts = trimmed.split('/');
+    const title = parts[parts.length - 1] || first;
+    if (Array.isArray(sources) && sources.length > 1) {
+      return `${title} (+${sources.length - 1} more)`;
+    }
+    return title;
+  }
+
+  function setHistoryTab(tab) {
+    state.historyTab = tab;
+    if (tab === 'active') {
+      el('tab-active-btn').classList.add('active');
+      el('tab-history-btn').classList.remove('active');
+      el('clear-history-btn').classList.add('hidden');
+    } else {
+      el('tab-history-btn').classList.add('active');
+      el('tab-active-btn').classList.remove('active');
+    }
+    renderHistoryTable();
+  }
+
   async function loadHistory() {
-    const data = await api('/api/tasks?limit=50');
-    const body = el('history-body');
-    body.innerHTML = '';
-    for (const task of data.tasks) {
-      const row = document.createElement('tr');
-      row.className = 'task-row';
-      const sourcesText = escapeHtml(
-        Array.isArray(task.sources) ? task.sources.join(', ') : task.sources
-      );
-      row.innerHTML = `
-        <td>${task.started_at ? new Date(task.started_at).toLocaleString() : '-'}</td>
-        <td title="${sourcesText}">${sourcesText}</td>
-        <td>${escapeHtml(task.destination)}</td>
-        <td>${statusBadge(task.status)}</td>
-      `;
-      row.addEventListener('click', () => streamTask(task.task_id));
-      body.appendChild(row);
+    try {
+      const data = await api('/api/tasks?limit=100');
+      state.tasks = data.tasks || [];
+      renderHistoryTable();
+    } catch (err) {
+      console.error('Failed to load history:', err);
     }
   }
 
-  let activeSource = null;
+  const activeStreams = new Map(); // taskId -> { source, currentFile, pct }
 
-  function streamTask(taskId) {
-    if (activeSource) activeSource.close();
-    const logView = el('log-view');
-    logView.classList.remove('hidden');
-    logView.textContent = '';
+  function renderHistoryTable() {
+    const isHistoryTab = state.historyTab === 'history';
+    const activeContainer = el('active-transfers-container');
+    const historyTable = el('history-table');
 
-    const source = new EventSource(`/api/tasks/${taskId}/stream`);
-    activeSource = source;
-    source.onmessage = (e) => {
-      logView.textContent += e.data + '\n';
-      logView.scrollTop = logView.scrollHeight;
+    if (isHistoryTab) {
+      activeContainer.classList.add('hidden');
+      historyTable.classList.remove('hidden');
+
+      // Filter completed/historical tasks strictly
+      const historyTasks = state.tasks.filter(
+        (task) => task.status === 'succeeded' || task.status === 'failed' || task.status === 'interrupted'
+      );
+
+      if (historyTasks.length > 0) {
+        el('clear-history-btn').classList.remove('hidden');
+      } else {
+        el('clear-history-btn').classList.add('hidden');
+      }
+
+      const body = el('history-body');
+      body.innerHTML = '';
+
+      if (historyTasks.length === 0) {
+        const emptyRow = document.createElement('tr');
+        emptyRow.innerHTML = `<td colspan="5" style="color: var(--text-dim); text-align: center; padding: 12px;">No historical transfers</td>`;
+        body.appendChild(emptyRow);
+        return;
+      }
+
+      for (const task of historyTasks) {
+        const row = document.createElement('tr');
+        row.className = 'task-row';
+        const sourcesText = escapeHtml(
+          Array.isArray(task.sources) ? task.sources.join(', ') : task.sources
+        );
+        const timeStr = task.started_at
+          ? new Date(task.started_at).toLocaleString()
+          : task.created_at
+          ? new Date(task.created_at).toLocaleString()
+          : '-';
+
+        row.innerHTML = `
+          <td>${timeStr}</td>
+          <td title="${sourcesText}">${sourcesText}</td>
+          <td>${escapeHtml(task.destination)}</td>
+          <td>${statusBadge(task.status)}</td>
+          <td style="text-align: right;">
+            <button class="icon-btn danger delete-btn" title="Delete record" data-id="${task.task_id}">🗑️</button>
+          </td>
+        `;
+
+        const deleteBtn = row.querySelector('.delete-btn');
+        if (deleteBtn) {
+          deleteBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            try {
+              await api(`/api/tasks/${task.task_id}`, { method: 'DELETE' });
+              await loadHistory();
+            } catch (err) {
+              alert(`Failed to delete task: ${err.message}`);
+            }
+          });
+        }
+
+        body.appendChild(row);
+      }
+    } else {
+      // Active transfers tab
+      historyTable.classList.add('hidden');
+      activeContainer.classList.remove('hidden');
+      el('clear-history-btn').classList.add('hidden');
+
+      // Filter active/queued tasks strictly
+      const activeTasks = state.tasks.filter(
+        (task) => task.status === 'queued' || task.status === 'running'
+      );
+
+      // Clean up streams for tasks that are no longer active
+      const activeTaskIds = new Set(activeTasks.map((t) => t.task_id));
+      for (const [id, streamObj] of activeStreams.entries()) {
+        if (!activeTaskIds.has(id)) {
+          streamObj.source.close();
+          activeStreams.delete(id);
+        }
+      }
+
+      activeContainer.innerHTML = '';
+
+      if (activeTasks.length === 0) {
+        activeContainer.innerHTML = `<div style="color: var(--text-dim); text-align: center; padding: 16px;">No active transfers</div>`;
+        return;
+      }
+
+      for (const task of activeTasks) {
+        const card = document.createElement('div');
+        card.className = 'transfer-card';
+        card.id = `card-${task.task_id}`;
+
+        const primaryTitle = getPrimaryTitle(task.sources);
+        const sourcesText = Array.isArray(task.sources) ? task.sources.join(', ') : task.sources;
+        const streamData = activeStreams.get(task.task_id);
+        const currentPct = streamData ? streamData.pct : 0;
+        const currentDetail = streamData && streamData.currentFile
+          ? `Copying: ${streamData.currentFile} - ${currentPct}%`
+          : (task.status === 'queued' ? 'Queued in background...' : 'Starting transfer...');
+
+        card.innerHTML = `
+          <div class="card-top">
+            <span class="card-title" title="${escapeHtml(primaryTitle)}">${escapeHtml(primaryTitle)}</span>
+            <button class="btn-sm btn-danger cancel-btn" data-id="${task.task_id}">Cancel</button>
+          </div>
+          <div class="card-path truncate" title="${escapeHtml(sourcesText)} ➔ ${escapeHtml(task.destination)}">
+            ${escapeHtml(sourcesText)} ➔ ${escapeHtml(task.destination)}
+          </div>
+          <div class="bg-gray-800 rounded h-5 relative flex items-center justify-center overflow-hidden" style="position: relative;">
+            <div class="bg-blue-600 rounded absolute inset-0" id="progress-fill-${task.task_id}" style="width: ${currentPct}%; transition: width 0.2s ease;"></div>
+            <span class="absolute inset-0 flex items-center justify-center font-semibold text-xs text-white drop-shadow z-10 pointer-events-none" id="progress-text-${task.task_id}">
+              ${currentPct}%
+            </span>
+          </div>
+          <div class="card-details truncate" id="progress-detail-${task.task_id}">
+            ${escapeHtml(currentDetail)}
+          </div>
+        `;
+
+        const cancelBtn = card.querySelector('.cancel-btn');
+        if (cancelBtn) {
+          cancelBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            if (!confirm('Are you sure you want to cancel this transfer? Incomplete files will be deleted.')) {
+              return;
+            }
+            if (activeStreams.has(task.task_id)) {
+              activeStreams.get(task.task_id).source.close();
+              activeStreams.delete(task.task_id);
+            }
+            try {
+              await api(`/api/tasks/${task.task_id}/cancel`, { method: 'POST' });
+              await loadHistory();
+              if (state.source.path) await loadPane('source', state.source.path);
+              if (state.dest.path) await loadPane('dest', state.dest.path);
+            } catch (err) {
+              alert(`Failed to cancel task: ${err.message}`);
+            }
+          });
+        }
+
+        activeContainer.appendChild(card);
+
+        // Attach SSE stream if running/queued
+        attachTaskStream(task.task_id);
+      }
+    }
+  }
+
+  function attachTaskStream(taskId) {
+    if (activeStreams.has(taskId)) return;
+
+    const streamData = {
+      source: new EventSource(`/api/tasks/${taskId}/stream`),
+      currentFile: '',
+      pct: 0,
     };
-    source.addEventListener('status', () => {
+    activeStreams.set(taskId, streamData);
+
+    const source = streamData.source;
+
+    source.onmessage = (e) => {
+      const line = e.data;
+      const trimmed = line.trim();
+      if (!trimmed) return;
+
+      const fillEl = el(`progress-fill-${taskId}`);
+      const textEl = el(`progress-text-${taskId}`);
+      const detailEl = el(`progress-detail-${taskId}`);
+
+      // Check if line contains rsync progress percentage
+      const matches = trimmed.match(/(\d+)%/g);
+      if (matches && matches.length > 0) {
+        const lastMatch = matches[matches.length - 1];
+        const pct = parseInt(lastMatch.replace('%', ''), 10);
+        if (!isNaN(pct)) {
+          streamData.pct = pct;
+          if (fillEl) fillEl.style.width = `${pct}%`;
+          if (textEl) textEl.textContent = `${pct}%`;
+          if (detailEl) {
+            detailEl.textContent = streamData.currentFile
+              ? `Copying: ${streamData.currentFile} - ${pct}%`
+              : `Syncing: ${pct}%`;
+          }
+        }
+      } else {
+        const isRsyncSystemLine =
+          trimmed.startsWith('sending incremental') ||
+          trimmed.startsWith('sent ') ||
+          trimmed.startsWith('total size') ||
+          trimmed.startsWith('created directory') ||
+          trimmed.startsWith('building file list') ||
+          trimmed.startsWith('rsync') ||
+          trimmed.startsWith('sh ') ||
+          trimmed.includes('bytes/sec');
+
+        if (!isRsyncSystemLine) {
+          streamData.currentFile = trimmed;
+          if (detailEl) {
+            detailEl.textContent = `Copying: ${streamData.currentFile} - ${streamData.pct}%`;
+          }
+        }
+      }
+    };
+
+    source.addEventListener('status', (e) => {
       source.close();
-      if (activeSource === source) activeSource = null;
+      activeStreams.delete(taskId);
+
+      // Auto-remove card, auto-refresh panes, and refresh history
+      if (state.source.path) {
+        loadPane('source', state.source.path);
+      }
+      if (state.dest.path) {
+        loadPane('dest', state.dest.path);
+      }
       loadHistory();
     });
+
     source.onerror = () => {
       source.close();
-      if (activeSource === source) activeSource = null;
+      activeStreams.delete(taskId);
+      loadHistory();
     };
+  }
+
+  async function handleClearAllHistory() {
+    if (!confirm('Are you sure you want to delete all transfer history?')) return;
+    try {
+      await api('/api/tasks', { method: 'DELETE' });
+      await loadHistory();
+    } catch (err) {
+      alert(`Failed to clear history: ${err.message}`);
+    }
   }
 
   // --- Init ---
@@ -225,6 +491,11 @@
       await api('/api/logout', { method: 'POST' });
       window.location.href = '/login.html';
     });
+
+    el('new-folder-btn').addEventListener('click', handleNewFolder);
+    el('tab-active-btn').addEventListener('click', () => setHistoryTab('active'));
+    el('tab-history-btn').addEventListener('click', () => setHistoryTab('history'));
+    el('clear-history-btn').addEventListener('click', handleClearAllHistory);
 
     el('transfer-btn').addEventListener('click', openConfirmModal);
     el('confirm-cancel').addEventListener('click', closeConfirmModal);
@@ -240,3 +511,5 @@
 
   init().catch((err) => console.error(err));
 })();
+
+

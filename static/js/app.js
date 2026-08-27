@@ -52,6 +52,29 @@
     return `${v.toFixed(1)} ${units[i]}`;
   }
 
+  async function copyToClipboard(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      // Fallback for plain HTTP / non-localhost IP contexts
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      textArea.style.position = "fixed";
+      textArea.style.left = "-999999px";
+      textArea.style.top = "-999999px";
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+
+      const successful = document.execCommand('copy');
+      textArea.remove();
+
+      if (!successful) {
+        throw new Error("Copy command failed");
+      }
+    }
+  }
+
   // --- Pane rendering ---
 
   function normalizePath(p) {
@@ -229,7 +252,7 @@
           e.stopPropagation();
           try {
             const url = `${window.location.origin}/api/download?path=${encodeURIComponent(entry.path)}`;
-            await navigator.clipboard.writeText(url);
+            await copyToClipboard(url);
             copyBtn.innerHTML = '✓';
             copyBtn.style.color = 'var(--success)';
             toastSuccess('Link copied to clipboard');

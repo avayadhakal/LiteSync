@@ -100,11 +100,29 @@
     return which === 'source' ? state.selection : state.destSelection;
   }
 
+  // Returns true if path is directly in selSet or if any ancestor directory is in selSet.
+  function isPathSelected(path, selSet) {
+    if (!path || !selSet || selSet.size === 0) return false;
+    const norm = normalizePath(path);
+    for (const selPath of selSet) {
+      if (typeof selPath !== 'string') continue;
+      const normSel = normalizePath(selPath);
+      if (norm === normSel) return true;
+      if (normSel === '/') {
+        if (norm !== '/') return true;
+      } else if (norm.startsWith(normSel + '/')) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   function renderPane(which) {
     const pane = state[which];
     const sel = paneSelection(which);
     el(`${which}-path`).textContent = pane.path === null ? '(select a root)' : pane.path;
     const body = el(`${which}-body`);
+    const prevScrollTop = body.scrollTop;
     body.innerHTML = '';
 
     if (pane.path !== null) {
@@ -124,16 +142,70 @@
       // source pane's selection is used to build the Transfer payload.
       const cb = document.createElement('input');
       cb.type = 'checkbox';
-      cb.checked = sel.has(entry.path);
-      // Directory tri-state: fully checked when the dir itself is selected,
+      cb.checked = isPathSelected(entry.path, sel);
+      // Directory tri-state: fully checked when the dir itself (or ancestor) is selected,
       // indeterminate when only some descendant path is selected.
       if (entry.is_dir && !cb.checked) {
         cb.indeterminate = hasSelectedDescendant(entry.path, sel);
       }
       cb.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (cb.checked) sel.add(entry.path);
-        else sel.delete(entry.path);
+        const normEntry = normalizePath(entry.path);
+        if (cb.checked) {
+          sel.add(entry.path);
+          // When checking a directory, remove explicit descendant selections
+          // since the parent directory covers all descendants hierarchically.
+          if (entry.is_dir) {
+            const prefix = normEntry + '/';
+            for (const p of Array.from(sel)) {
+              if (normalizePath(p).startsWith(prefix)) {
+                sel.delete(p);
+              }
+            }
+          }
+        } else {
+          // Remove direct match from selection set
+          for (const p of Array.from(sel)) {
+            if (normalizePath(p) === normEntry) {
+              sel.delete(p);
+            }
+          }
+
+          // Check if item was checked via ancestor inheritance
+          const ancestorsToRemove = [];
+          for (const selPath of sel) {
+            const normSel = normalizePath(selPath);
+            if (normSel === '/' && normEntry !== '/') {
+              ancestorsToRemove.push(selPath);
+            } else if (normSel !== '/' && normEntry.startsWith(normSel + '/')) {
+              ancestorsToRemove.push(selPath);
+            }
+          }
+
+          // If checked via parent inheritance: remove parent from selection set
+          // and explicitly add all other sibling items in that folder.
+          if (ancestorsToRemove.length > 0) {
+            for (const a of ancestorsToRemove) {
+              sel.delete(a);
+            }
+            for (const sibling of pane.entries) {
+              if (normalizePath(sibling.path) !== normEntry) {
+                sel.add(sibling.path);
+              }
+            }
+          }
+
+          // If unchecking a directory, also remove any descendant paths
+          if (entry.is_dir) {
+            const prefix = normEntry + '/';
+            for (const p of Array.from(sel)) {
+              if (normalizePath(p).startsWith(prefix)) {
+                sel.delete(p);
+              }
+            }
+          }
+        }
+        renderPane(which);
         updateSelectionUI();
       });
       row.appendChild(cb);
@@ -197,6 +269,7 @@
 
       body.appendChild(row);
     }
+    body.scrollTop = prevScrollTop;
   }
 
   function selectionSummary(selSet) {
@@ -205,9 +278,10 @@
 
   // True when any selected path is a descendant of dirPath (but not dirPath itself).
   function hasSelectedDescendant(dirPath, selSet) {
+    if (!dirPath || !selSet || selSet.size === 0) return false;
     const prefix = normalizePath(dirPath) + '/';
     for (const p of selSet) {
-      if (typeof p === 'string' && p.startsWith(prefix)) return true;
+      if (typeof p === 'string' && normalizePath(p).startsWith(prefix)) return true;
     }
     return false;
   }

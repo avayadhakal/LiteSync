@@ -131,6 +131,11 @@ CREATE INDEX idx_tasks_created_at ON tasks(created_at DESC);
   * Visual feedback: Swaps icon to green checkmark (`✓`) for 1.5 seconds and emits `toastSuccess('Link copied to clipboard')`.
   * Responsive visibility: Completely hidden on desktop until row hover (`@media (hover: hover) { opacity: 0 } -> :hover { opacity: 1 }`), but permanently visible (`opacity: 0.6`) on mobile/touch interfaces.
   * Clicks isolate propagation (`e.stopPropagation()` & target checks) to prevent triggering parent row selection or navigation.
+* **Hierarchical Selection Cascading & Pruning (`isPathSelected`):**
+  * Selecting a parent directory automatically cascades down to all child items and subfolders when browsing inside it.
+  * Evaluation: `isPathSelected(path, selectionSet)` checks if a path is directly selected or if any ancestor directory is in the selection set.
+  * Uncheck & Prune: Unchecking an item that inherited selection from a parent automatically removes the parent directory from the selection set and explicitly adds all remaining sibling items in the directory to preserve state.
+  * Directory Tri-State: Unchecked directories with selected descendants display an indeterminate state (`-`). Scroll position is preserved across selection toggles.
 
 ## 6. Security & Deployment
 

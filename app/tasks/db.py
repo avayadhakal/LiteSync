@@ -121,6 +121,22 @@ def list_tasks(limit: int = 50, offset: int = 0) -> list[dict]:
     return [_row_to_dict(r) for r in rows]
 
 
+def list_queued_tasks() -> list[dict]:
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT * FROM tasks WHERE status='queued' ORDER BY created_at ASC"
+        ).fetchall()
+    return [_row_to_dict(r) for r in rows]
+
+
+def next_queued_task() -> dict | None:
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT * FROM tasks WHERE status='queued' ORDER BY created_at ASC LIMIT 1"
+        ).fetchone()
+    return _row_to_dict(row) if row else None
+
+
 def list_running_tasks() -> list[dict]:
     with _connect() as conn:
         rows = conn.execute("SELECT * FROM tasks WHERE status IN ('queued', 'running')").fetchall()

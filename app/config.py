@@ -21,7 +21,6 @@ class Settings:
     session_max_age: int
     secure_cookie: bool
     data_dir: Path
-    tmux_socket_name: str
     host: str
     port: int
 
@@ -57,7 +56,6 @@ def load_settings() -> Settings:
         session_max_age=int(raw.get("session_max_age", 604800)),
         secure_cookie=bool(raw.get("secure_cookie", False)),
         data_dir=data_dir,
-        tmux_socket_name=raw.get("tmux_socket_name", "litesync"),
         host=raw.get("host", "0.0.0.0"),
         port=int(raw.get("port", 8000)),
     )

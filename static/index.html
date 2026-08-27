@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>LiteSync</title>
   <link rel="stylesheet" href="/css/app.css" />
 </head>
@@ -22,6 +23,7 @@
       </div>
       <div class="pane-body" id="source-body"></div>
     </section>
+    <div id="vertical-splitter" class="splitter-v"></div>
     <section class="pane" id="dest-pane">
       <div class="pane-header">
         <span>Destination</span>
@@ -39,6 +41,7 @@
     <button id="transfer-btn" class="primary" disabled>Transfer</button>
   </div>
 
+  <div id="horizontal-splitter" class="splitter-h"></div>
   <div class="history">
     <div class="tabs-bar">
       <button class="tab-btn active" id="tab-active-btn">Active Transfers</button>

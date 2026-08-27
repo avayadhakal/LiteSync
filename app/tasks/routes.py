@@ -15,7 +15,7 @@ from app.auth import get_current_user
 from app.config import get_settings
 from app.fsops import resolve_safe_path
 from app.tasks import db
-from app.tasks.runner import kill_task_session, start_tmux_task
+from app.tasks.runner import queue_task, terminate_task, wake_scheduler
 
 router = APIRouter(prefix="/api")
 
@@ -42,14 +42,25 @@ async def create_transfer(body: TransferRequest, user: str = Depends(get_current
     if not resolved_destination.is_dir():
         raise HTTPException(status_code=400, detail="Destination must be an existing directory")
 
-    task_id = start_tmux_task(
-        settings=settings,
-        sources=resolved_sources,
-        destination=str(resolved_destination),
-        delete_source=body.delete_source,
-        created_by=user,
-    )
-    return {"task_id": task_id}
+    # Fire and forget: expand the batch into one queued task per source so
+    # every selected item gets its own progress card, log, SSE stream, and
+    # cancel control. The background scheduler independently picks these up.
+    task_ids = [
+        queue_task(
+            settings=settings,
+            source=source,
+            destination=str(resolved_destination),
+            delete_source=body.delete_source,
+            created_by=user,
+        )
+        for source in resolved_sources
+    ]
+
+    # Nudge the scheduler so the queue starts immediately (it polls the DB
+    # on its own regardless).
+    wake_scheduler()
+
+    return {"task_ids": task_ids}
 
 
 @router.get("/tasks")
@@ -143,13 +154,19 @@ async def cancel_task(task_id: str, _user: str = Depends(get_current_user)):
 
     settings = get_settings()
 
-    # 1. Kill tmux session
-    kill_task_session(settings, task["tmux_session"])
+    if task["status"] == "queued":
+        # Simply take it out of the queue; the scheduler only picks rows
+        # with status='queued', so it is skipped. Nothing copied yet, so the
+        # filesystem stays completely untouched.
+        db.mark_finished(task_id, "interrupted", None, "Transfer cancelled by user")
+        return {"success": True}
 
-    # 2. Mark as interrupted
+    # Running: gracefully stop the rsync child. The scheduler escalates to
+    # SIGKILL if SIGTERM is ignored within ~5s.
+    terminate_task(task_id)
     db.mark_finished(task_id, "interrupted", None, "Transfer cancelled by user")
 
-    # 3. Cleanup destination items
+    # Cleanup destination items
     try:
         resolved_dest = resolve_safe_path(task["destination"], settings.allowed_roots)
         for src in task["sources"]:

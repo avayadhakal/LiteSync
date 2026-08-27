@@ -13,7 +13,7 @@ from app.config import get_settings
 from app.routes_browse import router as browse_router
 from app.tasks import db
 from app.tasks.routes import router as tasks_router
-from app.tasks.runner import poll_running_tasks, reconcile_on_startup
+from app.tasks.runner import reconcile_on_startup, run_scheduler
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
@@ -47,4 +47,4 @@ async def on_startup():
     settings = get_settings()
     db.init_db(settings.data_dir)
     reconcile_on_startup(settings)
-    asyncio.create_task(poll_running_tasks(settings))
+    asyncio.create_task(run_scheduler(settings))

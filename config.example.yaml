@@ -25,8 +25,5 @@ secure_cookie: false
 # Where the sqlite db and per-task logs are stored.
 data_dir: ./data
 
-# Isolated tmux server socket name, avoids colliding with other tmux usage.
-tmux_socket_name: litesync
-
 host: 0.0.0.0
 port: 8000

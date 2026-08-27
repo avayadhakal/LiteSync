@@ -197,6 +197,7 @@
   }
 
   function getPrimaryTitle(sources) {
+    // Tasks are unbatched server-side (exactly one source per task).
     let first = '';
     if (Array.isArray(sources) && sources.length > 0) {
       first = sources[0];
@@ -206,11 +207,7 @@
     if (!first) return 'Transfer';
     const trimmed = first.replace(/\/+$/, '');
     const parts = trimmed.split('/');
-    const title = parts[parts.length - 1] || first;
-    if (Array.isArray(sources) && sources.length > 1) {
-      return `${title} (+${sources.length - 1} more)`;
-    }
-    return title;
+    return parts[parts.length - 1] || first;
   }
 
   function setHistoryTab(tab) {
@@ -311,10 +308,17 @@
       activeContainer.classList.remove('hidden');
       el('clear-history-btn').classList.add('hidden');
 
-      // Filter active/queued tasks strictly
-      const activeTasks = state.tasks.filter(
-        (task) => task.status === 'queued' || task.status === 'running'
-      );
+      // Filter active/queued tasks strictly, then order by priority:
+      // running (actively copying) cards first, queued cards after.
+      // FIFO (created_at ascending) as the tie-breaker within each block.
+      const statusRank = (task) => (task.status === 'running' ? 0 : 1);
+      const activeTasks = state.tasks
+        .filter((task) => task.status === 'queued' || task.status === 'running')
+        .sort((a, b) => {
+          const rankDiff = statusRank(a) - statusRank(b);
+          if (rankDiff !== 0) return rankDiff;
+          return new Date(a.created_at) - new Date(b.created_at);
+        });
 
       // Clean up streams for tasks that are no longer active
       const activeTaskIds = new Set(activeTasks.map((t) => t.task_id));
@@ -343,7 +347,7 @@
         const currentPct = streamData ? streamData.pct : 0;
         const currentDetail = streamData && streamData.currentFile
           ? `Copying: ${streamData.currentFile} - ${currentPct}%`
-          : (task.status === 'queued' ? 'Queued in background...' : 'Starting transfer...');
+          : (task.status === 'queued' ? 'Queued...' : 'Starting transfer...');
 
         card.innerHTML = `
           <div class="card-top">
@@ -481,6 +485,48 @@
     }
   }
 
+  // --- Resizable splitters (CSS variable architecture) ---
+
+  function initResizers() {
+    const root = document.documentElement;
+    const drag = (handle, onMove) => {
+      handle.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        handle.setPointerCapture(e.pointerId);
+        handle.classList.add('splitter-dragging');
+        const move = (ev) => onMove(ev);
+        const up = () => {
+          handle.classList.remove('splitter-dragging');
+          handle.removeEventListener('pointermove', move);
+          handle.removeEventListener('pointerup', up);
+        };
+        handle.addEventListener('pointermove', move);
+        handle.addEventListener('pointerup', up);
+      });
+    };
+
+    const panesEl = document.querySelector('.panes');
+    drag(el('vertical-splitter'), (e) => {
+      // Desktop (row): drag adjusts left pane width.
+      // Mobile (column): drag adjusts top pane height.
+      if (getComputedStyle(panesEl).flexDirection === 'column') {
+        const rect = panesEl.getBoundingClientRect();
+        const pct = ((e.clientY - rect.top) / rect.height) * 100;
+        root.style.setProperty('--top-height', `${Math.min(80, Math.max(20, pct))}%`);
+      } else {
+        const pct = (e.clientX / window.innerWidth) * 100;
+        root.style.setProperty('--left-width', `${Math.min(80, Math.max(20, pct))}%`);
+      }
+    });
+
+    const historyEl = document.querySelector('.history');
+    drag(el('horizontal-splitter'), (e) => {
+      const height = historyEl.getBoundingClientRect().bottom - e.clientY;
+      const max = window.innerHeight * 0.7;
+      root.style.setProperty('--bottom-height', `${Math.min(max, Math.max(120, height))}px`);
+    });
+  }
+
   // --- Init ---
 
   async function init() {
@@ -496,6 +542,8 @@
     el('tab-active-btn').addEventListener('click', () => setHistoryTab('active'));
     el('tab-history-btn').addEventListener('click', () => setHistoryTab('history'));
     el('clear-history-btn').addEventListener('click', handleClearAllHistory);
+
+    initResizers();
 
     el('transfer-btn').addEventListener('click', openConfirmModal);
     el('confirm-cancel').addEventListener('click', closeConfirmModal);

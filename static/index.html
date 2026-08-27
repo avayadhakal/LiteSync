@@ -21,9 +21,9 @@
         <span>Source</span>
         <span class="pane-path" id="source-path"></span>
         <div class="pane-actions">
-          <button class="icon-btn" data-src-action="mkdir" title="New Folder">📁+</button>
-          <button class="icon-btn" data-src-action="rename" title="Rename">✏️</button>
-          <button class="icon-btn danger" data-src-action="delete" title="Delete">🗑️</button>
+          <button class="icon-btn" data-pane-action="mkdir" data-pane="source" title="New Folder">📁+</button>
+          <button class="icon-btn" data-pane-action="rename" data-pane="source" title="Rename">✏️</button>
+          <button class="icon-btn danger" data-pane-action="delete" data-pane="source" title="Delete">🗑️</button>
         </div>
       </div>
       <div class="pane-body" id="source-body"></div>
@@ -33,7 +33,11 @@
       <div class="pane-header">
         <span>Destination</span>
         <span class="pane-path" id="dest-path"></span>
-        <button id="new-folder-btn" class="icon-btn" title="New Folder">📁+ New Folder</button>
+        <div class="pane-actions">
+          <button class="icon-btn" data-pane-action="mkdir" data-pane="dest" title="New Folder">📁+</button>
+          <button class="icon-btn" data-pane-action="rename" data-pane="dest" title="Rename">✏️</button>
+          <button class="icon-btn danger" data-pane-action="delete" data-pane="dest" title="Delete">🗑️</button>
+        </div>
       </div>
       <div class="pane-body" id="dest-body"></div>
     </section>

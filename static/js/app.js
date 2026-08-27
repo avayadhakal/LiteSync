@@ -3,8 +3,9 @@
     roots: [],
     source: { path: null, entries: [] },
     dest: { path: null, entries: [] },
-    selection: new Set(), // absolute paths selected in the source pane
-    historyTab: 'active', // 'active' | 'history' | 'activity'
+    selection: new Set(),     // absolute paths selected in the SOURCE pane  (drives Transfer)
+    destSelection: new Set(), // absolute paths selected in the DEST pane   (mkdir/rename/delete target)
+    historyTab: 'active', // 'active' | 'activity'
     tasks: [],
     activeTaskId: null,
     finishedTaskIds: new Set(), // task ids whose completion was already handled
@@ -87,17 +88,25 @@
         throw err;
       }
     }
-    if (which === 'source' && navigated) {
+    const sel = paneSelection(which);
+    if (navigated) {
       // Selection resets on navigation only; a same-path refresh (e.g. after
       // a transfer completes) preserves selections that are still valid.
-      state.selection.clear();
+      sel.clear();
     }
     renderPane(which);
     updateSelectionUI();
   }
 
+  // Per-pane selection accessor. The source pane drives Transfer submissions;
+  // the dest pane supports the same file operations via its own selection.
+  function paneSelection(which) {
+    return which === 'source' ? state.selection : state.destSelection;
+  }
+
   function renderPane(which) {
     const pane = state[which];
+    const sel = paneSelection(which);
     el(`${which}-path`).textContent = pane.path === null ? '(select a root)' : pane.path;
     const body = el(`${which}-body`);
     body.innerHTML = '';
@@ -114,18 +123,19 @@
       const row = document.createElement('div');
       row.className = `entry ${entry.is_dir ? 'dir' : 'file'}`;
 
-      if (which === 'source') {
-        const cb = document.createElement('input');
-        cb.type = 'checkbox';
-        cb.checked = state.selection.has(entry.path);
-        cb.addEventListener('click', (e) => {
-          e.stopPropagation();
-          if (cb.checked) state.selection.add(entry.path);
-          else state.selection.delete(entry.path);
-          updateSelectionUI();
-        });
-        row.appendChild(cb);
-      }
+      // Both panes expose selection checkboxes so the user can mark items for
+      // New Folder (parent), Rename, and Delete in either pane. Only the
+      // source pane's selection is used to build the Transfer payload.
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = sel.has(entry.path);
+      cb.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (cb.checked) sel.add(entry.path);
+        else sel.delete(entry.path);
+        updateSelectionUI();
+      });
+      row.appendChild(cb);
 
       const name = document.createElement('span');
       name.className = 'name';
@@ -151,6 +161,7 @@
   }
 
   function updateSelectionUI() {
+    // Only the source pane drives the Transfer button; show its count.
     const count = state.selection.size;
     el('selection-count').textContent = count > 0 ? `${count} selected` : '';
     el('transfer-btn').disabled = !(count > 0 && state.dest.path);
@@ -321,21 +332,27 @@
     }
   }
 
-  function openRenameModal() {
-    if (state.selection.size !== 1) {
+  function openRenameModal(which) {
+    const sel = paneSelection(which);
+    if (sel.size !== 1) {
       toastError('Select exactly one item to rename.');
       return;
     }
-    const selectedPath = Array.from(state.selection)[0];
+    const selectedPath = Array.from(sel)[0];
     const currentName = normalizePath(selectedPath).split('/').pop();
+    el('rename-modal').dataset.pane = which;
+    el('rename-modal').dataset.path = selectedPath;
     el('rename-input').value = currentName;
     el('rename-target').textContent = selectedPath;
     openModal('rename');
   }
 
   async function submitRename() {
-    const selectedPath = Array.from(state.selection)[0];
+    const modal = el('rename-modal');
+    const which = modal.dataset.pane || 'source';
+    const selectedPath = modal.dataset.path;
     if (!selectedPath) { closeModal('rename'); return; }
+    const sel = paneSelection(which);
     const currentName = normalizePath(selectedPath).split('/').pop();
 
     const name = el('rename-input').value.trim();
@@ -357,10 +374,10 @@
         body: JSON.stringify({ path: selectedPath, new_name: name }),
       });
       closeModal('rename');
-      state.selection.delete(selectedPath);
-      state.selection.add(result.new_path);
+      sel.delete(selectedPath);
+      sel.add(result.new_path);
       updateSelectionUI();
-      await loadPane('source', state.source.path, true);
+      await loadPane(which, state[which].path, true);
       toastSuccess(`Renamed to: ${name}`);
       logActivity('rename', `Renamed ${selectedPath} → ${result.new_path}`, 'success');
     } catch (err) {
@@ -369,12 +386,15 @@
     }
   }
 
-  function openDeleteModal() {
-    if (state.selection.size === 0) {
+  function openDeleteModal(which) {
+    const sel = paneSelection(which);
+    if (sel.size === 0) {
       toastError('Select one or more items to delete.');
       return;
     }
-    const paths = Array.from(state.selection);
+    // Snapshot selection at open time so submitDelete doesn't depend on live state.
+    el('delete-modal').dataset.pane = which;
+    const paths = Array.from(sel);
     el('delete-title').textContent =
       paths.length === 1 ? 'Delete this item?' : `Delete ${paths.length} items?`;
     const list = el('delete-list');
@@ -388,7 +408,9 @@
   }
 
   async function submitDelete() {
-    const paths = Array.from(state.selection);
+    const which = el('delete-modal').dataset.pane || 'source';
+    const sel = paneSelection(which);
+    const paths = Array.from(sel);
     if (paths.length === 0) { closeModal('delete'); return; }
     closeModal('delete');
     const failures = [];
@@ -398,13 +420,13 @@
           method: 'POST',
           body: JSON.stringify({ path: p }),
         });
-        state.selection.delete(p);
+        sel.delete(p);
       } catch (err) {
         failures.push(`${normalizePath(p).split('/').pop()}: ${err.message}`);
       }
     }
     updateSelectionUI();
-    await loadPane('source', state.source.path, true);
+    await loadPane(which, state[which].path, true);
 
     if (failures.length === 0) {
       toastSuccess(paths.length === 1 ? 'Deleted.' : `Deleted ${paths.length} items.`);
@@ -863,15 +885,14 @@
       window.location.href = '/login.html';
     });
 
-    el('new-folder-btn').addEventListener('click', () => openMkdirModal('dest'));
-
-    // Source-pane toolbar: New Folder / Rename / Delete
-    document.querySelectorAll('[data-src-action]').forEach((btn) => {
-      const action = btn.getAttribute('data-src-action');
+    // Both panes expose New Folder / Rename / Delete via [data-pane-action][data-pane]
+    document.querySelectorAll('[data-pane-action]').forEach((btn) => {
+      const action = btn.getAttribute('data-pane-action');
+      const pane = btn.getAttribute('data-pane') || 'source';
       btn.addEventListener('click', () => {
-        if (action === 'mkdir') openMkdirModal('source');
-        else if (action === 'rename') openRenameModal();
-        else if (action === 'delete') openDeleteModal();
+        if (action === 'mkdir') openMkdirModal(pane);
+        else if (action === 'rename') openRenameModal(pane);
+        else if (action === 'delete') openDeleteModal(pane);
       });
     });
 

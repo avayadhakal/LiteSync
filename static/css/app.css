@@ -153,6 +153,37 @@ input[type="text"], input[type="password"] {
   font-family: ui-monospace, monospace;
 }
 
+/* Mobile: pane header wraps so "Source" + path sit on the first row and the
+   action buttons stack below — prevents the overlap that used to happen because
+   everything was forced onto one line with nowrap. */
+@media (max-width: 768px) {
+  .pane-header {
+    height: auto;
+    min-height: 40px;
+    flex-wrap: wrap;
+    padding: 6px 12px;
+    white-space: normal;
+    row-gap: 4px;
+    column-gap: 8px;
+  }
+  .pane-header > span:first-child {
+    flex: none;
+    order: 1;
+  }
+  .pane-header .pane-path {
+    flex: 1;
+    min-width: 0;
+    order: 2;
+    font-size: 11px;
+  }
+  .pane-header .pane-actions {
+    flex: 1 1 100%;
+    order: 3;           /* drops to second row */
+    justify-content: flex-start;
+    margin-top: 4px;
+  }
+}
+
 .pane-body { flex: 1; overflow-y: auto; }
 
 .entry {
@@ -268,6 +299,16 @@ tr.task-row:hover { background: var(--panel-alt); }
   color: #fff;
   border-color: var(--danger);
 }
+/* Filled red solid variant — for Clear Log and other destructive primary buttons. */
+.btn-danger-solid {
+  background: var(--danger);
+  color: #fff;
+  border-color: var(--danger);
+}
+.btn-danger-solid:hover {
+  background: #c23a3a;
+  border-color: #c23a3a;
+}
 .icon-btn {
   background: none;
   border: none;
@@ -359,6 +400,112 @@ tr.task-row:hover { background: var(--panel-alt); }
 }
 
 .hidden { display: none !important; }
+
+/* Transfer-popup-style modal fields */
+.modal-field { margin: 12px 0 4px; }
+.modal-field input[type="text"] {
+  width: 100%;
+  font-size: 16px; /* >=16px prevents iOS auto-zoom on focus */
+  padding: 8px 10px;
+  margin-top: 4px;
+}
+.modal-label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.modal-error {
+  color: var(--danger);
+  font-size: 12px;
+  margin-top: 6px;
+  min-height: 16px;
+}
+.modal-hint {
+  font-size: 13px;
+  margin-top: 8px;
+  word-break: break-all;
+}
+
+/* Toast notifications container (top-right) */
+.toast-stack {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 200;
+  pointer-events: none;
+}
+.toast {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 10px 14px;
+  min-width: 220px;
+  max-width: min(360px, calc(100vw - 32px));
+  font-size: 13px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+  pointer-events: auto;
+  animation: toast-in 0.18s ease-out;
+  word-break: break-word;
+}
+.toast.success { border-left-color: var(--success); }
+.toast.error   { border-left-color: var(--danger); }
+.toast.info    { border-left-color: var(--accent); }
+.toast.warn    { border-left-color: var(--warn); }
+.toast.toast-out {
+  opacity: 0;
+  transform: translateX(20px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* Activity log */
+.activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.activity-item {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.activity-item.activity-success { border-left-color: var(--success); }
+.activity-item.activity-error   { border-left-color: var(--danger); }
+.activity-item.activity-info    { border-left-color: var(--accent); }
+.activity-time {
+  color: var(--text-dim);
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  flex: none;
+}
+.activity-message { flex: 1; word-break: break-word; }
+
+/* Pane header action buttons */
+.pane-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+}
+.pane-actions .icon-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.icon-btn.danger { color: var(--danger); }
 
 
 

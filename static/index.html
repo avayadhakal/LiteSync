@@ -20,6 +20,11 @@
       <div class="pane-header">
         <span>Source</span>
         <span class="pane-path" id="source-path"></span>
+        <div class="pane-actions">
+          <button class="icon-btn" data-src-action="mkdir" title="New Folder">📁+</button>
+          <button class="icon-btn" data-src-action="rename" title="Rename">✏️</button>
+          <button class="icon-btn danger" data-src-action="delete" title="Delete">🗑️</button>
+        </div>
       </div>
       <div class="pane-body" id="source-body"></div>
     </section>
@@ -44,18 +49,13 @@
   <div id="horizontal-splitter" class="splitter-h"></div>
   <div class="history">
     <div class="tabs-bar">
-      <button class="tab-btn active" id="tab-active-btn">Active Transfers</button>
-      <button class="tab-btn" id="tab-history-btn">Transfer History</button>
+      <button class="tab-btn active" id="tab-active-btn" data-tab="active">Active Operations</button>
+      <button class="tab-btn" id="tab-activity-btn" data-tab="activity">Activity Log</button>
       <span class="spacer" style="flex: 1;"></span>
-      <button class="btn-sm btn-danger hidden" id="clear-history-btn">Clear All</button>
+      <button class="btn-sm btn-danger-solid hidden" id="clear-activity-btn">Clear Log</button>
     </div>
     <div id="active-transfers-container" class="cards-container"></div>
-    <table id="history-table" class="hidden">
-      <thead>
-        <tr><th>Started</th><th>Source(s)</th><th>Destination</th><th>Status</th><th style="width: 80px; text-align: right;">Actions</th></tr>
-      </thead>
-      <tbody id="history-body"></tbody>
-    </table>
+    <div id="activity-container" class="activity-list hidden"></div>
   </div>
 
 
@@ -72,6 +72,68 @@
       </div>
     </div>
   </div>
+
+  <!-- New Folder popup (transfer-modal style) -->
+  <div class="modal-backdrop hidden" id="mkdir-modal">
+    <div class="modal">
+      <h2>New Folder</h2>
+      <div class="modal-field">
+        <label class="modal-label" for="mkdir-input">Folder name</label>
+        <input type="text" id="mkdir-input" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="e.g. Photos" />
+        <div class="modal-error hidden" id="mkdir-error"></div>
+      </div>
+      <div class="modal-hint">Location: <span id="mkdir-location" style="color: var(--text-dim);"></span></div>
+      <div class="actions">
+        <button id="mkdir-cancel">Cancel</button>
+        <button id="mkdir-ok" class="primary">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rename popup (transfer-modal style) -->
+  <div class="modal-backdrop hidden" id="rename-modal">
+    <div class="modal">
+      <h2>Rename</h2>
+      <div class="modal-field">
+        <label class="modal-label" for="rename-input">New name</label>
+        <input type="text" id="rename-input" autocomplete="off" autocapitalize="off" spellcheck="false" />
+        <div class="modal-error hidden" id="rename-error"></div>
+      </div>
+      <div class="modal-hint">Item: <span id="rename-target" style="color: var(--text-dim);"></span></div>
+      <div class="actions">
+        <button id="rename-cancel">Cancel</button>
+        <button id="rename-ok" class="primary">Rename</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Generic styled confirm popup (transfer-modal style) -->
+  <div class="modal-backdrop hidden" id="action-confirm-modal">
+    <div class="modal">
+      <h2 id="action-confirm-title">Are you sure?</h2>
+      <div class="modal-hint" id="action-confirm-message"></div>
+      <div class="actions">
+        <button id="action-confirm-cancel">Cancel</button>
+        <button id="action-confirm-ok" class="primary">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete confirmation popup (transfer-modal style) -->
+  <div class="modal-backdrop hidden" id="delete-modal">
+    <div class="modal">
+      <h2 id="delete-title">Delete selected items?</h2>
+      <ul id="delete-list" style="max-height: 140px;"></ul>
+      <div class="modal-hint" style="color: var(--danger);">This permanently removes the selected file(s)/folder(s). This cannot be undone.</div>
+      <div class="actions">
+        <button id="delete-cancel">Cancel</button>
+        <button id="delete-ok" class="primary" style="background: var(--danger); border-color: var(--danger);">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top-right toast notification stack -->
+  <div id="toast-stack" class="toast-stack"></div>
 
   <script src="/js/app.js"></script>
 </body>

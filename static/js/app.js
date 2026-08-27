@@ -4,12 +4,16 @@
     source: { path: null, entries: [] },
     dest: { path: null, entries: [] },
     selection: new Set(), // absolute paths selected in the source pane
-    historyTab: 'active', // 'active' | 'history'
+    historyTab: 'active', // 'active' | 'history' | 'activity'
     tasks: [],
     activeTaskId: null,
     finishedTaskIds: new Set(), // task ids whose completion was already handled
     historyLoaded: false,
+    activity: [], // [{ts, kind, message, source}] newest-first
   };
+
+  const ACTIVITY_STORAGE_KEY = 'litesync_activity_log';
+  const ACTIVITY_MAX_ENTRIES = 200;
 
   const el = (id) => document.getElementById(id);
 
@@ -152,25 +156,268 @@
     el('transfer-btn').disabled = !(count > 0 && state.dest.path);
   }
 
-  async function handleNewFolder() {
-    if (!state.dest.path) {
-      alert('Please select a destination folder first.');
+  // --- Toast notifications (top-right stack) ---
+
+  // kind: 'success' | 'error' | 'info' | 'warn'. Returns the element so callers
+  // can dismiss it early if needed.
+  function showToast(msg, kind = 'info', timeoutMs = 4000) {
+    const stack = el('toast-stack');
+    if (!stack) return null;
+    const t = document.createElement('div');
+    t.className = `toast ${kind}`;
+    t.textContent = msg;
+    stack.appendChild(t);
+    const dismiss = () => {
+      t.classList.add('toast-out');
+      setTimeout(() => t.remove(), 220);
+    };
+    t.addEventListener('click', dismiss);
+    if (timeoutMs > 0) setTimeout(dismiss, timeoutMs);
+    // Cap stack size to avoid unbounded growth on rapid events.
+    while (stack.children.length > 5) stack.firstChild.remove();
+    return t;
+  }
+
+  // Back-compat convenience wrapper for boolean isError callers.
+  function toastSuccess(msg) { showToast(msg, 'success'); }
+  function toastError(msg)   { showToast(msg, 'error'); }
+
+  // --- Activity log (file mutations + transfer lifecycle) ---
+
+  function loadActivity() {
+    try {
+      const raw = localStorage.getItem(ACTIVITY_STORAGE_KEY);
+      state.activity = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(state.activity)) state.activity = [];
+    } catch (_err) {
+      state.activity = [];
+    }
+  }
+
+  function saveActivity() {
+    try {
+      localStorage.setItem(ACTIVITY_STORAGE_KEY, JSON.stringify(state.activity));
+    } catch (_err) { /* quota or private mode — ignore */ }
+  }
+
+  // kind: 'mkdir' | 'rename' | 'delete' | 'transfer' | ...
+  // source: optional path(s) context
+  function logActivity(kind, message, level = 'info') {
+    state.activity.unshift({
+      ts: Date.now(),
+      kind,
+      level, // 'success' | 'error' | 'info'
+      message: String(message),
+    });
+    if (state.activity.length > ACTIVITY_MAX_ENTRIES) {
+      state.activity.length = ACTIVITY_MAX_ENTRIES;
+    }
+    saveActivity();
+    if (state.historyTab === 'activity') renderActivity();
+    // Update clear-activity button visibility regardless of current tab.
+    const clearBtn = el('clear-activity-btn');
+    if (clearBtn && state.historyTab === 'activity') {
+      clearBtn.classList.toggle('hidden', state.activity.length === 0);
+    }
+  }
+
+  function clearActivity() {
+    state.activity = [];
+    saveActivity();
+    renderActivity();
+  }
+
+  function formatActivityTime(ts) {
+    const d = new Date(ts);
+    return d.toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+  }
+
+  function renderActivity() {
+    const container = el('activity-container');
+    if (!container) return;
+    container.innerHTML = '';
+    if (state.activity.length === 0) {
+      container.innerHTML = `<div style="color: var(--text-dim); text-align: center; padding: 16px;">No activity yet</div>`;
       return;
     }
-    const folderName = prompt('Enter new folder name:');
-    if (!folderName || !folderName.trim()) return;
+    for (const entry of state.activity) {
+      const item = document.createElement('div');
+      item.className = `activity-item activity-${entry.level}`;
+      const time = document.createElement('span');
+      time.className = 'activity-time';
+      time.textContent = formatActivityTime(entry.ts);
+      const msg = document.createElement('span');
+      msg.className = 'activity-message';
+      msg.textContent = `[${entry.kind}] ${entry.message}`;
+      item.appendChild(time);
+      item.appendChild(msg);
+      container.appendChild(item);
+    }
+  }
 
+  // --- Source pane actions: New Folder / Rename / Delete ---
+  // Each uses a dedicated popup that matches the transfer-confirm modal style.
+
+  function setModalError(which, msg) {
+    const errEl = el(`${which}-error`);
+    if (errEl) {
+      errEl.textContent = msg || '';
+      errEl.classList[msg ? 'remove' : 'add']('hidden');
+    }
+  }
+
+  function openModal(which) {
+    el(`${which}-modal`).classList.remove('hidden');
+    requestAnimationFrame(() => {
+      const input = el(`${which}-input`);
+      if (input) { input.focus(); input.select(); }
+    });
+  }
+
+  function closeModal(which) {
+    el(`${which}-modal`).classList.add('hidden');
+    setModalError(which, '');
+  }
+
+  function openMkdirModal(which = 'source') {
+    if (!state[which].path) {
+      toastError(`Navigate to a folder in the ${which === 'source' ? 'Source' : 'Destination'} pane first.`);
+      return;
+    }
+    el('mkdir-modal').dataset.pane = which;
+    el('mkdir-input').value = '';
+    el('mkdir-location').textContent = state[which].path;
+    openModal('mkdir');
+  }
+
+  async function submitMkdir() {
+    const which = el('mkdir-modal').dataset.pane || 'source';
+    const name = el('mkdir-input').value.trim();
+    if (!name) {
+      setModalError('mkdir', 'Folder name is required.');
+      return;
+    }
+    if (name.includes('/') || name.includes('\\')) {
+      setModalError('mkdir', 'Name cannot contain slashes.');
+      return;
+    }
     try {
       await api('/api/mkdir', {
         method: 'POST',
-        body: JSON.stringify({
-          path: state.dest.path,
-          name: folderName.trim(),
-        }),
+        body: JSON.stringify({ path: state[which].path, name }),
       });
-      await loadPane('dest', state.dest.path);
+      closeModal('mkdir');
+      await loadPane(which, state[which].path, true);
+      toastSuccess(`Created folder: ${name}`);
+      logActivity('mkdir', `Created folder ${name} in ${state[which].path}`, 'success');
     } catch (err) {
-      alert(`Failed to create folder: ${err.message}`);
+      setModalError('mkdir', err.message);
+    }
+  }
+
+  function openRenameModal() {
+    if (state.selection.size !== 1) {
+      toastError('Select exactly one item to rename.');
+      return;
+    }
+    const selectedPath = Array.from(state.selection)[0];
+    const currentName = normalizePath(selectedPath).split('/').pop();
+    el('rename-input').value = currentName;
+    el('rename-target').textContent = selectedPath;
+    openModal('rename');
+  }
+
+  async function submitRename() {
+    const selectedPath = Array.from(state.selection)[0];
+    if (!selectedPath) { closeModal('rename'); return; }
+    const currentName = normalizePath(selectedPath).split('/').pop();
+
+    const name = el('rename-input').value.trim();
+    if (!name) {
+      setModalError('rename', 'Name is required.');
+      return;
+    }
+    if (name.includes('/') || name.includes('\\')) {
+      setModalError('rename', 'Name cannot contain slashes.');
+      return;
+    }
+    if (name === currentName) {
+      closeModal('rename');
+      return;
+    }
+    try {
+      const result = await api('/api/rename', {
+        method: 'POST',
+        body: JSON.stringify({ path: selectedPath, new_name: name }),
+      });
+      closeModal('rename');
+      state.selection.delete(selectedPath);
+      state.selection.add(result.new_path);
+      updateSelectionUI();
+      await loadPane('source', state.source.path, true);
+      toastSuccess(`Renamed to: ${name}`);
+      logActivity('rename', `Renamed ${selectedPath} → ${result.new_path}`, 'success');
+    } catch (err) {
+      setModalError('rename', err.message);
+      logActivity('rename', `Failed to rename ${selectedPath}: ${err.message}`, 'error');
+    }
+  }
+
+  function openDeleteModal() {
+    if (state.selection.size === 0) {
+      toastError('Select one or more items to delete.');
+      return;
+    }
+    const paths = Array.from(state.selection);
+    el('delete-title').textContent =
+      paths.length === 1 ? 'Delete this item?' : `Delete ${paths.length} items?`;
+    const list = el('delete-list');
+    list.innerHTML = '';
+    for (const p of paths) {
+      const li = document.createElement('li');
+      li.textContent = normalizePath(p).split('/').pop();
+      list.appendChild(li);
+    }
+    openModal('delete');
+  }
+
+  async function submitDelete() {
+    const paths = Array.from(state.selection);
+    if (paths.length === 0) { closeModal('delete'); return; }
+    closeModal('delete');
+    const failures = [];
+    for (const p of paths) {
+      try {
+        await api('/api/delete', {
+          method: 'POST',
+          body: JSON.stringify({ path: p }),
+        });
+        state.selection.delete(p);
+      } catch (err) {
+        failures.push(`${normalizePath(p).split('/').pop()}: ${err.message}`);
+      }
+    }
+    updateSelectionUI();
+    await loadPane('source', state.source.path, true);
+
+    if (failures.length === 0) {
+      toastSuccess(paths.length === 1 ? 'Deleted.' : `Deleted ${paths.length} items.`);
+      logActivity(
+        'delete',
+        paths.length === 1
+          ? `Deleted ${paths[0]}`
+          : `Deleted ${paths.length} items (${paths.map((p) => normalizePath(p).split('/').pop()).join(', ')})`,
+        'success'
+      );
+    } else {
+      toastError(`Some items could not be deleted: ${failures.join('; ')}`);
+      logActivity('delete', `Delete failures: ${failures.join('; ')}`, 'error');
     }
   }
 
@@ -203,9 +450,17 @@
     try {
       result = await api('/api/transfer', { method: 'POST', body: JSON.stringify(body) });
     } catch (err) {
-      alert(`Transfer failed to start: ${err.message}`);
+      toastError(`Transfer failed to start: ${err.message}`);
+      logActivity('transfer', `Failed to start transfer: ${err.message}`, 'error');
       return;
     }
+    const itemCount = Array.isArray(result.task_ids) ? result.task_ids.length : body.sources.length;
+    toastSuccess(`Queued ${itemCount} transfer${itemCount === 1 ? '' : 's'} → ${body.destination}`);
+    logActivity(
+      'transfer',
+      `Queued ${itemCount} transfer${itemCount === 1 ? '' : 's'} (${body.sources.map((p) => normalizePath(p).split('/').pop()).join(', ')}) → ${body.destination}${body.delete_source ? ' [delete source]' : ''}`,
+      'info'
+    );
     state.selection.clear();
     updateSelectionUI();
     setHistoryTab('active');
@@ -216,11 +471,7 @@
     await loadHistory();
   }
 
-  // --- History / log streaming ---
-
-  function statusBadge(status) {
-    return `<span class="badge ${status}">${status}</span>`;
-  }
+  // --- Transfer progress streaming ---
 
   function getPrimaryTitle(sources) {
     // Tasks are unbatched server-side (exactly one source per task).
@@ -238,15 +489,25 @@
 
   function setHistoryTab(tab) {
     state.historyTab = tab;
-    if (tab === 'active') {
-      el('tab-active-btn').classList.add('active');
-      el('tab-history-btn').classList.remove('active');
-      el('clear-history-btn').classList.add('hidden');
-    } else {
-      el('tab-history-btn').classList.add('active');
-      el('tab-active-btn').classList.remove('active');
+    const isActiveTab = tab === 'active';
+    const isActivityTab = tab === 'activity';
+
+    el('tab-active-btn').classList.toggle('active', isActiveTab);
+    el('tab-activity-btn').classList.toggle('active', isActivityTab);
+
+    const activeContainer = el('active-transfers-container');
+    const activityContainer = el('activity-container');
+
+    activeContainer.classList.toggle('hidden', !isActiveTab);
+    activityContainer.classList.toggle('hidden', !isActivityTab);
+
+    el('clear-activity-btn').classList.toggle('hidden', !isActivityTab || state.activity.length === 0);
+
+    if (isActiveTab) {
+      renderActiveTransfers();
+    } else if (isActivityTab) {
+      renderActivity();
     }
-    renderHistoryTable();
   }
 
   const TERMINAL_STATUSES = new Set(['succeeded', 'failed', 'interrupted']);
@@ -259,7 +520,7 @@
       const prevById = new Map(state.tasks.map((t) => [t.task_id, t]));
 
       state.tasks = incoming;
-      renderHistoryTable();
+      renderActiveTransfers();
 
       // Completion watcher: fast same-filesystem moves can finish before the
       // SSE stream ever attaches (task goes queued -> succeeded inside the
@@ -317,174 +578,127 @@
       pruneCompletedSelection(task);
       updateSelectionUI();
     }
-    // 2) Force-refresh both panes (cache-busted) so the transfer's effect is
+    // 2) Surface a toast + activity log entry mirroring mkdir/rename/delete.
+    const title = task ? getPrimaryTitle(task.sources) : 'Transfer';
+    const dest = task && task.destination ? task.destination : '';
+    if (status === 'succeeded') {
+      toastSuccess(`Transfer complete: ${title}${dest ? ` → ${dest}` : ''}`);
+      logActivity(
+        'transfer',
+        `Transfer succeeded: ${(task && task.sources ? [].concat(task.sources).join(', ') : title)}${dest ? ` → ${dest}` : ''}${task && task.delete_source ? ' [source deleted]' : ''}`,
+        'success'
+      );
+    } else if (status === 'failed') {
+      const reason = (task && (task.error_message || task.error)) || `exit code ${task ? task.exit_code : '?'}`;
+      toastError(`Transfer failed: ${title} — ${reason}`);
+      logActivity('transfer', `Transfer failed: ${title} — ${reason}`, 'error');
+    } else if (status === 'interrupted') {
+      showToast(`Transfer canceled: ${title}`, 'warn');
+      logActivity('transfer', `Transfer canceled: ${title}${dest ? ` → ${dest}` : ''}`, 'info');
+    }
+    // 3) Force-refresh both panes (cache-busted) so the transfer's effect is
     //    visible immediately: moved items vanish from source, appear in dest.
     await Promise.all([
       state.source.path ? loadPane('source', state.source.path, true) : Promise.resolve(),
       state.dest.path ? loadPane('dest', state.dest.path, true) : Promise.resolve(),
     ]);
-    // 3) Re-render history — drops the completed card.
+    // 4) Re-render history — drops the completed card.
     await loadHistory();
   }
 
-  function renderHistoryTable() {
-    const isHistoryTab = state.historyTab === 'history';
+  function renderActiveTransfers() {
+    if (state.historyTab !== 'active') return;
     const activeContainer = el('active-transfers-container');
-    const historyTable = el('history-table');
 
-    if (isHistoryTab) {
-      activeContainer.classList.add('hidden');
-      historyTable.classList.remove('hidden');
+    // Filter active/queued tasks strictly, then order by priority:
+    // running (actively copying) cards first, queued cards after.
+    // FIFO (created_at ascending) as the tie-breaker within each block.
+    const statusRank = (task) => (task.status === 'running' ? 0 : 1);
+    const activeTasks = state.tasks
+      .filter((task) => task.status === 'queued' || task.status === 'running')
+      .sort((a, b) => {
+        const rankDiff = statusRank(a) - statusRank(b);
+        if (rankDiff !== 0) return rankDiff;
+        return new Date(a.created_at) - new Date(b.created_at);
+      });
 
-      // Filter completed/historical tasks strictly
-      const historyTasks = state.tasks.filter(
-        (task) => task.status === 'succeeded' || task.status === 'failed' || task.status === 'interrupted'
-      );
-
-      if (historyTasks.length > 0) {
-        el('clear-history-btn').classList.remove('hidden');
-      } else {
-        el('clear-history-btn').classList.add('hidden');
+    // Clean up streams for tasks that are no longer active
+    const activeTaskIds = new Set(activeTasks.map((t) => t.task_id));
+    for (const [id, streamObj] of activeStreams.entries()) {
+      if (!activeTaskIds.has(id)) {
+        streamObj.source.close();
+        activeStreams.delete(id);
       }
+    }
 
-      const body = el('history-body');
-      body.innerHTML = '';
+    activeContainer.innerHTML = '';
 
-      if (historyTasks.length === 0) {
-        const emptyRow = document.createElement('tr');
-        emptyRow.innerHTML = `<td colspan="5" style="color: var(--text-dim); text-align: center; padding: 12px;">No historical transfers</td>`;
-        body.appendChild(emptyRow);
-        return;
-      }
+    if (activeTasks.length === 0) {
+      activeContainer.innerHTML = `<div style="color: var(--text-dim); text-align: center; padding: 16px;">No active operations</div>`;
+      return;
+    }
 
-      for (const task of historyTasks) {
-        const row = document.createElement('tr');
-        row.className = 'task-row';
-        const sourcesText = escapeHtml(
-          Array.isArray(task.sources) ? task.sources.join(', ') : task.sources
-        );
-        const timeStr = task.started_at
-          ? new Date(task.started_at).toLocaleString()
-          : task.created_at
-          ? new Date(task.created_at).toLocaleString()
-          : '-';
+    for (const task of activeTasks) {
+      const card = document.createElement('div');
+      card.className = 'transfer-card';
+      card.id = `card-${task.task_id}`;
 
-        row.innerHTML = `
-          <td>${timeStr}</td>
-          <td title="${sourcesText}">${sourcesText}</td>
-          <td>${escapeHtml(task.destination)}</td>
-          <td>${statusBadge(task.status)}</td>
-          <td style="text-align: right;">
-            <button class="icon-btn danger delete-btn" title="Delete record" data-id="${task.task_id}">🗑️</button>
-          </td>
-        `;
+      const primaryTitle = getPrimaryTitle(task.sources);
+      const sourcesText = Array.isArray(task.sources) ? task.sources.join(', ') : task.sources;
+      const streamData = activeStreams.get(task.task_id);
+      const currentPct = streamData ? streamData.pct : 0;
+      const currentDetail = streamData && streamData.currentFile
+        ? `Copying: ${streamData.currentFile} - ${currentPct}%`
+        : (task.status === 'queued' ? 'Queued...' : 'Starting transfer...');
 
-        const deleteBtn = row.querySelector('.delete-btn');
-        if (deleteBtn) {
-          deleteBtn.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            try {
-              await api(`/api/tasks/${task.task_id}`, { method: 'DELETE' });
-              await loadHistory();
-            } catch (err) {
-              alert(`Failed to delete task: ${err.message}`);
-            }
-          });
-        }
+      card.innerHTML = `
+        <div class="card-top">
+          <span class="card-title" title="${escapeHtml(primaryTitle)}">${escapeHtml(primaryTitle)}</span>
+          <button class="btn-sm btn-danger cancel-btn" data-id="${task.task_id}">Cancel</button>
+        </div>
+        <div class="card-path truncate" title="${escapeHtml(sourcesText)} ➔ ${escapeHtml(task.destination)}">
+          ${escapeHtml(sourcesText)} ➔ ${escapeHtml(task.destination)}
+        </div>
+        <div class="bg-gray-800 rounded h-5 relative flex items-center justify-center overflow-hidden" style="position: relative;">
+          <div class="bg-blue-600 rounded absolute inset-0" id="progress-fill-${task.task_id}" style="width: ${currentPct}%; transition: width 0.2s ease;"></div>
+          <span class="absolute inset-0 flex items-center justify-center font-semibold text-xs text-white drop-shadow z-10 pointer-events-none" id="progress-text-${task.task_id}">
+            ${currentPct}%
+          </span>
+        </div>
+        <div class="card-details truncate" id="progress-detail-${task.task_id}">
+          ${escapeHtml(currentDetail)}
+        </div>
+      `;
 
-        body.appendChild(row);
-      }
-    } else {
-      // Active transfers tab
-      historyTable.classList.add('hidden');
-      activeContainer.classList.remove('hidden');
-      el('clear-history-btn').classList.add('hidden');
-
-      // Filter active/queued tasks strictly, then order by priority:
-      // running (actively copying) cards first, queued cards after.
-      // FIFO (created_at ascending) as the tie-breaker within each block.
-      const statusRank = (task) => (task.status === 'running' ? 0 : 1);
-      const activeTasks = state.tasks
-        .filter((task) => task.status === 'queued' || task.status === 'running')
-        .sort((a, b) => {
-          const rankDiff = statusRank(a) - statusRank(b);
-          if (rankDiff !== 0) return rankDiff;
-          return new Date(a.created_at) - new Date(b.created_at);
+      const cancelBtn = card.querySelector('.cancel-btn');
+      if (cancelBtn) {
+        cancelBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const title = getPrimaryTitle(task.sources);
+          const ok = await confirmStyled(
+            `Cancel transfer: ${title}?`,
+            'Incomplete files in the destination will be deleted.',
+            'Cancel Transfer',
+            true
+          );
+          if (!ok) return;
+          if (activeStreams.has(task.task_id)) {
+            activeStreams.get(task.task_id).source.close();
+            activeStreams.delete(task.task_id);
+          }
+          try {
+            await api(`/api/tasks/${task.task_id}/cancel`, { method: 'POST' });
+            await onTaskFinished('interrupted', task);
+          } catch (err) {
+            toastError(`Failed to cancel task: ${err.message}`);
+          }
         });
-
-      // Clean up streams for tasks that are no longer active
-      const activeTaskIds = new Set(activeTasks.map((t) => t.task_id));
-      for (const [id, streamObj] of activeStreams.entries()) {
-        if (!activeTaskIds.has(id)) {
-          streamObj.source.close();
-          activeStreams.delete(id);
-        }
       }
 
-      activeContainer.innerHTML = '';
+      activeContainer.appendChild(card);
 
-      if (activeTasks.length === 0) {
-        activeContainer.innerHTML = `<div style="color: var(--text-dim); text-align: center; padding: 16px;">No active transfers</div>`;
-        return;
-      }
-
-      for (const task of activeTasks) {
-        const card = document.createElement('div');
-        card.className = 'transfer-card';
-        card.id = `card-${task.task_id}`;
-
-        const primaryTitle = getPrimaryTitle(task.sources);
-        const sourcesText = Array.isArray(task.sources) ? task.sources.join(', ') : task.sources;
-        const streamData = activeStreams.get(task.task_id);
-        const currentPct = streamData ? streamData.pct : 0;
-        const currentDetail = streamData && streamData.currentFile
-          ? `Copying: ${streamData.currentFile} - ${currentPct}%`
-          : (task.status === 'queued' ? 'Queued...' : 'Starting transfer...');
-
-        card.innerHTML = `
-          <div class="card-top">
-            <span class="card-title" title="${escapeHtml(primaryTitle)}">${escapeHtml(primaryTitle)}</span>
-            <button class="btn-sm btn-danger cancel-btn" data-id="${task.task_id}">Cancel</button>
-          </div>
-          <div class="card-path truncate" title="${escapeHtml(sourcesText)} ➔ ${escapeHtml(task.destination)}">
-            ${escapeHtml(sourcesText)} ➔ ${escapeHtml(task.destination)}
-          </div>
-          <div class="bg-gray-800 rounded h-5 relative flex items-center justify-center overflow-hidden" style="position: relative;">
-            <div class="bg-blue-600 rounded absolute inset-0" id="progress-fill-${task.task_id}" style="width: ${currentPct}%; transition: width 0.2s ease;"></div>
-            <span class="absolute inset-0 flex items-center justify-center font-semibold text-xs text-white drop-shadow z-10 pointer-events-none" id="progress-text-${task.task_id}">
-              ${currentPct}%
-            </span>
-          </div>
-          <div class="card-details truncate" id="progress-detail-${task.task_id}">
-            ${escapeHtml(currentDetail)}
-          </div>
-        `;
-
-        const cancelBtn = card.querySelector('.cancel-btn');
-        if (cancelBtn) {
-          cancelBtn.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            if (!confirm('Are you sure you want to cancel this transfer? Incomplete files will be deleted.')) {
-              return;
-            }
-            if (activeStreams.has(task.task_id)) {
-              activeStreams.get(task.task_id).source.close();
-              activeStreams.delete(task.task_id);
-            }
-            try {
-              await api(`/api/tasks/${task.task_id}/cancel`, { method: 'POST' });
-              await onTaskFinished('interrupted', task);
-            } catch (err) {
-              alert(`Failed to cancel task: ${err.message}`);
-            }
-          });
-        }
-
-        activeContainer.appendChild(card);
-
-        // Attach SSE stream if running/queued
-        attachTaskStream(task);
-      }
+      // Attach SSE stream if running/queued
+      attachTaskStream(task);
     }
   }
 
@@ -568,14 +782,32 @@
     };
   }
 
-  async function handleClearAllHistory() {
-    if (!confirm('Are you sure you want to delete all transfer history?')) return;
-    try {
-      await api('/api/tasks', { method: 'DELETE' });
-      await loadHistory();
-    } catch (err) {
-      alert(`Failed to clear history: ${err.message}`);
-    }
+  // Reusable styled confirm modal (matches transfer-confirm look).
+  function confirmStyled(title, message, okLabel = 'Confirm', isDanger = false) {
+    return new Promise((resolve) => {
+      const modal = el('action-confirm-modal');
+      el('action-confirm-title').textContent = title;
+      el('action-confirm-message').textContent = message || '';
+      const okBtn = el('action-confirm-ok');
+      okBtn.textContent = okLabel;
+      okBtn.style.background = isDanger ? 'var(--danger)' : '';
+      okBtn.style.borderColor = isDanger ? 'var(--danger)' : '';
+      modal.classList.remove('hidden');
+      const ok = el('action-confirm-ok');
+      const cancel = el('action-confirm-cancel');
+      const cleanup = () => {
+        ok.removeEventListener('click', onOk);
+        cancel.removeEventListener('click', onCancel);
+        modal.removeEventListener('click', onBackdrop);
+        modal.classList.add('hidden');
+      };
+      const onOk = () => { cleanup(); resolve(true); };
+      const onCancel = () => { cleanup(); resolve(false); };
+      const onBackdrop = (e) => { if (e.target === modal) onCancel(); };
+      ok.addEventListener('click', onOk);
+      cancel.addEventListener('click', onCancel);
+      modal.addEventListener('click', onBackdrop);
+    });
   }
 
   // --- Resizable splitters (CSS variable architecture) ---
@@ -631,10 +863,42 @@
       window.location.href = '/login.html';
     });
 
-    el('new-folder-btn').addEventListener('click', handleNewFolder);
+    el('new-folder-btn').addEventListener('click', () => openMkdirModal('dest'));
+
+    // Source-pane toolbar: New Folder / Rename / Delete
+    document.querySelectorAll('[data-src-action]').forEach((btn) => {
+      const action = btn.getAttribute('data-src-action');
+      btn.addEventListener('click', () => {
+        if (action === 'mkdir') openMkdirModal('source');
+        else if (action === 'rename') openRenameModal();
+        else if (action === 'delete') openDeleteModal();
+      });
+    });
+
+    // Source-pane modal wiring
+    el('mkdir-cancel').addEventListener('click', () => closeModal('mkdir'));
+    el('mkdir-ok').addEventListener('click', submitMkdir);
+    el('mkdir-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') submitMkdir();
+      else if (e.key === 'Escape') closeModal('mkdir');
+    });
+
+    el('rename-cancel').addEventListener('click', () => closeModal('rename'));
+    el('rename-ok').addEventListener('click', submitRename);
+    el('rename-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') submitRename();
+      else if (e.key === 'Escape') closeModal('rename');
+    });
+
+    el('delete-cancel').addEventListener('click', () => closeModal('delete'));
+    el('delete-ok').addEventListener('click', submitDelete);
     el('tab-active-btn').addEventListener('click', () => setHistoryTab('active'));
-    el('tab-history-btn').addEventListener('click', () => setHistoryTab('history'));
-    el('clear-history-btn').addEventListener('click', handleClearAllHistory);
+    el('tab-activity-btn').addEventListener('click', () => setHistoryTab('activity'));
+    el('clear-activity-btn').addEventListener('click', () => {
+      if (state.activity.length === 0) return;
+      clearActivity();
+      toastSuccess('Activity log cleared.');
+    });
 
     initResizers();
 
@@ -642,12 +906,15 @@
     el('confirm-cancel').addEventListener('click', closeConfirmModal);
     el('confirm-ok').addEventListener('click', submitTransfer);
 
+    loadActivity();
+
     const roots = await api('/api/roots');
     state.roots = roots.roots;
 
     await loadPane('source', null);
     await loadPane('dest', null);
     await loadHistory();
+    renderActivity(); // pre-render so switching to the tab is instant
   }
 
   init().catch((err) => console.error(err));

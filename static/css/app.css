@@ -127,17 +127,26 @@ input[type="text"], input[type="password"] {
   .history { height: var(--bottom-height, 200px); flex: none; }
 }
 
+/* Pane header — single-row grid: Label | Path (flexible) | Actions */
 .pane-header {
   height: 40px;
   flex: none;
-  padding: 0 16px;
+  padding: 8px 16px;
   border-bottom: 1px solid var(--border);
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr auto; /* Label | Path (flexible) | Actions */
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   font-size: 12px;
   color: var(--text-dim);
   white-space: nowrap;
+}
+
+.pane-header .pane-label {
+  grid-column: 1;
+  grid-row: 1;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 .pane-header .icon-btn {
@@ -145,42 +154,48 @@ input[type="text"], input[type="password"] {
   line-height: 1;
 }
 
-.pane-path {
-  flex: 1;
-  overflow-x: auto;
-  white-space: nowrap;
-  color: var(--text);
-  font-family: ui-monospace, monospace;
+.pane-header .pane-actions {
+  grid-column: 3;
+  grid-row: 1;
 }
 
-/* Mobile: pane header wraps so "Source" + path sit on the first row and the
-   action buttons stack below — prevents the overlap that used to happen because
-   everything was forced onto one line with nowrap. */
+.pane-path {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+  color: var(--text);
+  font-family: ui-monospace, monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis; /* Keeps long paths from pushing UI out of bounds */
+}
+
+/* Mobile: stacked layout — label + actions on row 1, full-width path below */
 @media (max-width: 768px) {
   .pane-header {
+    /* Row 1: Label and Actions | Row 2: Full-width Path */
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto;
+    gap: 4px 8px;
     height: auto;
     min-height: 40px;
-    flex-wrap: wrap;
     padding: 6px 12px;
-    white-space: normal;
-    row-gap: 4px;
-    column-gap: 8px;
   }
-  .pane-header > span:first-child {
-    flex: none;
-    order: 1;
+
+  .pane-label {
+    grid-column: 1;
+    grid-row: 1;
   }
-  .pane-header .pane-path {
-    flex: 1;
-    min-width: 0;
-    order: 2;
-    font-size: 11px;
+
+  .pane-actions {
+    grid-column: 2;
+    grid-row: 1;
   }
-  .pane-header .pane-actions {
-    flex: 1 1 100%;
-    order: 3;           /* drops to second row */
-    justify-content: flex-start;
-    margin-top: 4px;
+
+  .pane-path {
+    grid-column: 1 / span 2; /* Span both columns on the bottom row */
+    grid-row: 2;
+    font-size: 0.9em; /* Slightly smaller on mobile */
   }
 }
 
@@ -310,17 +325,22 @@ tr.task-row:hover { background: var(--panel-alt); }
   border-color: #c23a3a;
 }
 .icon-btn {
-  background: none;
+  background: transparent;
   border: none;
-  padding: 2px 4px;
+  padding: 4px 6px; /* Comfortable touch target */
+  border-radius: 4px;
   cursor: pointer;
   color: var(--text-dim);
   font-size: 13px;
-  border-radius: 4px;
+  line-height: 1;
+  transition: background 0.15s, color 0.15s;
 }
 .icon-btn:hover {
   color: var(--text);
-  background: var(--panel-alt);
+  background: var(--panel-alt); /* Subtle hover state */
+}
+.icon-btn:active {
+  background: var(--border);
 }
 .icon-btn.danger:hover {
   color: var(--danger);
@@ -498,7 +518,7 @@ tr.task-row:hover { background: var(--panel-alt); }
 .pane-actions {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
   flex: none;
 }
 .pane-actions .icon-btn:disabled {

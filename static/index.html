@@ -44,9 +44,20 @@
   </div>
 
   <div class="controls">
-    <label><input type="checkbox" id="delete-checkbox" /> Delete source files after successful copy</label>
     <span class="spacer"></span>
-    <span id="selection-count" style="color: var(--text-dim);"></span>
+    <div class="selection-inline hidden" id="selection-inline">
+      <span id="selection-inline-count" class="selection-inline-count hidden"></span>
+      <button id="selection-view-btn" class="btn-sm selection-view-btn hidden" title="View selected items">View</button>
+      <button id="selection-clear-btn" class="btn-sm btn-ghost-danger hidden">Clear</button>
+
+      <div id="selection-preview" class="selection-preview hidden" role="dialog" aria-label="Selected items">
+        <div class="selection-preview-header">
+          <span id="selection-preview-count" class="selection-preview-count"></span>
+          <button id="selection-preview-close" class="selection-preview-close" aria-label="Close">&times;</button>
+        </div>
+        <ul id="selection-preview-list" class="selection-preview-list"></ul>
+      </div>
+    </div>
     <button id="transfer-btn" class="primary" disabled>Transfer</button>
   </div>
 
@@ -70,6 +81,7 @@
       <h2>Are you sure you want to transfer the selected items?</h2>
       <ul id="confirm-list"></ul>
       <div>Destination: <span id="confirm-dest" style="color: var(--text-dim);"></span></div>
+      <label class="modal-checkbox"><input type="checkbox" id="delete-checkbox" /> Delete source files after successful copy</label>
       <div class="actions">
         <button id="confirm-cancel">Cancel</button>
         <button id="confirm-ok" class="primary">Transfer</button>

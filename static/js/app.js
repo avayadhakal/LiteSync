@@ -60,7 +60,6 @@
 
   async function loadPane(which, path, forceRefresh = false) {
     const pane = state[which];
-    const navigated = pane.path !== path;
     if (path === null) {
       pane.path = null;
       pane.entries = state.roots.map((r) => ({ name: r, path: r, is_dir: true, size: 0 }));
@@ -88,12 +87,9 @@
         throw err;
       }
     }
-    const sel = paneSelection(which);
-    if (navigated) {
-      // Selection resets on navigation only; a same-path refresh (e.g. after
-      // a transfer completes) preserves selections that are still valid.
-      sel.clear();
-    }
+    // Selections persist across navigation: the Set is keyed by absolute path,
+    // so navigating away and back re-checks entries that are still selected.
+    // Mutations (rename/delete/transfer-finish) prune stale paths explicitly.
     renderPane(which);
     updateSelectionUI();
   }
@@ -129,6 +125,11 @@
       const cb = document.createElement('input');
       cb.type = 'checkbox';
       cb.checked = sel.has(entry.path);
+      // Directory tri-state: fully checked when the dir itself is selected,
+      // indeterminate when only some descendant path is selected.
+      if (entry.is_dir && !cb.checked) {
+        cb.indeterminate = hasSelectedDescendant(entry.path, sel);
+      }
       cb.addEventListener('click', (e) => {
         e.stopPropagation();
         if (cb.checked) sel.add(entry.path);
@@ -160,11 +161,84 @@
     }
   }
 
+  function selectionSummary(selSet) {
+    return Array.from(selSet).map((p) => normalizePath(p).split('/').pop() || p);
+  }
+
+  // True when any selected path is a descendant of dirPath (but not dirPath itself).
+  function hasSelectedDescendant(dirPath, selSet) {
+    const prefix = normalizePath(dirPath) + '/';
+    for (const p of selSet) {
+      if (typeof p === 'string' && p.startsWith(prefix)) return true;
+    }
+    return false;
+  }
+
   function updateSelectionUI() {
     // Only the source pane drives the Transfer button; show its count.
     const count = state.selection.size;
-    el('selection-count').textContent = count > 0 ? `${count} selected` : '';
     el('transfer-btn').disabled = !(count > 0 && state.dest.path);
+
+    // Inline selection summary in the .controls footer. Hiding the whole badge
+    // wrapper (not just its children) prevents an empty-pill artifact at 0 selected
+    // and collapses the nested popover's anchor automatically.
+    const countEl = el('selection-inline-count');
+    const viewBtn = el('selection-view-btn');
+    const clearBtn = el('selection-clear-btn');
+    const inlineGroup = el('selection-inline');
+    const hasSel = count > 0;
+    if (countEl) {
+      countEl.textContent = hasSel ? `${count} selected` : '';
+      countEl.classList.toggle('hidden', !hasSel);
+    }
+    if (viewBtn) viewBtn.classList.toggle('hidden', !hasSel);
+    if (clearBtn) clearBtn.classList.toggle('hidden', !hasSel);
+    if (inlineGroup) inlineGroup.classList.toggle('hidden', !hasSel);
+
+    // Refresh the preview popover contents if it's open.
+    const preview = el('selection-preview');
+    if (preview && !preview.classList.contains('hidden')) {
+      renderSelectionPreview();
+    }
+  }
+
+  function renderSelectionPreview() {
+    const list = el('selection-preview-list');
+    const countEl = el('selection-preview-count');
+    if (!list || !countEl) return;
+    // Full paths (normalized) so identically-named items from different
+    // locations are distinguishable; basename fallback guards odd inputs.
+    const paths = Array.from(state.selection).map((p) => {
+      const norm = normalizePath(p);
+      return typeof norm === 'string' && norm ? norm : String(p);
+    });
+    countEl.textContent = `${paths.length} selected`;
+    list.innerHTML = '';
+    for (const path of paths) {
+      const li = document.createElement('li');
+      li.textContent = path;
+      li.title = path; // full path on hover when the row is ellipsized
+      list.appendChild(li);
+    }
+  }
+
+  function openSelectionPreview() {
+    const preview = el('selection-preview');
+    if (!preview) return;
+    renderSelectionPreview();
+    preview.classList.remove('hidden');
+  }
+
+  function closeSelectionPreview() {
+    const preview = el('selection-preview');
+    if (preview) preview.classList.add('hidden');
+  }
+
+  function toggleSelectionPreview() {
+    const preview = el('selection-preview');
+    if (!preview) return;
+    if (preview.classList.contains('hidden')) openSelectionPreview();
+    else closeSelectionPreview();
   }
 
   // --- Toast notifications (top-right stack) ---
@@ -454,6 +528,8 @@
       list.appendChild(li);
     }
     el('confirm-dest').textContent = state.dest.path;
+    // The delete-source toggle lives in this modal; unchecked is its default.
+    el('delete-checkbox').checked = false;
     el('confirm-modal').classList.remove('hidden');
   }
 
@@ -483,8 +559,13 @@
       `Queued ${itemCount} transfer${itemCount === 1 ? '' : 's'} (${body.sources.map((p) => normalizePath(p).split('/').pop()).join(', ')}) → ${body.destination}${body.delete_source ? ' [delete source]' : ''}`,
       'info'
     );
+    // Reset the form to defaults after a successful queue (matches the
+    // selection Clear button flow): empty the selection, redraw the source
+    // pane so checkbox ticks clear, and restore the delete-source toggle.
     state.selection.clear();
+    el('delete-checkbox').checked = false;
     updateSelectionUI();
+    renderPane('source');
     setHistoryTab('active');
     // Auto-refresh destination pane on start
     if (state.dest.path) {
@@ -925,6 +1006,38 @@
     el('transfer-btn').addEventListener('click', openConfirmModal);
     el('confirm-cancel').addEventListener('click', closeConfirmModal);
     el('confirm-ok').addEventListener('click', submitTransfer);
+
+    // Inline Clear button: wipe the source selection and refresh checks.
+    el('selection-clear-btn').addEventListener('click', () => {
+      if (state.selection.size === 0) return;
+      state.selection.clear();
+      closeSelectionPreview();
+      updateSelectionUI();
+      renderPane('source');
+      toastSuccess('Selection cleared.');
+    });
+
+    // View button: toggle the selected-items preview popover.
+    el('selection-view-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleSelectionPreview();
+    });
+    el('selection-preview-close').addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeSelectionPreview();
+    });
+    // Click-outside closes the preview.
+    document.addEventListener('click', (e) => {
+      const preview = el('selection-preview');
+      if (!preview || preview.classList.contains('hidden')) return;
+      if (preview.contains(e.target)) return;
+      if (e.target === el('selection-view-btn')) return;
+      closeSelectionPreview();
+    });
+    // Esc closes the preview.
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeSelectionPreview();
+    });
 
     loadActivity();
 

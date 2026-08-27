@@ -212,9 +212,167 @@ input[type="text"], input[type="password"] {
 .entry:hover { background: var(--panel-alt); }
 .entry .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .entry .size { color: var(--text-dim); font-size: 12px; }
+
+/* Checkbox tri-state visuals: unchecked | partially selected (indeterminate) | fully selected.
+   Custom-rendered so the indeterminate state shows a white dash inside the standard
+   blue-accented box instead of the browser's jarring yellow warning style. */
+.entry input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  cursor: pointer;
+  flex: none;
+  position: relative;
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  transition: background 0.12s, border-color 0.12s;
+}
+.entry input[type="checkbox"]:hover { border-color: var(--accent); }
+.entry input[type="checkbox"]:checked,
+.entry input[type="checkbox"]:indeterminate {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+/* White dash for the partially-selected (indeterminate) state. */
+.entry input[type="checkbox"]:indeterminate::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  top: 50%;
+  height: 2px;
+  margin-top: -1px;
+  border-radius: 1px;
+  background: #fff;
+}
+/* White check mark for the fully-selected state. */
+.entry input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 5px;
+  height: 9px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+/* Row tint helps users spot folders whose descendants contain selections. */
+.entry.dir:has(input[type="checkbox"]:indeterminate) {
+  background: rgba(79, 140, 255, 0.04);
+}
+.entry.dir:has(input[type="checkbox"]:checked) {
+  background: rgba(79, 140, 255, 0.08);
+}
+.entry.dir:has(input[type="checkbox"]:indeterminate):hover,
+.entry.dir:has(input[type="checkbox"]:checked):hover {
+  background: var(--panel-alt);
+}
 .entry.dir .name::before { content: "📁 "; }
 .entry:not(.dir) .name::before { content: "📄 "; }
 .entry.parent .name::before { content: "⬆️ "; }
+
+/* Selection badge — right-aligned control cluster inside the .controls footer.
+   Doubles as the positioning context for the selected-items popover. */
+.selection-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  min-width: 0;
+  position: relative;
+  isolation: isolate;  /* popover z-index resolves locally, not against the page */
+  background: var(--panel-alt);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px; /* match the app's standard control radius */
+  padding: 3px 8px;
+}
+.selection-inline-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
+/* Ghost buttons — transparent until hovered, to reduce visual noise. */
+.selection-view-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-dim);
+}
+.selection-view-btn:hover {
+  color: var(--accent);
+  border-color: var(--border);
+}
+.btn-ghost-danger {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-dim);
+}
+.btn-ghost-danger:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+/* Selected-items preview popover — floats directly above the selection badge. */
+.selection-preview {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  right: 0;             /* right edge flush with the badge's right edge */
+  z-index: 150;
+  width: min(480px, calc(100vw - 32px));
+  max-height: 60vh;
+  background: var(--panel-alt);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.selection-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  flex: none;
+}
+.selection-preview-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+.selection-preview-close {
+  background: transparent;
+  border: none;
+  padding: 0 4px;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.selection-preview-close:hover { color: var(--text); }
+.selection-preview-list {
+  list-style: none;
+  margin: 0;
+  padding: 6px 12px;
+  overflow-y: auto;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.selection-preview-list li {
+  padding: 6px 0;
+  line-height: 1.4;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  hyphens: auto; /* insert soft hyphens so long words wrap cleanly instead of truncating */
+  text-align: left;
+}
 
 .controls {
   display: flex;
@@ -224,8 +382,38 @@ input[type="text"], input[type="password"] {
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
 }
-.controls label { display: flex; align-items: center; gap: 6px; color: var(--text-dim); }
 .controls .spacer { flex: 1; }
+
+@media (max-width: 768px) {
+  .controls {
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    padding: 8px 12px;
+  }
+  .controls .spacer { display: none; }
+  /* Row 2: badge on the left, Transfer pinned to the right. */
+  .selection-inline { margin-right: auto; }
+  .selection-inline-count { font-size: 11px; }
+  #transfer-btn { margin-left: auto; flex: none; }
+
+  /* Mobile popover: viewport-fixed bottom sheet — can never be clipped by the
+     action-bar wrap or the badge's containing block. Clears the history panel.
+     isolation: auto on the wrapper lets the fixed popover's z-index compete at
+     the root level so it paints opaquely above the action bar. */
+  .selection-inline { isolation: auto; }
+  .selection-preview {
+    position: fixed;
+    left: 16px;
+    right: 16px;
+    bottom: calc(var(--bottom-height, 280px) + 12px);
+    width: auto;
+    max-width: calc(100vw - 32px);
+    max-height: 50vh;
+    z-index: 1000;
+    background: var(--panel-alt); /* explicitly opaque */
+    opacity: 1;
+  }
+}
 
 .history {
   padding: 12px 16px;
@@ -264,6 +452,15 @@ tr.task-row:hover { background: var(--panel-alt); }
 .modal h2 { margin-top: 0; font-size: 15px; }
 .modal ul { max-height: 140px; overflow-y: auto; font-size: 13px; color: var(--text-dim); }
 .modal .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.modal-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-dim);
+  font-size: 12px;
+  margin-top: 12px;
+  /* no bottom margin — .actions' margin-top already provides the gap to the buttons */
+}
 
 .log-view {
   background: #000;

@@ -124,7 +124,7 @@ input[type="text"], input[type="password"] {
   #source-pane { height: var(--top-height, 50%); flex: none; }
   #dest-pane { flex: 1 1 0; min-height: 0; }
   .splitter-v { width: auto; height: 6px; cursor: row-resize; }
-  .history { height: var(--bottom-height, 280px); flex: none; min-height: 220px; }
+  .history { height: var(--bottom-height, 280px); flex: none; min-height: 0; }
 }
 
 /* Pane header — single-row grid: Label | Path (flexible) | Actions */
@@ -231,7 +231,7 @@ input[type="text"], input[type="password"] {
   padding: 12px 16px;
   display: flex;
   flex-direction: column;
-  min-height: 280px;
+  min-height: 0;
   overflow: hidden; /* inner list containers scroll instead */
 }
 .history h2 { font-size: 13px; color: var(--text-dim); margin: 0 0 8px; text-transform: uppercase; letter-spacing: 0.04em; }

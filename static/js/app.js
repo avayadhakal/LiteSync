@@ -859,18 +859,17 @@
       if (getComputedStyle(panesEl).flexDirection === 'column') {
         const rect = panesEl.getBoundingClientRect();
         const pct = ((e.clientY - rect.top) / rect.height) * 100;
-        root.style.setProperty('--top-height', `${Math.min(80, Math.max(20, pct))}%`);
+        root.style.setProperty('--top-height', `${pct}%`);
       } else {
         const pct = (e.clientX / window.innerWidth) * 100;
-        root.style.setProperty('--left-width', `${Math.min(80, Math.max(20, pct))}%`);
+        root.style.setProperty('--left-width', `${pct}%`);
       }
     });
 
     const historyEl = document.querySelector('.history');
     drag(el('horizontal-splitter'), (e) => {
       const height = historyEl.getBoundingClientRect().bottom - e.clientY;
-      const max = window.innerHeight * 0.7;
-      root.style.setProperty('--bottom-height', `${Math.min(max, Math.max(120, height))}px`);
+      root.style.setProperty('--bottom-height', `${height}px`);
     });
   }
 

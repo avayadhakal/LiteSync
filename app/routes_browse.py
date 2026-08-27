@@ -47,6 +47,20 @@ async def browse(path: str, _user: str = Depends(get_current_user)):
     }
 
 
+from fastapi.responses import FileResponse
+
+@router.get("/download")
+async def download_file(path: str, _user: str = Depends(get_current_user)):
+    settings = get_settings()
+    resolved = resolve_safe_path(path, settings.allowed_roots)
+    if not resolved.exists():
+        raise HTTPException(status_code=404, detail="Path does not exist")
+    if not resolved.is_file():
+        raise HTTPException(status_code=400, detail="Path is not a file")
+    
+    return FileResponse(resolved)
+
+
 @router.post("/mkdir")
 async def create_folder(body: MkdirRequest, _user: str = Depends(get_current_user)):
     settings = get_settings()

@@ -213,6 +213,23 @@ input[type="text"], input[type="password"] {
 .entry .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .entry .size { color: var(--text-dim); font-size: 12px; }
 
+.btn-copy-path {
+  opacity: 0.6;
+  font-size: 14px;
+}
+.btn-copy-path:hover {
+  opacity: 1;
+}
+@media (hover: hover) {
+  .entry .btn-copy-path {
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .entry:hover .btn-copy-path {
+    opacity: 1;
+  }
+}
+
 /* Checkbox tri-state visuals: unchecked | partially selected (indeterminate) | fully selected.
    Custom-rendered so the indeterminate state shows a white dash inside the standard
    blue-accented box instead of the browser's jarring yellow warning style. */

@@ -148,11 +148,49 @@
         size.className = 'size';
         size.textContent = formatSize(entry.size);
         row.appendChild(size);
+
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'icon-btn btn-copy-path';
+        copyBtn.innerHTML = '📋';
+        copyBtn.title = 'Copy download link';
+        copyBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          try {
+            const url = `${window.location.origin}/api/download?path=${encodeURIComponent(entry.path)}`;
+            await navigator.clipboard.writeText(url);
+            copyBtn.innerHTML = '✓';
+            copyBtn.style.color = 'var(--success)';
+            toastSuccess('Link copied to clipboard');
+            setTimeout(() => {
+              copyBtn.innerHTML = '📋';
+              copyBtn.style.color = '';
+            }, 1500);
+          } catch (err) {
+            toastError('Failed to copy link');
+          }
+        });
+        row.appendChild(copyBtn);
+      }
+
+      row.title = entry.path;
+
+      if (window.matchMedia('(hover: none)').matches) {
+        let touchTimer = null;
+        row.addEventListener('touchstart', (e) => {
+          if (e.target.tagName === 'INPUT' || e.target.closest('.btn-copy-path')) return;
+          touchTimer = setTimeout(() => {
+            showToast(entry.path, 'info');
+          }, 500);
+        }, { passive: true });
+        const clearTouch = () => { if (touchTimer) clearTimeout(touchTimer); };
+        row.addEventListener('touchend', clearTouch, { passive: true });
+        row.addEventListener('touchmove', clearTouch, { passive: true });
+        row.addEventListener('touchcancel', clearTouch, { passive: true });
       }
 
       if (entry.is_dir) {
         row.addEventListener('click', (e) => {
-          if (e.target.tagName === 'INPUT') return;
+          if (e.target.tagName === 'INPUT' || e.target.closest('.btn-copy-path')) return;
           loadPane(which, entry.path);
         });
       }

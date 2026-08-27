@@ -124,7 +124,7 @@ input[type="text"], input[type="password"] {
   #source-pane { height: var(--top-height, 50%); flex: none; }
   #dest-pane { flex: 1 1 0; min-height: 0; }
   .splitter-v { width: auto; height: 6px; cursor: row-resize; }
-  .history { height: var(--bottom-height, 280px); flex: none; min-height: 240px; }
+  .history { height: var(--bottom-height, 280px); flex: none; min-height: 220px; }
 }
 
 /* Pane header — single-row grid: Label | Path (flexible) | Actions */

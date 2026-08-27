@@ -254,7 +254,7 @@
     if (!container) return;
     container.innerHTML = '';
     if (state.activity.length === 0) {
-      container.innerHTML = `<div style="color: var(--text-dim); text-align: center; padding: 16px;">No activity yet</div>`;
+      container.innerHTML = `<div class="empty-state">No activity yet</div>`;
       return;
     }
     for (const entry of state.activity) {
@@ -656,7 +656,7 @@
     activeContainer.innerHTML = '';
 
     if (activeTasks.length === 0) {
-      activeContainer.innerHTML = `<div style="color: var(--text-dim); text-align: center; padding: 16px;">No active operations</div>`;
+      activeContainer.innerHTML = `<div class="empty-state">No active operations</div>`;
       return;
     }
 

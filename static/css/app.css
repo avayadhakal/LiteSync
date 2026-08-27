@@ -114,7 +114,7 @@ input[type="text"], input[type="password"] {
 @media (min-width: 769px) {
   #source-pane { width: var(--left-width, 50%); flex: none; }
   #dest-pane { flex: 1; }
-  .history { height: var(--bottom-height, 220px); flex: none; }
+  .history { height: var(--bottom-height, 320px); flex: none; }
 }
 
 /* Mobile: vertical stacking; the vertical splitter becomes a
@@ -124,7 +124,7 @@ input[type="text"], input[type="password"] {
   #source-pane { height: var(--top-height, 50%); flex: none; }
   #dest-pane { flex: 1 1 0; min-height: 0; }
   .splitter-v { width: auto; height: 6px; cursor: row-resize; }
-  .history { height: var(--bottom-height, 200px); flex: none; }
+  .history { height: var(--bottom-height, 280px); flex: none; min-height: 240px; }
 }
 
 /* Pane header — single-row grid: Label | Path (flexible) | Actions */
@@ -229,7 +229,10 @@ input[type="text"], input[type="password"] {
 
 .history {
   padding: 12px 16px;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 280px;
+  overflow: hidden; /* inner list containers scroll instead */
 }
 .history h2 { font-size: 13px; color: var(--text-dim); margin: 0 0 8px; text-transform: uppercase; letter-spacing: 0.04em; }
 
@@ -351,6 +354,9 @@ tr.task-row:hover { background: var(--panel-alt); }
   display: flex;
   flex-direction: column;
   gap: 10px;
+  flex: 1;          /* Fill the expanded panel height */
+  min-height: 0;
+  overflow-y: auto; /* Scroll cards independently of the tabs bar */
 }
 
 .transfer-card {
@@ -491,6 +497,9 @@ tr.task-row:hover { background: var(--panel-alt); }
   display: flex;
   flex-direction: column;
   gap: 6px;
+  flex: 1;          /* Fill the expanded panel height */
+  min-height: 0;
+  overflow-y: auto; /* Scroll log entries independently of the tabs bar */
 }
 .activity-item {
   background: var(--panel);
@@ -513,6 +522,14 @@ tr.task-row:hover { background: var(--panel-alt); }
   flex: none;
 }
 .activity-message { flex: 1; word-break: break-word; }
+
+/* Empty-state message: vertically & horizontally centered in the list area */
+.empty-state {
+  color: var(--text-dim);
+  text-align: center;
+  padding: 16px;
+  margin: auto; /* flex container: centers within the available space */
+}
 
 /* Pane header action buttons */
 .pane-actions {

@@ -7,6 +7,8 @@
     historyTab: 'active', // 'active' | 'history'
     tasks: [],
     activeTaskId: null,
+    finishedTaskIds: new Set(), // task ids whose completion was already handled
+    historyLoaded: false,
   };
 
   const el = (id) => document.getElementById(id);
@@ -47,19 +49,43 @@
 
   // --- Pane rendering ---
 
-  async function loadPane(which, path) {
+  function normalizePath(p) {
+    return String(p || '').replace(/\/+/g, '/').replace(/\/+$/g, '') || '/';
+  }
+
+  async function loadPane(which, path, forceRefresh = false) {
     const pane = state[which];
+    const navigated = pane.path !== path;
     if (path === null) {
       pane.path = null;
       pane.entries = state.roots.map((r) => ({ name: r, path: r, is_dir: true, size: 0 }));
       pane.parent = undefined;
     } else {
-      const data = await api(`/api/browse?path=${encodeURIComponent(path)}`);
-      pane.path = data.path;
-      pane.entries = data.entries;
-      pane.parent = data.parent;
+      let fetchPath = path;
+      try {
+        const data = await api(`/api/browse?path=${encodeURIComponent(fetchPath)}`, {
+          // Fresh fetch — never serve the browser's cached directory listing,
+          // otherwise moved/deleted entries linger in the pane after transfers.
+          ...(forceRefresh ? { cache: 'no-store' } : {}),
+        });
+        pane.path = data.path;
+        pane.entries = data.entries;
+        pane.parent = data.parent;
+      } catch (err) {
+        // The current directory itself may have just been moved/deleted by a
+        // completed transfer: fall back to its parent so the pane never shows
+        // a listing of a path that no longer exists.
+        const parent = normalizePath(fetchPath).replace(/\/[^/]+$/, '') || '/';
+        if (parent !== normalizePath(fetchPath)) {
+          await loadPane(which, parent, true);
+          return;
+        }
+        throw err;
+      }
     }
-    if (which === 'source') {
+    if (which === 'source' && navigated) {
+      // Selection resets on navigation only; a same-path refresh (e.g. after
+      // a transfer completes) preserves selections that are still valid.
       state.selection.clear();
     }
     renderPane(which);
@@ -223,17 +249,83 @@
     renderHistoryTable();
   }
 
+  const TERMINAL_STATUSES = new Set(['succeeded', 'failed', 'interrupted']);
+  const ACTIVE_STATUSES = new Set(['queued', 'running']);
+
   async function loadHistory() {
     try {
       const data = await api('/api/tasks?limit=100');
-      state.tasks = data.tasks || [];
+      const incoming = data.tasks || [];
+      const prevById = new Map(state.tasks.map((t) => [t.task_id, t]));
+
+      state.tasks = incoming;
       renderHistoryTable();
+
+      // Completion watcher: fast same-filesystem moves can finish before the
+      // SSE stream ever attaches (task goes queued -> succeeded inside the
+      // submit round-trip), so react to terminal transitions right here.
+      for (const task of incoming) {
+        if (!TERMINAL_STATUSES.has(task.status)) continue;
+        if (state.finishedTaskIds.has(task.task_id)) continue;
+        const prev = prevById.get(task.task_id);
+        const wasActive = prev && ACTIVE_STATUSES.has(prev.status);
+        // A task that was never seen active but finished right after being
+        // submitted (created moments ago) is the instant-move race.
+        const isInstantFinish =
+          !prev &&
+          state.historyLoaded &&
+          Date.now() - new Date(task.created_at).getTime() < 30_000;
+        if (wasActive || isInstantFinish) {
+          state.finishedTaskIds.add(task.task_id);
+          await onTaskFinished(task.status, task);
+        }
+      }
+
+      state.historyLoaded = true;
     } catch (err) {
       console.error('Failed to load history:', err);
     }
   }
 
   const activeStreams = new Map(); // taskId -> { source, currentFile, pct }
+
+  function pruneCompletedSelection(task) {
+    // Sources of a successfully finished task were moved (delete-source) or
+    // copied & pruned, so keeping them selected points at stale paths.
+    // Normalize both sides (task sources may carry trailing slashes that
+    // pane-entry paths never have) before comparing against selection keys.
+    if (!task || !Array.isArray(task.sources)) return false;
+    let changed = false;
+    for (const src of task.sources) {
+      const normalized = normalizePath(src);
+      for (const key of state.selection) {
+        if (normalizePath(key) === normalized) {
+          state.selection.delete(key);
+          changed = true;
+        }
+      }
+    }
+    return changed;
+  }
+
+  async function onTaskFinished(status, task) {
+    if (task && task.task_id) state.finishedTaskIds.add(task.task_id);
+    if (status === 'succeeded') {
+      // 1) Drop successfully moved/deleted source paths from the persistent
+      //    selection state and update the selection bar — this MUST run before
+      //    the pane refresh so the re-rendered DOM reads pruned selection state.
+      pruneCompletedSelection(task);
+      updateSelectionUI();
+    }
+    // 2) Force-refresh both panes (cache-busted) so the transfer's effect is
+    //    visible immediately: moved items vanish from source, appear in dest.
+    await Promise.all([
+      state.source.path ? loadPane('source', state.source.path, true) : Promise.resolve(),
+      state.dest.path ? loadPane('dest', state.dest.path, true) : Promise.resolve(),
+    ]);
+    // 3) Re-render history — drops the completed card.
+    await loadHistory();
+  }
 
   function renderHistoryTable() {
     const isHistoryTab = state.historyTab === 'history';
@@ -381,9 +473,7 @@
             }
             try {
               await api(`/api/tasks/${task.task_id}/cancel`, { method: 'POST' });
-              await loadHistory();
-              if (state.source.path) await loadPane('source', state.source.path);
-              if (state.dest.path) await loadPane('dest', state.dest.path);
+              await onTaskFinished('interrupted', task);
             } catch (err) {
               alert(`Failed to cancel task: ${err.message}`);
             }
@@ -393,12 +483,13 @@
         activeContainer.appendChild(card);
 
         // Attach SSE stream if running/queued
-        attachTaskStream(task.task_id);
+        attachTaskStream(task);
       }
     }
   }
 
-  function attachTaskStream(taskId) {
+  function attachTaskStream(task) {
+    const taskId = task.task_id;
     if (activeStreams.has(taskId)) return;
 
     const streamData = {
@@ -458,14 +549,16 @@
       source.close();
       activeStreams.delete(taskId);
 
-      // Auto-remove card, auto-refresh panes, and refresh history
-      if (state.source.path) {
-        loadPane('source', state.source.path);
+      let status = null;
+      try {
+        status = JSON.parse(e.data).status;
+      } catch (_err) {
+        // Malformed payload: still treat the stream as finished below.
       }
-      if (state.dest.path) {
-        loadPane('dest', state.dest.path);
-      }
-      loadHistory();
+
+      // Task reached a terminal state ('succeeded' | 'failed' | 'interrupted'):
+      // prune stale selections, auto-remove the card, refresh both panes.
+      onTaskFinished(status, task).catch((err) => console.error('Post-task refresh failed:', err));
     });
 
     source.onerror = () => {

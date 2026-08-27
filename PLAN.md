@@ -117,6 +117,21 @@ CREATE INDEX idx_tasks_created_at ON tasks(created_at DESC);
 7. **Startup reconciliation**: every stale `running` task is marked `interrupted`; its recorded PID, if still alive (verified via `/proc/<pid>/cmdline` containing `rsync` to guard PID reuse), is best-effort SIGTERMed. Queued tasks survive restarts and simply resume through the scheduler.
 8. **SSE stream**: tails each task's log file, emitting data lines, closing with a terminal `status` event.
 
+### Same-filesystem fast path (instant rename for delete-after-copy)
+
+In `app/tasks/runner.py`, `_run_task()` inspects the source and destination paths **before spawning rsync**. `_same_filesystem()` compares `os.stat(src).st_dev` for every source against the destination (or its parent if the destination does not exist) — identical device IDs mean the paths share a mount point/filesystem.
+
+When both are on the same filesystem and `delete_source` is `True`, the worker bypasses the external rsync subprocess entirely: `_fast_move()` performs an immediate `shutil.move()` per source (an atomic `rename(2)` on a shared filesystem, with a built-in fallback to copy+delete if rename is refused). It then:
+
+1. writes the source basename plus an instant ``100%`` progress line to the task's log file (an rsync-style summary line the existing SSE replay + `(/\d+)%/` progress parsing render as an immediate 100% completion),
+2. records `mark_finished(task_id, 'succeeded', 0, None)` in SQLite at once — the SSE generator then replays the log and closes with the terminal `status` event.
+
+**Fallback:** if `shutil.move()` raises any `OSError` (e.g. the destination entry already exists, where rsync would merge instead of overwrite), `_fast_move()` returns `False` and the task transparently falls through to the normal rsync subprocess path — the fast path never turns a mergable conflict into a failure.
+
+**Frontend implication:** an instant move can complete inside the `POST /api/transfer` round-trip, before any card is rendered or SSE stream attached — the very first `GET /api/tasks` may already return `succeeded`. `loadHistory()` therefore embeds a completion watcher: any task transitioning from an active state (queued/running) to a terminal one, or a never-seen task created within the last 30s that already finished, routes through `onTaskFinished(status, task)` — pruning completed source paths from the persistent selection (`state.selection`, with trailing-slash-normalized comparison), updating the selection bar, and cache-bust force-refreshing both panes. A `state.finishedTaskIds` set deduplicates SSE status events, cancel callbacks, and the watcher. `loadPane('source', ...)` clears the selection only on actual navigation, so its same-path preserve-refresh no longer stomps the pruning. If the currently viewed source directory itself was the moved item, the `/api/browse` 404 falls back to its parent directory.
+
+**Atomicity note:** with the `st_dev` gate, `shutil.move()` uses `os.rename()` strictly on one filesystem and is atomic (destination appears fully formed; no partial-copy window). `os.rename`'s rare same-fs refusals fall back inside `shutil` to copy+delete; should strict atomic-only semantics ever be required, `_fast_move` can switch to a bare `os.rename()` that simply returns `False` on failure to trigger the rsync fallback.
+
 ## Frontend (UI Overhaul)
 
 Plain HTML + vanilla JS without npm toolchains.
@@ -167,7 +182,7 @@ Handwritten CSS only — **no Tailwind, no build step**. The layout skeleton was
 * **Card Rendering & Cleanup:** Each active task generates a 4-row HTML card containing progress bars (`#fill-{id}`) and text (`#text-{id}`) updated via SSE. Upon receiving an SSE `status` event (completion/failure), the stream closes, the map entry is deleted, and `loadHistory()` is triggered to automatically remove the card.
 
 
-* **Auto-Refresh:** Upon task completion or cancellation, `loadPane('source')` and `loadPane('dest')` are immediately invoked to refresh the file browsers without a page reload.
+* **Auto-Refresh:** Upon task completion or cancellation, `loadPane('source')` and `loadPane('dest')` are immediately invoked to refresh the file browsers without a page reload. A completion watcher inside `loadHistory()` guarantees this even for the instantaneous same-filesystem fast path, which can finish before an SSE stream ever attaches; terminal-transition detection in the polls keeps pane refreshes symmetric to rsync completions.
 
 
 ## Security & Deployment
@@ -192,5 +207,9 @@ Handwritten CSS only — **no Tailwind, no build step**. The layout skeleton was
 * *Manual Verification 3*: Switch to the Transfer History tab while a transfer is active and verify it is hidden from the table.
 
 * *Manual Verification 4*: When a transfer finishes, confirm the card disappears instantly, routes to the History table, and both file panes refresh automatically.
+
+5. **Same-filesystem fast path**:
+* *Manual Verification 5*: With `delete_source` checked, move a folder from one allowed root to another root **on the same mount**; confirm no rsync runs (no `pid` file, log starts with an instant `100%` line), the task lands straight into the History tab as `succeeded`, the moved folder vanishes from the source pane and appears in the destination without a manual refresh, and the source pane's selection box is unchecked for the moved item.
+* *Manual Verification 5a*: Repeat with a destination entry of the same name already present — the move should fall back to rsync's merge semantics rather than fail.
 
 ---

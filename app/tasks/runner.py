@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import shutil
 import signal
 import uuid
 from pathlib import Path
@@ -72,6 +73,49 @@ def terminate_task(task_id: str) -> bool:
     return False
 
 
+def _same_filesystem(sources: list[str], destination: str) -> bool:
+    """True when every source and the destination live on one filesystem.
+
+    Same st_dev means os.rename() can move the items atomically, so a
+    delete-after-copy on a shared filesystem never needs rsync.
+    """
+    try:
+        dst = Path(destination)
+        ref = os.stat(dst if dst.exists() else dst.parent).st_dev
+        return all(os.stat(src).st_dev == ref for src in sources)
+    except OSError:
+        return False
+
+
+def _fast_move(task: dict, log_path: Path) -> bool:
+    """Instant same-filesystem move: a pure rename instead of an rsync
+    subprocess. Writes an instant 100% completion line to the task log (the
+    SSE stream replays the log before ending with the terminal status event)
+    and records 'succeeded' immediately.
+
+    Returns False when the move cannot be applied (e.g. the destination
+    entry already exists — rsync would merge, shutil.move refuses), so the
+    caller falls back to the normal rsync subprocess path.
+    """
+    task_id = task["task_id"]
+    destination = task["destination"]
+
+    try:
+        log_fh = open(log_path, "ab")
+        try:
+            for source in task["sources"]:
+                shutil.move(source, destination)
+                log_fh.write(f"{Path(source).name}\n".encode())
+            log_fh.write(b"            100%    0.00kB/s    0:00:00 (xfr, to-chk=0/1)\n")
+        finally:
+            log_fh.close()
+    except OSError:
+        return False
+
+    db.mark_finished(task_id, "succeeded", 0, None)
+    return True
+
+
 def _prune_empty_dirs(source: str) -> None:
     """Delete now-empty directories after delete_source copies.
 
@@ -108,6 +152,12 @@ async def _run_task(task: dict) -> None:
     latest = db.get_task(task_id)
     if latest is None or latest["status"] != "running":
         return
+
+    # Fast path: a delete-after-copy within a single filesystem is just a
+    # rename — do it in-process and record instant success, no rsync spawn.
+    if task["delete_source"] and _same_filesystem(task["sources"], task["destination"]):
+        if _fast_move(task, log_path):
+            return
 
     argv = build_rsync_argv(
         task["sources"], task["destination"], bool(task["delete_source"])

@@ -3,6 +3,7 @@ import shutil
 
 from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import FileResponse
 
 from app.auth import get_current_user
 from app.config import get_settings
@@ -47,8 +48,6 @@ async def browse(path: str, _user: str = Depends(get_current_user)):
     }
 
 
-from fastapi.responses import FileResponse
-
 @router.get("/download")
 async def download_file(path: str, _user: str = Depends(get_current_user)):
     settings = get_settings()
@@ -58,7 +57,7 @@ async def download_file(path: str, _user: str = Depends(get_current_user)):
     if not resolved.is_file():
         raise HTTPException(status_code=400, detail="Path is not a file")
     
-    return FileResponse(resolved)
+    return FileResponse(path=resolved, filename=resolved.name)
 
 
 @router.post("/mkdir")

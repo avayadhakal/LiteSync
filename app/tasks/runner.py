@@ -33,7 +33,7 @@ def queue_task(
     source: str,
     destination: str,
     delete_source: bool,
-    created_by: str,
+    created_by: str = "",
 ) -> str:
     """Persist a single-source task as 'queued'. Nothing is launched here —
     the background scheduler independently picks queued rows up, so the HTTP
@@ -41,16 +41,13 @@ def queue_task(
     task_id = uuid.uuid4().hex
     task_dir = settings.data_dir / "tasks" / task_id
     task_dir.mkdir(parents=True, exist_ok=True)
-    log_path = task_dir / "log"
 
+    operation = "move" if delete_source else "copy"
     db.insert_task(
-        task_id=task_id,
-        sources=[source],
+        id=task_id,
+        source=source,
         destination=destination,
-        delete_source=delete_source,
-        created_by=created_by,
-        tmux_session="",  # legacy column, unused since the tmux removal
-        log_path=str(log_path),
+        operation=operation,
     )
     return task_id
 

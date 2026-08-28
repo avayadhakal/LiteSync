@@ -287,6 +287,13 @@ def mark_running(task_id: str) -> None:
 
 def mark_finished(task_id: str, status: str, exit_code: int | None, error_message: str | None = None) -> None:
     with _lock, _connect() as conn:
+        row = conn.execute(
+            "SELECT source, destination, operation, status FROM tasks WHERE id=?",
+            (task_id,),
+        ).fetchone()
+
+        prev_status = row["status"] if row else None
+
         conn.execute(
             """
             UPDATE tasks
@@ -295,6 +302,49 @@ def mark_finished(task_id: str, status: str, exit_code: int | None, error_messag
             """,
             (status, exit_code, error_message, now_iso(), task_id),
         )
+
+        # Automatically record terminal transfer activity once
+        if row and status in ("succeeded", "failed", "interrupted") and prev_status not in ("succeeded", "failed", "interrupted"):
+            src_str = str(row["source"])
+            dst_str = str(row["destination"])
+            src_name = Path(src_str).name or src_str
+            dst_name = Path(dst_str).name or dst_str
+            op = str(row["operation"])
+
+            if status == "succeeded":
+                summary = f"{src_name} → {dst_name} [source deleted]" if op == "move" else f"{src_name} → {dst_name}"
+            elif status == "failed":
+                summary = error_message or f"rsync exited with code {exit_code}"
+            else:
+                summary = error_message or "cancelled by user"
+
+            msg_data = {
+                "operation": op,
+                "status": status,
+                "source": src_str,
+                "destination": dst_str,
+                "name": src_name,
+                "summary": summary,
+                "exit_code": exit_code,
+                "error": error_message,
+            }
+
+            conn.execute(
+                "INSERT INTO activity (kind, message, created_at) VALUES (?, ?, ?)",
+                ("transfer", json.dumps(msg_data), now_iso()),
+            )
+
+            # Auto-prune activity log table to keep newest 500 entries
+            conn.execute(
+                """
+                DELETE FROM activity
+                WHERE id NOT IN (
+                    SELECT id FROM activity
+                    ORDER BY created_at DESC, id DESC
+                    LIMIT 500
+                )
+                """
+            )
 
 
 def get_task(task_id: str) -> dict | None:
@@ -343,16 +393,17 @@ def delete_task(task_id: str) -> None:
 
 def add_activity(
     kind: str,
-    message: str,
+    message: str | dict,
     created_at: str | None = None,
     max_entries: int = 500,
 ) -> int:
     """Insert an entry into the activity log table and optionally prune oldest entries."""
     ts = created_at or now_iso()
+    msg_str = json.dumps(message) if isinstance(message, dict) else str(message)
     with _lock, _connect() as conn:
         cursor = conn.execute(
             "INSERT INTO activity (kind, message, created_at) VALUES (?, ?, ?)",
-            (kind, message, ts),
+            (kind, msg_str, ts),
         )
         inserted_id = cursor.lastrowid or 0
         if max_entries > 0:

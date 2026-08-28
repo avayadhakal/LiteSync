@@ -18,6 +18,7 @@ from starlette.types import Send
 from app.auth import get_current_user, read_session_cookie, verify_password
 from app.config import get_download_signing_key, get_settings
 from app.fsops import list_directory, resolve_safe_path
+from app.tasks import db
 
 router = APIRouter(prefix="/api")
 
@@ -196,6 +197,21 @@ async def create_folder(body: MkdirRequest, _user: str = Depends(get_current_use
     except OSError as e:
         raise HTTPException(status_code=500, detail=f"Failed to create directory: {e}")
 
+    parent_name = parent_resolved.name
+    summary = f"{parent_name}/{folder_name}" if parent_name else folder_name
+    db.add_activity(
+        kind="mkdir",
+        message={
+            "operation": "mkdir",
+            "status": "succeeded",
+            "path": str(new_dir),
+            "name": folder_name,
+            "parent": str(parent_resolved),
+            "summary": summary,
+            "error": None,
+        },
+    )
+
     return {"success": True, "path": str(new_dir)}
 
 
@@ -222,6 +238,20 @@ async def rename_entry(body: RenameRequest, _user: str = Depends(get_current_use
     except OSError as e:
         raise HTTPException(status_code=500, detail=f"Failed to rename: {e}")
 
+    db.add_activity(
+        kind="rename",
+        message={
+            "operation": "rename",
+            "status": "succeeded",
+            "old_path": str(source),
+            "new_path": str(target),
+            "old_name": source.name,
+            "new_name": target.name,
+            "summary": f"{source.name} → {target.name}",
+            "error": None,
+        },
+    )
+
     return {"success": True, "old_path": str(source), "new_path": str(target)}
 
 
@@ -242,6 +272,18 @@ async def delete_entry(body: DeleteRequest, _user: str = Depends(get_current_use
             target.unlink()
     except OSError as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete: {e}")
+
+    db.add_activity(
+        kind="delete",
+        message={
+            "operation": "delete",
+            "status": "succeeded",
+            "path": str(target),
+            "name": target.name,
+            "summary": target.name,
+            "error": None,
+        },
+    )
 
     return {"success": True, "path": str(target)}
 

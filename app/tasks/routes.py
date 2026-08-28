@@ -216,3 +216,15 @@ async def cancel_task(task_id: str, _user: str = Depends(get_current_user)):
     return {"success": True}
 
 
+@router.get("/activity")
+async def get_activity(limit: int = 100, offset: int = 0, _user: str = Depends(get_current_user)):
+    return {"activity": db.list_activity(limit=limit, offset=offset)}
+
+
+@router.delete("/activity")
+async def clear_activity(_user: str = Depends(get_current_user)):
+    db.clear_activity()
+    return {"success": True}
+
+
+

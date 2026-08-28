@@ -262,11 +262,8 @@
     activeTaskId: null,
     finishedTaskIds: new Set(), // task ids whose completion was already handled
     historyLoaded: false,
-    activity: [], // [{ts, kind, message, source}] newest-first
+    activity: [], // [{id, kind, message, created_at}] newest-first
   };
-
-  const ACTIVITY_STORAGE_KEY = 'litesync_activity_log';
-  const ACTIVITY_MAX_ENTRIES = 200;
 
   const el = (id) => document.getElementById(id);
 
@@ -572,53 +569,33 @@
   function toastSuccess(msg) { showToast(msg, 'success'); }
   function toastError(msg)   { showToast(msg, 'error'); }
 
-  // --- Activity log (file mutations + transfer lifecycle) ---
+  // --- Activity log (Authoritative SQLite persistence via /api/activity) ---
 
-  function loadActivity() {
+  async function loadActivity() {
     try {
-      const raw = localStorage.getItem(ACTIVITY_STORAGE_KEY);
-      state.activity = raw ? JSON.parse(raw) : [];
-      if (!Array.isArray(state.activity)) state.activity = [];
-    } catch (_err) {
+      const data = await api('/api/activity?limit=100');
+      state.activity = data.activity || [];
+      renderActivity();
+    } catch (err) {
+      console.error('Failed to load activity:', err);
+    }
+  }
+
+  async function clearActivity() {
+    try {
+      await api('/api/activity', { method: 'DELETE' });
       state.activity = [];
+      renderActivity();
+      toastSuccess('Activity log cleared.');
+    } catch (err) {
+      toastError(`Failed to clear activity log: ${err.message}`);
     }
-  }
-
-  function saveActivity() {
-    try {
-      localStorage.setItem(ACTIVITY_STORAGE_KEY, JSON.stringify(state.activity));
-    } catch (_err) { /* quota or private mode — ignore */ }
-  }
-
-  // kind: 'mkdir' | 'rename' | 'delete' | 'transfer' | ...
-  // source: optional path(s) context
-  function logActivity(kind, message, level = 'info') {
-    state.activity.unshift({
-      ts: Date.now(),
-      kind,
-      level, // 'success' | 'error' | 'info'
-      message: String(message),
-    });
-    if (state.activity.length > ACTIVITY_MAX_ENTRIES) {
-      state.activity.length = ACTIVITY_MAX_ENTRIES;
-    }
-    saveActivity();
-    if (state.historyTab === 'activity') renderActivity();
-    // Update clear-activity button visibility regardless of current tab.
-    const clearBtn = el('clear-activity-btn');
-    if (clearBtn && state.historyTab === 'activity') {
-      clearBtn.classList.toggle('hidden', state.activity.length === 0);
-    }
-  }
-
-  function clearActivity() {
-    state.activity = [];
-    saveActivity();
-    renderActivity();
   }
 
   function formatActivityTime(ts) {
+    if (!ts) return '';
     const d = new Date(ts);
+    if (isNaN(d.getTime())) return String(ts);
     return d.toLocaleString(undefined, {
       month: 'short',
       day: 'numeric',
@@ -628,27 +605,273 @@
     });
   }
 
+  function parseActivityMessage(rawMsg, kind) {
+    if (typeof rawMsg === 'object' && rawMsg !== null) {
+      return rawMsg;
+    }
+    if (typeof rawMsg === 'string') {
+      const trimmed = rawMsg.trim();
+      if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+        try {
+          return JSON.parse(trimmed);
+        } catch (_err) {}
+      }
+    }
+    // Fallback for legacy plain text messages
+    return {
+      operation: kind || 'info',
+      status: 'succeeded',
+      name: String(rawMsg || ''),
+      summary: String(rawMsg || ''),
+    };
+  }
+
+  function getActivityDisplayInfo(entry) {
+    const data = parseActivityMessage(entry.message, entry.kind);
+    const op = (data.operation || entry.kind || 'info').toLowerCase();
+    const status = (data.status || 'succeeded').toLowerCase();
+
+    let icon = '✓';
+    let badgeText = 'SUCCESS';
+    let statusClass = 'status-succeeded';
+    let primaryText = data.name || data.summary || data.path || 'Operation';
+    let secondaryHtml = '';
+
+    if (op === 'move') {
+      badgeText = 'MOVED';
+      if (status === 'succeeded') {
+        icon = '✓';
+        statusClass = 'status-succeeded';
+        const dst = data.destination ? normalizePath(data.destination).split('/').pop() || data.destination : '';
+        secondaryHtml = `→ ${escapeHtml(dst || data.destination || '')} <span class="activity-tag">[source deleted]</span>`;
+      } else if (status === 'interrupted') {
+        icon = '⊘';
+        badgeText = 'INTERRUPTED — MOVE';
+        statusClass = 'status-interrupted';
+        secondaryHtml = escapeHtml(data.summary || data.error || 'cancelled by user');
+      } else {
+        icon = '✗';
+        badgeText = 'FAILED — MOVE';
+        statusClass = 'status-failed';
+        secondaryHtml = escapeHtml(data.summary || data.error || 'rsync exited with error');
+      }
+    } else if (op === 'copy' || op === 'transfer') {
+      badgeText = 'COPIED';
+      if (status === 'succeeded') {
+        icon = '✓';
+        statusClass = 'status-succeeded';
+        const dst = data.destination ? normalizePath(data.destination).split('/').pop() || data.destination : '';
+        secondaryHtml = `→ ${escapeHtml(dst || data.destination || '')}`;
+      } else if (status === 'interrupted') {
+        icon = '⊘';
+        badgeText = 'INTERRUPTED — COPY';
+        statusClass = 'status-interrupted';
+        secondaryHtml = escapeHtml(data.summary || data.error || 'cancelled by user');
+      } else {
+        icon = '✗';
+        badgeText = 'FAILED — COPY';
+        statusClass = 'status-failed';
+        secondaryHtml = escapeHtml(data.summary || data.error || 'rsync exited with error');
+      }
+    } else if (op === 'mkdir') {
+      icon = '+';
+      badgeText = 'CREATED FOLDER';
+      statusClass = status === 'failed' ? 'status-failed' : 'status-succeeded';
+      primaryText = data.summary || data.name || data.path;
+      if (status === 'failed') {
+        icon = '✗';
+        badgeText = 'FAILED — NEW FOLDER';
+        secondaryHtml = escapeHtml(data.error || 'Failed to create directory');
+      }
+    } else if (op === 'rename') {
+      icon = '→';
+      badgeText = 'RENAMED';
+      statusClass = status === 'failed' ? 'status-failed' : 'status-succeeded';
+      primaryText = data.summary || (data.old_name ? `${data.old_name} → ${data.new_name}` : data.name);
+      if (status === 'failed') {
+        icon = '✗';
+        badgeText = 'FAILED — RENAME';
+        secondaryHtml = escapeHtml(data.error || 'Failed to rename');
+      }
+    } else if (op === 'delete') {
+      icon = '🗑';
+      badgeText = 'DELETED';
+      statusClass = status === 'failed' ? 'status-failed' : 'status-succeeded';
+      primaryText = data.name || (data.path ? normalizePath(data.path).split('/').pop() : 'item');
+      if (status === 'failed') {
+        icon = '✗';
+        badgeText = 'FAILED — DELETE';
+        secondaryHtml = escapeHtml(data.error || 'Failed to delete');
+      }
+    } else {
+      badgeText = (entry.kind || 'INFO').toUpperCase();
+      statusClass = 'status-info';
+      primaryText = data.summary || data.name || String(entry.message);
+    }
+
+    return {
+      icon,
+      badgeText,
+      statusClass,
+      primaryText,
+      secondaryHtml,
+      data,
+    };
+  }
+
   function renderActivity() {
     const container = el('activity-container');
     if (!container) return;
     container.innerHTML = '';
+
+    const clearBtn = el('clear-activity-btn');
+    if (clearBtn && state.historyTab === 'activity') {
+      clearBtn.classList.toggle('hidden', state.activity.length === 0);
+    }
+
     if (state.activity.length === 0) {
       container.innerHTML = `<div class="empty-state">No activity yet</div>`;
       return;
     }
+
     for (const entry of state.activity) {
-      const item = document.createElement('div');
-      item.className = `activity-item activity-${entry.level}`;
-      const time = document.createElement('span');
-      time.className = 'activity-time';
-      time.textContent = formatActivityTime(entry.ts);
-      const msg = document.createElement('span');
-      msg.className = 'activity-message';
-      msg.textContent = `[${entry.kind}] ${entry.message}`;
-      item.appendChild(time);
-      item.appendChild(msg);
-      container.appendChild(item);
+      const info = getActivityDisplayInfo(entry);
+      const card = document.createElement('div');
+      card.className = `activity-card ${info.statusClass}`;
+      card.setAttribute('role', 'button');
+      card.setAttribute('tabindex', '0');
+
+      card.innerHTML = `
+        <div class="activity-card-header">
+          <div class="activity-badge-group">
+            <span class="activity-status-icon">${info.icon}</span>
+            <span class="activity-op-badge">${escapeHtml(info.badgeText)}</span>
+          </div>
+          <div class="activity-meta">
+            <span class="activity-time">${escapeHtml(formatActivityTime(entry.created_at || entry.ts))}</span>
+            <button class="activity-details-btn" title="View Details">Details</button>
+          </div>
+        </div>
+        <div class="activity-card-body">
+          <div class="activity-primary-line" title="${escapeHtml(info.primaryText)}">${escapeHtml(info.primaryText)}</div>
+          ${info.secondaryHtml ? `<div class="activity-secondary-line">${info.secondaryHtml}</div>` : ''}
+        </div>
+      `;
+
+      const openDetails = (e) => {
+        e.stopPropagation();
+        openActivityDetails(entry, info);
+      };
+
+      card.addEventListener('click', openDetails);
+      card.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          openDetails(e);
+        }
+      });
+
+      const detailsBtn = card.querySelector('.activity-details-btn');
+      if (detailsBtn) {
+        detailsBtn.addEventListener('click', openDetails);
+      }
+
+      container.appendChild(card);
     }
+  }
+
+  function openActivityDetails(entry, info) {
+    const modal = el('activity-details-modal');
+    const body = el('activity-details-body');
+    if (!modal || !body) return;
+
+    if (!info) info = getActivityDisplayInfo(entry);
+    const data = info.data || {};
+    const createdStr = entry.created_at || (entry.ts ? new Date(entry.ts).toISOString() : '');
+
+    const rows = [];
+    rows.push({ label: 'Timestamp', value: `${formatActivityTime(createdStr)} (${createdStr})` });
+    rows.push({ label: 'Operation', value: (data.operation || entry.kind || 'unknown').toUpperCase() });
+    rows.push({ label: 'Status', value: (data.status || 'succeeded').toUpperCase() });
+
+    if (data.source) {
+      rows.push({ label: 'Source Path', value: data.source, copyable: true });
+    }
+    if (data.destination) {
+      rows.push({ label: 'Destination', value: data.destination, copyable: true });
+    }
+    if (data.old_path) {
+      rows.push({ label: 'Original Path', value: data.old_path, copyable: true });
+    }
+    if (data.new_path) {
+      rows.push({ label: 'New Path', value: data.new_path, copyable: true });
+    }
+    if (data.path && !data.source && !data.destination && !data.old_path) {
+      rows.push({ label: 'Path', value: data.path, copyable: true });
+    }
+    if (data.exit_code !== undefined && data.exit_code !== null) {
+      rows.push({ label: 'Exit Code', value: String(data.exit_code) });
+    }
+    if (data.summary) {
+      rows.push({ label: 'Summary', value: data.summary });
+    }
+
+    body.innerHTML = '';
+    for (const r of rows) {
+      const rowEl = document.createElement('div');
+      rowEl.className = 'activity-details-row';
+      const labelEl = document.createElement('div');
+      labelEl.className = 'activity-details-label';
+      labelEl.textContent = r.label;
+      const valEl = document.createElement('div');
+      valEl.className = 'activity-details-value';
+
+      if (r.copyable) {
+        valEl.className += ' activity-details-copyable';
+        const textSpan = document.createElement('span');
+        textSpan.textContent = r.value;
+        textSpan.style.wordBreak = 'break-all';
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'icon-btn';
+        copyBtn.innerHTML = '📋';
+        copyBtn.title = 'Copy path';
+        copyBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          try {
+            await copyToClipboard(r.value);
+            copyBtn.innerHTML = '✓';
+            copyBtn.style.color = 'var(--success)';
+            toastSuccess('Copied to clipboard');
+            setTimeout(() => {
+              copyBtn.innerHTML = '📋';
+              copyBtn.style.color = '';
+            }, 1500);
+          } catch (_err) {}
+        });
+        valEl.appendChild(textSpan);
+        valEl.appendChild(copyBtn);
+      } else {
+        valEl.textContent = r.value;
+      }
+
+      rowEl.appendChild(labelEl);
+      rowEl.appendChild(valEl);
+      body.appendChild(rowEl);
+    }
+
+    if (data.error) {
+      const errBox = document.createElement('div');
+      errBox.className = 'activity-details-error';
+      errBox.textContent = `Error: ${data.error}`;
+      body.appendChild(errBox);
+    }
+
+    modal.classList.remove('hidden');
+  }
+
+  function closeActivityDetails() {
+    const modal = el('activity-details-modal');
+    if (modal) modal.classList.add('hidden');
   }
 
   // --- Source pane actions: New Folder / Rename / Delete ---
@@ -705,7 +928,7 @@
       closeModal('mkdir');
       await loadPane(which, state[which].path, true);
       toastSuccess(`Created folder: ${name}`);
-      logActivity('mkdir', `Created folder ${name} in ${state[which].path}`, 'success');
+      await loadActivity();
     } catch (err) {
       setModalError('mkdir', err.message);
     }
@@ -758,10 +981,9 @@
       updateSelectionUI();
       await loadPane(which, state[which].path, true);
       toastSuccess(`Renamed to: ${name}`);
-      logActivity('rename', `Renamed ${selectedPath} → ${result.new_path}`, 'success');
+      await loadActivity();
     } catch (err) {
       setModalError('rename', err.message);
-      logActivity('rename', `Failed to rename ${selectedPath}: ${err.message}`, 'error');
     }
   }
 
@@ -809,17 +1031,10 @@
 
     if (failures.length === 0) {
       toastSuccess(paths.length === 1 ? 'Deleted.' : `Deleted ${paths.length} items.`);
-      logActivity(
-        'delete',
-        paths.length === 1
-          ? `Deleted ${paths[0]}`
-          : `Deleted ${paths.length} items (${paths.map((p) => normalizePath(p).split('/').pop()).join(', ')})`,
-        'success'
-      );
     } else {
       toastError(`Some items could not be deleted: ${failures.join('; ')}`);
-      logActivity('delete', `Delete failures: ${failures.join('; ')}`, 'error');
     }
+    await loadActivity();
   }
 
   // --- Transfer flow ---
@@ -862,18 +1077,11 @@
       result = await api('/api/transfer', { method: 'POST', body: JSON.stringify(body) });
     } catch (err) {
       toastError(`Transfer failed to start: ${err.message}`);
-      logActivity('transfer', `Failed to start transfer: ${err.message}`, 'error');
       return;
     }
     const itemCount = Array.isArray(result.task_ids) ? result.task_ids.length : body.sources.length;
     const opLabel = operation === 'move' ? 'move' : 'copy';
-    const sourceSummaries = sources.map((s) => typeof s === 'string' ? normalizePath(s).split('/').pop() : `${normalizePath(s.path).split('/').pop()} (partial)`);
     toastSuccess(`Queued ${itemCount} ${opLabel}${itemCount === 1 ? '' : 's'} → ${body.destination}`);
-    logActivity(
-      'transfer',
-      `Queued ${itemCount} ${opLabel}${itemCount === 1 ? '' : 's'} (${sourceSummaries.join(', ')}) → ${body.destination}`,
-      'info'
-    );
     // Reset the form to defaults after a successful queue (matches the
     // selection Clear button flow): empty the selection, redraw the source
     // pane so checkbox ticks clear, and restore the operation selection.
@@ -906,7 +1114,7 @@
     return parts[parts.length - 1] || first;
   }
 
-  function setHistoryTab(tab) {
+  async function setHistoryTab(tab) {
     state.historyTab = tab;
     const isActiveTab = tab === 'active';
     const isActivityTab = tab === 'activity';
@@ -925,7 +1133,7 @@
     if (isActiveTab) {
       renderActiveTransfers();
     } else if (isActivityTab) {
-      renderActivity();
+      await loadActivity();
     }
   }
 
@@ -991,32 +1199,27 @@
       pruneCompletedSelection(task);
       updateSelectionUI();
     }
-    // 2) Surface a toast + activity log entry mirroring mkdir/rename/delete.
+    // 2) Surface a toast notification (activity log entry is recorded by the backend).
     const title = task ? getPrimaryTitle(task.sources) : 'Transfer';
     const dest = task && task.destination ? task.destination : '';
     if (status === 'succeeded') {
       const opLabel = task && task.operation === 'move' ? 'Move' : 'Transfer';
       toastSuccess(`${opLabel} complete: ${title}${dest ? ` → ${dest}` : ''}`);
-      logActivity(
-        'transfer',
-        `Transfer succeeded: ${(task && task.sources ? [].concat(task.sources).join(', ') : title)}${dest ? ` → ${dest}` : ''}`,
-        'success'
-      );
     } else if (status === 'failed') {
       const reason = (task && (task.error_message || task.error)) || `exit code ${task ? task.exit_code : '?'}`;
       toastError(`Transfer failed: ${title} — ${reason}`);
-      logActivity('transfer', `Transfer failed: ${title} — ${reason}`, 'error');
     } else if (status === 'interrupted') {
       showToast(`Transfer canceled: ${title}`, 'warn');
-      logActivity('transfer', `Transfer canceled: ${title}${dest ? ` → ${dest}` : ''}`, 'info');
     }
-    // 3) Force-refresh both panes (cache-busted) so the transfer's effect is
+    // 3) Refresh activity log from server
+    await loadActivity();
+    // 4) Force-refresh both panes (cache-busted) so the transfer's effect is
     //    visible immediately: moved items vanish from source, appear in dest.
     await Promise.all([
       state.source.path ? loadPane('source', state.source.path, true) : Promise.resolve(),
       state.dest.path ? loadPane('dest', state.dest.path, true) : Promise.resolve(),
     ]);
-    // 4) Re-render history — drops the completed card.
+    // 5) Re-render history — drops the completed card.
     await loadHistory();
   }
 
@@ -1306,11 +1509,29 @@
     el('delete-ok').addEventListener('click', submitDelete);
     el('tab-active-btn').addEventListener('click', () => setHistoryTab('active'));
     el('tab-activity-btn').addEventListener('click', () => setHistoryTab('activity'));
-    el('clear-activity-btn').addEventListener('click', () => {
+    el('clear-activity-btn').addEventListener('click', async () => {
       if (state.activity.length === 0) return;
-      clearActivity();
-      toastSuccess('Activity log cleared.');
+      const ok = await confirmStyled(
+        'Clear Activity Log?',
+        'This will permanently clear the activity log history.',
+        'Clear Log',
+        true
+      );
+      if (!ok) return;
+      await clearActivity();
     });
+
+    // Activity details modal wiring
+    const detailsCloseBtn = el('activity-details-close');
+    if (detailsCloseBtn) {
+      detailsCloseBtn.addEventListener('click', closeActivityDetails);
+    }
+    const detailsModal = el('activity-details-modal');
+    if (detailsModal) {
+      detailsModal.addEventListener('click', (e) => {
+        if (e.target === detailsModal) closeActivityDetails();
+      });
+    }
 
     initResizers();
 
@@ -1345,12 +1566,15 @@
       if (e.target === el('selection-view-btn')) return;
       closeSelectionPreview();
     });
-    // Esc closes the preview.
+    // Esc closes the preview and modals.
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') closeSelectionPreview();
+      if (e.key === 'Escape') {
+        closeSelectionPreview();
+        closeActivityDetails();
+      }
     });
 
-    loadActivity();
+    await loadActivity();
 
     const roots = await api('/api/roots');
     state.roots = roots.roots;

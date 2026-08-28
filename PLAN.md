@@ -127,7 +127,8 @@ CREATE INDEX idx_tasks_created_at ON tasks(created_at DESC);
   * On touch devices (`window.matchMedia('(hover: none)')`), a ~500ms long-press listener (`touchstart`/`touchend`/`touchmove`/`touchcancel`) displays a non-intrusive `showToast(entry.path, 'info')` notification.
 * **Copy Download Link to Clipboard (`.btn-copy-path`):**
   * Subtle icon button (`📋`) rendered specifically on file rows (`!entry.is_dir`).
-  * Copies a fully qualified download URL (`${window.location.origin}/api/download?path=...`) directly to the clipboard via `navigator.clipboard.writeText`.
+  * Copies a fully qualified download/stream URL (`${window.location.origin}/api/download?path=...&token=...`) directly to the clipboard with HTTP fallback.
+  * Signed Streaming Token: Generates cryptographically signed query tokens allowing external media players (VLC, mpv, Infuse) to stream media seamlessly with HTTP Range seeking.
   * Visual feedback: Swaps icon to green checkmark (`✓`) for 1.5 seconds and emits `toastSuccess('Link copied to clipboard')`.
   * Responsive visibility: Completely hidden on desktop until row hover (`@media (hover: hover) { opacity: 0 } -> :hover { opacity: 1 }`), but permanently visible (`opacity: 0.6`) on mobile/touch interfaces.
   * Clicks isolate propagation (`e.stopPropagation()` & target checks) to prevent triggering parent row selection or navigation.

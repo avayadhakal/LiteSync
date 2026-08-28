@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import base64
 import sys
 import time
 
 import bcrypt
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, Query, Request, Response
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from pydantic import BaseModel
 
@@ -64,17 +65,51 @@ def clear_failed_attempts(username: str) -> None:
 
 
 async def get_current_user(
-    request: Request, litesync_session: str | None = Cookie(default=None)
+    request: Request,
+    litesync_session: str | None = Cookie(default=None),
+    token: str | None = Query(default=None),
+    authorization: str | None = Header(default=None),
 ) -> str:
-    username = read_session_cookie(litesync_session) if litesync_session else None
-    if username is None:
-        if request.url.path.startswith("/api/"):
-            raise HTTPException(status_code=401, detail="Not authenticated")
-        raise HTTPException(
-            status_code=303,
-            headers={"Location": "/login.html"},
-        )
-    return username
+    # 1. Cookie authentication (standard web browser session)
+    if litesync_session:
+        username = read_session_cookie(litesync_session)
+        if username:
+            return username
+
+    # 2. Signed query token authentication (VLC / external media streaming)
+    if token:
+        username = read_session_cookie(token)
+        if username:
+            return username
+
+    # 3. Authorization header authentication (Bearer token or Basic auth)
+    if authorization:
+        if authorization.startswith("Bearer "):
+            bearer_token = authorization[7:].strip()
+            username = read_session_cookie(bearer_token)
+            if username:
+                return username
+        elif authorization.startswith("Basic "):
+            try:
+                decoded = base64.b64decode(authorization[6:].strip()).decode("utf-8")
+                user, password = decoded.split(":", 1)
+                settings = get_settings()
+                u = settings.find_user(user)
+                if u and verify_password(password, u.password_hash):
+                    return user
+            except Exception:
+                pass
+
+    if request.url.path.startswith("/api/"):
+        headers = {}
+        if request.url.path == "/api/download":
+            headers["WWW-Authenticate"] = 'Basic realm="LiteSync"'
+        raise HTTPException(status_code=401, detail="Not authenticated", headers=headers)
+
+    raise HTTPException(
+        status_code=303,
+        headers={"Location": "/login.html"},
+    )
 
 
 router = APIRouter(prefix="/api")
@@ -118,7 +153,8 @@ async def logout(response: Response):
 
 @router.get("/whoami")
 async def whoami(user: str = Depends(get_current_user)):
-    return {"username": user}
+    token = create_session_cookie(user)
+    return {"username": user, "token": token}
 
 
 def main() -> None:

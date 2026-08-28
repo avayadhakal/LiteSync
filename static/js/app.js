@@ -1,5 +1,6 @@
 (() => {
   const state = {
+    token: null,
     roots: [],
     source: { path: null, entries: [] },
     dest: { path: null, entries: [] },
@@ -251,7 +252,8 @@
         copyBtn.addEventListener('click', async (e) => {
           e.stopPropagation();
           try {
-            const url = `${window.location.origin}/api/download?path=${encodeURIComponent(entry.path)}`;
+            const tokenParam = state.token ? `&token=${encodeURIComponent(state.token)}` : '';
+            const url = `${window.location.origin}/api/download?path=${encodeURIComponent(entry.path)}${tokenParam}`;
             await copyToClipboard(url);
             copyBtn.innerHTML = '✓';
             copyBtn.style.color = 'var(--success)';
@@ -1093,6 +1095,7 @@
 
   async function init() {
     const who = await api('/api/whoami');
+    state.token = who.token || null;
     el('whoami').textContent = who.username;
 
     el('logout-btn').addEventListener('click', async () => {

@@ -2,18 +2,17 @@
 #
 # deploy.sh — LiteSync Raspberry Pi deployment helper
 #
-# Stages LiteSync from this (freshly cloned) git repository into /opt/litesync,
-# creates the dedicated `litesync` system user, builds a fresh aarch64
-# virtual environment, generates a hardened systemd unit, and starts it.
+# Stages LiteSync from this git repository into /opt/litesync, creates the
+# dedicated `litesync` system user, manages the virtual environment, generates
+# a hardened systemd unit, and restarts the service.
 #
 # Usage (on the Pi, from the cloned repo):
 #     git clone <your-repo-url> LiteSync && cd LiteSync
 #     sudo bash deploy.sh
 #
-# Re-running the script is safe (idempotent): it refreshes the code, rebuilds
-# the venv, regenerates the unit file, and restarts the service. An already
-# configured /opt/litesync/config.yaml is never overwritten — unless you
-# place a config.yaml inside this repo, which then becomes the source of truth.
+# Re-running the script is safe (idempotent): it updates backend/UI code and
+# pip packages while strictly preserving your existing database (litesync.db),
+# task logs (data/tasks/), and configuration (config.yaml).
 
 set -euo pipefail
 
@@ -41,19 +40,26 @@ die()  { printf '\033[1;31m[x]\033[0m %s\n' "$*" >&2; exit 1; }
     || die "deploy.sh must live in (and run from) the LiteSync repository root."
 
 # ---------------------------------------------------------------------------
-# 1. System dependencies
+# 1. Stop service gracefully before updating code (if already running)
 # ---------------------------------------------------------------------------
-log "Installing system dependencies (rsync, python3-venv)..."
+if systemctl is-active --quiet "${SERVICE_NAME}" 2>/dev/null; then
+    log "Stopping ${SERVICE_NAME}.service before staging updates..."
+    systemctl stop "${SERVICE_NAME}"
+fi
+
+# ---------------------------------------------------------------------------
+# 2. System dependencies
+# ---------------------------------------------------------------------------
+log "Checking system dependencies (rsync, python3-venv)..."
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
 apt-get install -y --no-install-recommends rsync python3-venv
 
-# Older Raspberry Pi OS (bullseye) ships Python 3.9; LiteSync targets 3.9+.
 PY_MINOR="$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
 log "System python3: ${PY_MINOR}"
 
 # ---------------------------------------------------------------------------
-# 2. Dedicated service user
+# 3. Dedicated service user
 # ---------------------------------------------------------------------------
 if id "${SERVICE_NAME}" &>/dev/null; then
     log "User '${SERVICE_NAME}' already exists — skipping creation."
@@ -63,26 +69,25 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 3. Stage the application into /opt/litesync
+# 4. Stage the application into /opt/litesync
 # ---------------------------------------------------------------------------
-log "Staging application into ${INSTALL_DIR}..."
 install -d -m 0755 "${INSTALL_DIR}"
 
-# Copy application code and assets. (cp of explicit paths keeps the x86-64
-# .venv, .git, and local data/ out of the staging area.)
-cp -r "${SCRIPT_DIR}/app" "${SCRIPT_DIR}/static" "${INSTALL_DIR}/"
-cp "${SCRIPT_DIR}/requirements.txt" "${SCRIPT_DIR}/config.example.yaml" "${INSTALL_DIR}/"
-# Drop any stale bytecode that may have come along from a dev machine.
-find "${INSTALL_DIR}/app" -name '__pycache__' -type d -prune -exec rm -rf {} +
+if [[ "${SCRIPT_DIR}" != "${INSTALL_DIR}" ]]; then
+    log "Staging application code into ${INSTALL_DIR}..."
+    cp -r "${SCRIPT_DIR}/app" "${SCRIPT_DIR}/static" "${INSTALL_DIR}/"
+    cp "${SCRIPT_DIR}/requirements.txt" "${SCRIPT_DIR}/config.example.yaml" "${INSTALL_DIR}/"
+    # Drop any stale bytecode that may have come along from a dev machine.
+    find "${INSTALL_DIR}/app" -name '__pycache__' -type d -prune -exec rm -rf {} +
+fi
 
-# --- config.yaml (gitignored, so it is normally absent from a fresh clone) ---
-if [[ -f "${SCRIPT_DIR}/config.yaml" ]]; then
-    # The user prepared a real config next to the clone: it is the source of truth.
-    log "Found config.yaml in the repo — installing it."
-    install -m 0600 "${SCRIPT_DIR}/config.yaml" "${INSTALL_DIR}/config.yaml"
+# --- config.yaml (Preserve existing active config; never overwrite) ---
+if [[ -f "${INSTALL_DIR}/config.yaml" ]]; then
+    log "Keeping existing active ${INSTALL_DIR}/config.yaml (credentials & settings preserved)."
     CONFIG_SEEDED=false
-elif [[ -f "${INSTALL_DIR}/config.yaml" ]]; then
-    log "Keeping existing ${INSTALL_DIR}/config.yaml (never overwriting a configured one)."
+elif [[ -f "${SCRIPT_DIR}/config.yaml" ]]; then
+    log "Found config.yaml in repository — installing it to ${INSTALL_DIR}/config.yaml."
+    install -m 0600 "${SCRIPT_DIR}/config.yaml" "${INSTALL_DIR}/config.yaml"
     CONFIG_SEEDED=false
 else
     warn "No config.yaml found — seeding from config.example.yaml with a fresh random secret_key."
@@ -90,27 +95,31 @@ else
     CONFIG_SEEDED=true
 fi
 
-# Database + per-task logs live here (config.yaml's data_dir: ./data resolves
-# relative to WorkingDirectory, i.e. /opt/litesync/data).
-install -d -m 0755 "${INSTALL_DIR}/data"
+# --- Data directory (Database + task logs) ---
+# Ensure data directory exists with correct permissions without altering existing database/logs.
+if [[ -d "${INSTALL_DIR}/data" ]]; then
+    log "Preserving existing data directory at ${INSTALL_DIR}/data (database & task logs intact)."
+else
+    log "Creating initial data directory at ${INSTALL_DIR}/data..."
+    install -d -m 0755 "${INSTALL_DIR}/data"
+fi
 
 # ---------------------------------------------------------------------------
-# 4. Fresh aarch64 virtual environment
+# 5. Virtual environment (Fast incremental update)
 # ---------------------------------------------------------------------------
-# Never copy a venv from another machine: bcrypt/pydantic-core ship native
-# extensions compiled for the build host's architecture. Build it here, on
-# the Pi.
-log "Building fresh virtual environment at ${INSTALL_DIR}/.venv (this can take a few minutes on a Pi)..."
-rm -rf "${INSTALL_DIR}/.venv"
-python3 -m venv "${INSTALL_DIR}/.venv"
 VENV_PY="${INSTALL_DIR}/.venv/bin/python"
-"${VENV_PY}" -m pip install --no-cache-dir -r "${INSTALL_DIR}/requirements.txt"
+if [[ -x "${VENV_PY}" ]]; then
+    log "Updating virtual environment packages in ${INSTALL_DIR}/.venv..."
+    "${VENV_PY}" -m pip install -q -r "${INSTALL_DIR}/requirements.txt"
+else
+    log "Building fresh virtual environment at ${INSTALL_DIR}/.venv (first-time setup)..."
+    python3 -m venv "${INSTALL_DIR}/.venv"
+    "${VENV_PY}" -m pip install --no-cache-dir -r "${INSTALL_DIR}/requirements.txt"
+fi
 
 # ---------------------------------------------------------------------------
-# 5. Read host/port/allowed_roots from the staged config.yaml
+# 6. Read host/port/allowed_roots from the staged config.yaml
 # ---------------------------------------------------------------------------
-# The uvicorn --host/--port flags override anything in config.yaml, so we read
-# the config values here and pass them explicitly — the two can never drift.
 read -r HOST PORT < <("${VENV_PY}" - <<PYEOF
 import yaml
 d = yaml.safe_load(open("${INSTALL_DIR}/config.yaml"))
@@ -155,7 +164,7 @@ for root in "${ALLOWED_ROOTS[@]}"; do
 done
 
 # ---------------------------------------------------------------------------
-# 6. Generate the systemd unit
+# 7. Generate the systemd unit
 # ---------------------------------------------------------------------------
 log "Generating ${SERVICE_FILE} (host=${HOST} port=${PORT})..."
 cat > "${SERVICE_FILE}" <<EOF
@@ -191,15 +200,17 @@ WantedBy=multi-user.target
 EOF
 
 # ---------------------------------------------------------------------------
-# 7. Ownership, activation, verification
+# 8. Ownership, activation, verification
 # ---------------------------------------------------------------------------
 log "Setting ownership to ${SERVICE_NAME}:${SERVICE_NAME}..."
 chown -R "${SERVICE_NAME}:${SERVICE_NAME}" "${INSTALL_DIR}"
 chmod 600 "${INSTALL_DIR}/config.yaml"
+chmod 755 "${INSTALL_DIR}/data"
 
-log "Enabling + starting ${SERVICE_NAME}.service..."
+log "Enabling & restarting ${SERVICE_NAME}.service with latest code..."
 systemctl daemon-reload
-systemctl enable --now "${SERVICE_NAME}"
+systemctl enable "${SERVICE_NAME}"
+systemctl restart "${SERVICE_NAME}"
 
 sleep 2
 echo
@@ -217,7 +228,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 8. Post-install checklist (only if we had to seed a placeholder config)
+# 9. Post-install checklist (only if we had to seed a placeholder config)
 # ---------------------------------------------------------------------------
 if [[ "${CONFIG_SEEDED}" == "true" ]]; then
     echo

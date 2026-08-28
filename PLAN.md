@@ -143,6 +143,11 @@ CREATE INDEX idx_tasks_created_at ON tasks(created_at DESC);
 * **Subprocess Safety:** Commands are built as argument lists (e.g., `["rsync", "-av", ...]`) and passed directly to `asyncio.create_subprocess_exec`. No shell (`shell=True`) is used, entirely eliminating shell-injection vectors.
 * **Permissions:** The app runs as a dedicated, non-root `litesync` system user. The `config.yaml` containing bcrypt hashes must be strictly `chmod 600`.
 * **Systemd Hardening:** The `litesync.service` unit file mandates `NoNewPrivileges=true` and `ProtectSystem=strict`, ensuring the worker process cannot escalate privileges and can only write to explicitly whitelisted directories (like its own `/opt/litesync/data` and the configured destination roots).
+* **Safe Idempotent Deployment (`deploy.sh`):**
+  * Staging preserves existing active `/opt/litesync/config.yaml` and never overwrites user configurations.
+  * Preserves `/opt/litesync/data` (`litesync.db` and task logs) without alteration or deletion during updates.
+  * Gracefully stops `litesync.service` before updating code and performs a clean `systemctl restart`.
+  * Optimizes virtual environment deployment with incremental pip updates rather than wiping `.venv`.
 * **Resource Footprint:** Expect a highly efficient ~30-50MB RSS footprint while idle, fitting easily within older Raspberry Pi hardware limits.
 
 ## 7. Build Order & Verification Plan

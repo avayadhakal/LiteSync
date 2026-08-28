@@ -131,6 +131,41 @@ password_hash = "$2b$12$envhash"
             else:
                 os.environ.pop("LITESYNC_CONFIG", None)
 
+    def test_download_signing_key_derivation(self):
+        from app.config import get_download_signing_key
+        config_content = """
+allowed_roots = ["/mnt/data"]
+secret_key = "my_master_secret"
+"""
+        config_path = self.config_dir / "derive_test.toml"
+        config_path.write_text(config_content)
+        settings = load_settings(config_path)
+
+        key1 = get_download_signing_key(settings)
+        self.assertIsInstance(key1, bytes)
+        self.assertEqual(len(key1), 32)
+        # Verify it is not equal to raw secret_key
+        self.assertNotEqual(key1, b"my_master_secret")
+        # Verify deterministic
+        self.assertEqual(key1, get_download_signing_key(settings))
+
+    def test_custom_download_secret_key(self):
+        from app.config import get_download_signing_key
+        config_content = """
+allowed_roots = ["/mnt/data"]
+secret_key = "my_master_secret"
+download_secret_key = "custom_download_secret"
+download_expiry = 3600
+"""
+        config_path = self.config_dir / "custom_secret_test.toml"
+        config_path.write_text(config_content)
+        settings = load_settings(config_path)
+
+        self.assertEqual(settings.download_expiry, 3600)
+        self.assertEqual(settings.download_secret_key, "custom_download_secret")
+        key = get_download_signing_key(settings)
+        self.assertEqual(key, b"custom_download_secret")
+
 
 if __name__ == "__main__":
     unittest.main()

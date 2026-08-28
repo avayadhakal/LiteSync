@@ -5,7 +5,7 @@ import sys
 import time
 
 import bcrypt
-from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, Query, Request, Response
+from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, Request, Response
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from pydantic import BaseModel
 
@@ -67,7 +67,6 @@ def clear_failed_attempts(username: str) -> None:
 async def get_current_user(
     request: Request,
     litesync_session: str | None = Cookie(default=None),
-    token: str | None = Query(default=None),
     authorization: str | None = Header(default=None),
 ) -> str:
     # 1. Cookie authentication (standard web browser session)
@@ -76,13 +75,7 @@ async def get_current_user(
         if username:
             return username
 
-    # 2. Signed query token authentication (VLC / external media streaming)
-    if token:
-        username = read_session_cookie(token)
-        if username:
-            return username
-
-    # 3. Authorization header authentication (Bearer token or Basic auth)
+    # 2. Authorization header authentication (Bearer token or Basic auth)
     if authorization:
         if authorization.startswith("Bearer "):
             bearer_token = authorization[7:].strip()
@@ -101,10 +94,7 @@ async def get_current_user(
                 pass
 
     if request.url.path.startswith("/api/"):
-        headers = {}
-        if request.url.path == "/api/download":
-            headers["WWW-Authenticate"] = 'Basic realm="LiteSync"'
-        raise HTTPException(status_code=401, detail="Not authenticated", headers=headers)
+        raise HTTPException(status_code=401, detail="Not authenticated")
 
     raise HTTPException(
         status_code=303,
@@ -153,8 +143,7 @@ async def logout(response: Response):
 
 @router.get("/whoami")
 async def whoami(user: str = Depends(get_current_user)):
-    token = create_session_cookie(user)
-    return {"username": user, "token": token}
+    return {"username": user}
 
 
 def main() -> None:

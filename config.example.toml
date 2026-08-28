@@ -16,6 +16,13 @@ secret_key = "REPLACE_ME_WITH_A_RANDOM_SECRET"
 # Session cookie lifetime, in seconds. Default: 7 days (604800 seconds).
 session_max_age = 604800
 
+# Signed download URL lifetime, in seconds. Default: 24 hours (86400 seconds).
+download_expiry = 86400
+
+# Optional dedicated secret key for download URL signing.
+# If omitted, a distinct key is derived automatically from secret_key.
+# download_secret_key = "OPTIONAL_SEPARATE_DOWNLOAD_SECRET"
+
 # Set true only if the app is served over HTTPS.
 secure_cookie = false
 

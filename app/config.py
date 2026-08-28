@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
 import os
 import tomllib
 from dataclasses import dataclass
@@ -22,6 +24,8 @@ class Settings:
     data_dir: Path
     host: str
     port: int
+    download_expiry: int = 86400
+    download_secret_key: str | None = None
 
     def find_user(self, username: str) -> User | None:
         for user in self.users:
@@ -61,7 +65,22 @@ def load_settings(config_path_override: Path | str | None = None) -> Settings:
         data_dir=data_dir,
         host=raw.get("host", "0.0.0.0"),
         port=int(raw.get("port", 8000)),
+        download_expiry=int(raw.get("download_expiry", 86400)),
+        download_secret_key=raw.get("download_secret_key"),
     )
+
+
+def get_download_signing_key(settings: Settings) -> bytes:
+    """Derive a domain-separated download signing key.
+
+    If an explicit download_secret_key is provided in configuration, it is used.
+    Otherwise, a dedicated key is derived from secret_key using HMAC-SHA256 with
+    the domain label 'litesync-download-signing' to decouple download URL signing
+    from session cookie signing.
+    """
+    if settings.download_secret_key:
+        return settings.download_secret_key.encode("utf-8")
+    return hmac.new(settings.secret_key.encode("utf-8"), b"litesync-download-signing", hashlib.sha256).digest()
 
 
 def get_settings() -> Settings:

@@ -1,6 +1,5 @@
 (() => {
   const state = {
-    token: null,
     roots: [],
     source: { path: null, entries: [] },
     dest: { path: null, entries: [] },
@@ -252,18 +251,18 @@
         copyBtn.addEventListener('click', async (e) => {
           e.stopPropagation();
           try {
-            const tokenParam = state.token ? `&token=${encodeURIComponent(state.token)}` : '';
-            const url = `${window.location.origin}/api/download?path=${encodeURIComponent(entry.path)}${tokenParam}`;
-            await copyToClipboard(url);
+            const data = await api(`/api/download/link?path=${encodeURIComponent(entry.path)}`);
+            const fullUrl = new URL(data.url, window.location.origin).href;
+            await copyToClipboard(fullUrl);
             copyBtn.innerHTML = '✓';
             copyBtn.style.color = 'var(--success)';
-            toastSuccess('Link copied to clipboard');
+            toastSuccess('Download link copied');
             setTimeout(() => {
               copyBtn.innerHTML = '📋';
               copyBtn.style.color = '';
             }, 1500);
           } catch (err) {
-            toastError('Failed to copy link');
+            toastError(err.message || 'Failed to copy link');
           }
         });
         row.appendChild(copyBtn);
@@ -1100,7 +1099,6 @@
 
   async function init() {
     const who = await api('/api/whoami');
-    state.token = who.token || null;
     el('whoami').textContent = who.username;
 
     el('logout-btn').addEventListener('click', async () => {

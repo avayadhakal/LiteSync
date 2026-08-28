@@ -55,7 +55,6 @@ def queue_task(
     source: str,
     destination: str,
     operation: str = "copy",
-    created_by: str = "",
     excludes: list[str] | None = None,
 ) -> str:
     """Persist a single-source task as 'queued'. Nothing is launched here —

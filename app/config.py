@@ -44,8 +44,12 @@ def load_settings(config_path_override: Path | str | None = None) -> Settings:
         config_path = Path(os.environ.get("LITESYNC_CONFIG", "./config.toml")).resolve()
 
     if not config_path.exists():
+        yaml_hint = ""
+        legacy_yaml = config_path.parent / "config.yaml"
+        if legacy_yaml.exists():
+            yaml_hint = f" Found legacy {legacy_yaml.name} - please migrate your settings to config.toml."
         raise FileNotFoundError(
-            f"Config file not found at {config_path}. Copy config.example.toml to "
+            f"Config file not found at {config_path}.{yaml_hint} Copy config.example.toml to "
             "config.toml and edit it, or set LITESYNC_CONFIG."
         )
 

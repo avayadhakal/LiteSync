@@ -87,6 +87,15 @@ password_hash = "$2b$12$pihash"
         self.assertIn("Config file not found", str(ctx.exception))
         self.assertIn("config.example.toml", str(ctx.exception))
 
+    def test_missing_config_file_with_legacy_yaml_diagnostic(self):
+        legacy_yaml = self.config_dir / "config.yaml"
+        legacy_yaml.write_text("allowed_roots:\n  - /mnt/share\n")
+        non_existent = self.config_dir / "config.toml"
+        with self.assertRaises(FileNotFoundError) as ctx:
+            load_settings(non_existent)
+        self.assertIn("Found legacy config.yaml", str(ctx.exception))
+        self.assertIn("please migrate your settings to config.toml", str(ctx.exception))
+
     def test_settings_immutability(self):
         config_content = """
 allowed_roots = ["/mnt/data"]

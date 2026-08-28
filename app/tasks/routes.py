@@ -92,7 +92,6 @@ async def create_transfer(body: TransferRequest, user: str = Depends(get_current
             source=source,
             destination=str(resolved_destination),
             operation=body.operation,
-            created_by=user,
             excludes=excludes,
         )
         for source, excludes in items_to_queue
@@ -170,10 +169,6 @@ async def delete_task(task_id: str, _user: str = Depends(get_current_user)):
     flat_log = settings.data_dir / "tasks" / f"{task_id}.log"
     flat_log.unlink(missing_ok=True)
 
-    legacy_dir = settings.data_dir / "tasks" / task_id
-    if legacy_dir.exists() and legacy_dir.is_dir():
-        shutil.rmtree(legacy_dir, ignore_errors=True)
-
     return {"success": True}
 
 
@@ -187,9 +182,6 @@ async def delete_all_completed_tasks(_user: str = Depends(get_current_user)):
             db.delete_task(t_id)
             flat_log = settings.data_dir / "tasks" / f"{t_id}.log"
             flat_log.unlink(missing_ok=True)
-            legacy_dir = settings.data_dir / "tasks" / t_id
-            if legacy_dir.exists() and legacy_dir.is_dir():
-                shutil.rmtree(legacy_dir, ignore_errors=True)
 
     return {"success": True}
 

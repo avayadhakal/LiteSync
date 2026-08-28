@@ -48,28 +48,16 @@ def get_task_log_path(task_id: str, data_dir: Path | None = None) -> Path:
         else:
             data_dir = Path("data")
 
-    flat_log = data_dir / "tasks" / f"{task_id}.log"
-    if flat_log.exists():
-        return flat_log
-
-    legacy_log = data_dir / "tasks" / task_id / "log"
-    if legacy_log.exists():
-        return legacy_log
-
-    return flat_log
+    return data_dir / "tasks" / f"{task_id}.log"
 
 
 def _row_to_dict(row: sqlite3.Row | None) -> dict | None:
-    """Convert SQLite Row to dictionary with authoritative fields and derived transitional compatibility aliases."""
+    """Convert SQLite Row to dictionary with authoritative fields."""
     if row is None:
         return None
     d = dict(row)
     task_id = d["id"]
-
-    # Transitional compatibility aliases (derived dynamically, not stored in DB)
     d["task_id"] = task_id
-    d["sources"] = [d["source"]]
-    d["log_path"] = str(get_task_log_path(task_id))
     raw_exc = d.get("excludes")
     if isinstance(raw_exc, str):
         try:

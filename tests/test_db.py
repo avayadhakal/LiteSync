@@ -102,11 +102,11 @@ class TestDatabaseSchemaAndTasks(unittest.TestCase):
         self.assertIsNone(task["exit_code"])
         self.assertIsNone(task["error_message"])
 
-        # Transitional compatibility aliases
+        # Field assertions
         self.assertEqual(task["task_id"], task_id)
-        self.assertEqual(task["sources"], ["/mnt/source/file.txt"])
+        self.assertNotIn("sources", task)
         self.assertNotIn("delete_source", task)
-        self.assertIn(task_id, task["log_path"])
+        self.assertNotIn("log_path", task)
 
     def test_insert_task_move_operation(self):
         task_id = "task_uuid_move"

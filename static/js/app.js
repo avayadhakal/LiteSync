@@ -1271,8 +1271,8 @@
     // so keeping them selected points at stale paths.
     if (!task) return false;
     let changed = false;
-    const sources = Array.isArray(task.sources) ? task.sources : (task.source ? [task.source] : []);
-    for (const src of sources) {
+    const src = task.source || (Array.isArray(task.sources) ? task.sources[0] : null);
+    if (src) {
       state.selection.deletePath(src);
       changed = true;
     }
@@ -1289,7 +1289,7 @@
       updateSelectionUI();
     }
     // 2) Surface a toast notification (activity log entry is recorded by the backend).
-    const title = task ? getPrimaryTitle(task.sources) : 'Transfer';
+    const title = task ? getPrimaryTitle(task.source || task.sources) : 'Transfer';
     const dest = task && task.destination ? task.destination : '';
     if (status === 'succeeded') {
       const opLabel = task && task.operation === 'move' ? 'Move' : 'Transfer';
@@ -1349,8 +1349,8 @@
       card.className = 'transfer-card';
       card.id = `card-${task.task_id}`;
 
-      const primaryTitle = getPrimaryTitle(task.sources);
-      const sourcesText = Array.isArray(task.sources) ? task.sources.join(', ') : task.sources;
+      const primaryTitle = getPrimaryTitle(task.source || task.sources);
+      const sourceText = task.source || (Array.isArray(task.sources) ? task.sources.join(', ') : (task.sources || ''));
       const streamData = activeStreams.get(task.task_id);
       const currentPct = streamData ? streamData.pct : 0;
       const currentDetail = streamData && streamData.currentFile
@@ -1362,8 +1362,8 @@
           <span class="card-title" title="${escapeHtml(primaryTitle)}">${escapeHtml(primaryTitle)}</span>
           <button class="btn-sm btn-danger cancel-btn" data-id="${task.task_id}">Cancel</button>
         </div>
-        <div class="card-path truncate" title="${escapeHtml(sourcesText)} ➔ ${escapeHtml(task.destination)}">
-          ${escapeHtml(sourcesText)} ➔ ${escapeHtml(task.destination)}
+        <div class="card-path truncate" title="${escapeHtml(sourceText)} ➔ ${escapeHtml(task.destination)}">
+          ${escapeHtml(sourceText)} ➔ ${escapeHtml(task.destination)}
         </div>
         <div class="bg-gray-800 rounded h-5 relative flex items-center justify-center overflow-hidden" style="position: relative;">
           <div class="bg-blue-600 rounded absolute inset-0" id="progress-fill-${task.task_id}" style="width: ${currentPct}%; transition: width 0.2s ease;"></div>
@@ -1380,7 +1380,7 @@
       if (cancelBtn) {
         cancelBtn.addEventListener('click', async (e) => {
           e.stopPropagation();
-          const title = getPrimaryTitle(task.sources);
+          const title = getPrimaryTitle(task.source || task.sources);
           const ok = await confirmStyled(
             `Cancel transfer: ${title}?`,
             'The active transfer will be stopped.',

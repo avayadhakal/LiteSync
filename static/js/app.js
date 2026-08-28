@@ -665,8 +665,8 @@
       list.appendChild(li);
     }
     el('confirm-dest').textContent = state.dest.path;
-    // The delete-source toggle lives in this modal; unchecked is its default.
-    el('delete-checkbox').checked = false;
+    const copyRadio = document.querySelector('input[name="transfer-op"][value="copy"]');
+    if (copyRadio) copyRadio.checked = true;
     el('confirm-modal').classList.remove('hidden');
   }
 
@@ -676,10 +676,12 @@
 
   async function submitTransfer() {
     closeConfirmModal();
+    const opRadio = document.querySelector('input[name="transfer-op"]:checked');
+    const operation = opRadio ? opRadio.value : 'copy';
     const body = {
       sources: Array.from(state.selection),
       destination: state.dest.path,
-      delete_source: el('delete-checkbox').checked,
+      operation: operation,
     };
     let result;
     try {
@@ -690,17 +692,19 @@
       return;
     }
     const itemCount = Array.isArray(result.task_ids) ? result.task_ids.length : body.sources.length;
-    toastSuccess(`Queued ${itemCount} transfer${itemCount === 1 ? '' : 's'} → ${body.destination}`);
+    const opLabel = operation === 'move' ? 'move' : 'copy';
+    toastSuccess(`Queued ${itemCount} ${opLabel}${itemCount === 1 ? '' : 's'} → ${body.destination}`);
     logActivity(
       'transfer',
-      `Queued ${itemCount} transfer${itemCount === 1 ? '' : 's'} (${body.sources.map((p) => normalizePath(p).split('/').pop()).join(', ')}) → ${body.destination}${body.delete_source ? ' [delete source]' : ''}`,
+      `Queued ${itemCount} ${opLabel}${itemCount === 1 ? '' : 's'} (${body.sources.map((p) => normalizePath(p).split('/').pop()).join(', ')}) → ${body.destination}`,
       'info'
     );
     // Reset the form to defaults after a successful queue (matches the
     // selection Clear button flow): empty the selection, redraw the source
-    // pane so checkbox ticks clear, and restore the delete-source toggle.
+    // pane so checkbox ticks clear, and restore the operation selection.
     state.selection.clear();
-    el('delete-checkbox').checked = false;
+    const copyRadio = document.querySelector('input[name="transfer-op"][value="copy"]');
+    if (copyRadio) copyRadio.checked = true;
     updateSelectionUI();
     renderPane('source');
     setHistoryTab('active');
@@ -791,8 +795,8 @@
   const activeStreams = new Map(); // taskId -> { source, currentFile, pct }
 
   function pruneCompletedSelection(task) {
-    // Sources of a successfully finished task were moved (delete-source) or
-    // copied & pruned, so keeping them selected points at stale paths.
+    // Sources of a successfully finished task were moved or copied,
+    // so keeping them selected points at stale paths.
     // Normalize both sides (task sources may carry trailing slashes that
     // pane-entry paths never have) before comparing against selection keys.
     if (!task || !Array.isArray(task.sources)) return false;
@@ -822,10 +826,11 @@
     const title = task ? getPrimaryTitle(task.sources) : 'Transfer';
     const dest = task && task.destination ? task.destination : '';
     if (status === 'succeeded') {
-      toastSuccess(`Transfer complete: ${title}${dest ? ` → ${dest}` : ''}`);
+      const opLabel = task && task.operation === 'move' ? 'Move' : 'Transfer';
+      toastSuccess(`${opLabel} complete: ${title}${dest ? ` → ${dest}` : ''}`);
       logActivity(
         'transfer',
-        `Transfer succeeded: ${(task && task.sources ? [].concat(task.sources).join(', ') : title)}${dest ? ` → ${dest}` : ''}${task && task.delete_source ? ' [source deleted]' : ''}`,
+        `Transfer succeeded: ${(task && task.sources ? [].concat(task.sources).join(', ') : title)}${dest ? ` → ${dest}` : ''}`,
         'success'
       );
     } else if (status === 'failed') {
@@ -917,7 +922,7 @@
           const title = getPrimaryTitle(task.sources);
           const ok = await confirmStyled(
             `Cancel transfer: ${title}?`,
-            'Incomplete files in the destination will be deleted.',
+            'The active transfer will be stopped.',
             'Cancel Transfer',
             true
           );

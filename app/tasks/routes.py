@@ -26,7 +26,7 @@ _LINE_SPLIT = re.compile(r"[\r\n]")
 class TransferRequest(BaseModel):
     sources: list[str]
     destination: str
-    delete_source: bool = False
+    operation: str = "copy"
 
 
 @router.post("/transfer")
@@ -35,6 +35,9 @@ async def create_transfer(body: TransferRequest, user: str = Depends(get_current
 
     if not body.sources:
         raise HTTPException(status_code=400, detail="No sources selected")
+
+    if body.operation not in ("copy", "move"):
+        raise HTTPException(status_code=400, detail="Invalid operation. Must be 'copy' or 'move'")
 
     resolved_sources = [str(resolve_safe_path(s, settings.allowed_roots)) for s in body.sources]
     resolved_destination = resolve_safe_path(body.destination, settings.allowed_roots)
@@ -50,7 +53,7 @@ async def create_transfer(body: TransferRequest, user: str = Depends(get_current
             settings=settings,
             source=source,
             destination=str(resolved_destination),
-            delete_source=body.delete_source,
+            operation=body.operation,
             created_by=user,
         )
         for source in resolved_sources
@@ -82,21 +85,25 @@ async def stream_task(task_id: str, _user: str = Depends(get_current_user)):
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    log_path = Path(task["log_path"])
+    settings = get_settings()
+    log_path = db.get_task_log_path(task_id, settings.data_dir)
 
     async def generator():
         offset = 0
         while True:
             if log_path.exists():
-                with open(log_path, "rb") as f:
-                    f.seek(offset)
-                    chunk = f.read()
-                if chunk:
-                    offset += len(chunk)
-                    text = chunk.decode("utf-8", errors="replace")
-                    for line in _LINE_SPLIT.split(text):
-                        if line.strip():
-                            yield f"data: {line}\n\n"
+                try:
+                    with open(log_path, "rb") as f:
+                        f.seek(offset)
+                        chunk = f.read()
+                    if chunk:
+                        offset += len(chunk)
+                        text = chunk.decode("utf-8", errors="replace")
+                        for line in _LINE_SPLIT.split(text):
+                            if line.strip():
+                                yield f"data: {line}\n\n"
+                except OSError:
+                    pass
 
             current = db.get_task(task_id)
             if current is None:
@@ -112,7 +119,6 @@ async def stream_task(task_id: str, _user: str = Depends(get_current_user)):
 
 @router.delete("/tasks/{task_id}")
 async def delete_task(task_id: str, _user: str = Depends(get_current_user)):
-
     task = db.get_task(task_id)
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -121,25 +127,30 @@ async def delete_task(task_id: str, _user: str = Depends(get_current_user)):
 
     db.delete_task(task_id)
 
-    log_path = Path(task["log_path"])
-    task_dir = log_path.parent
-    if task_dir.exists() and task_dir.is_dir():
-        shutil.rmtree(task_dir, ignore_errors=True)
+    settings = get_settings()
+    flat_log = settings.data_dir / "tasks" / f"{task_id}.log"
+    flat_log.unlink(missing_ok=True)
+
+    legacy_dir = settings.data_dir / "tasks" / task_id
+    if legacy_dir.exists() and legacy_dir.is_dir():
+        shutil.rmtree(legacy_dir, ignore_errors=True)
 
     return {"success": True}
 
 
 @router.delete("/tasks")
 async def delete_all_completed_tasks(_user: str = Depends(get_current_user)):
-    # Retrieve all tasks and filter out completed ones
+    settings = get_settings()
     tasks = db.list_tasks(limit=1000)
     for task in tasks:
         if task["status"] not in ("queued", "running"):
-            db.delete_task(task["task_id"])
-            log_path = Path(task["log_path"])
-            task_dir = log_path.parent
-            if task_dir.exists() and task_dir.is_dir():
-                shutil.rmtree(task_dir, ignore_errors=True)
+            t_id = task["id"]
+            db.delete_task(t_id)
+            flat_log = settings.data_dir / "tasks" / f"{t_id}.log"
+            flat_log.unlink(missing_ok=True)
+            legacy_dir = settings.data_dir / "tasks" / t_id
+            if legacy_dir.exists() and legacy_dir.is_dir():
+                shutil.rmtree(legacy_dir, ignore_errors=True)
 
     return {"success": True}
 
@@ -152,8 +163,6 @@ async def cancel_task(task_id: str, _user: str = Depends(get_current_user)):
     if task["status"] not in ("queued", "running"):
         raise HTTPException(status_code=400, detail="Task is not active")
 
-    settings = get_settings()
-
     if task["status"] == "queued":
         # Simply take it out of the queue; the scheduler only picks rows
         # with status='queued', so it is skipped. Nothing copied yet, so the
@@ -161,30 +170,10 @@ async def cancel_task(task_id: str, _user: str = Depends(get_current_user)):
         db.mark_finished(task_id, "interrupted", None, "Transfer cancelled by user")
         return {"success": True}
 
-    # Running: gracefully stop the rsync child. The scheduler escalates to
-    # SIGKILL if SIGTERM is ignored within ~5s.
+    # Running: gracefully stop the rsync child. The scheduler watchdog escalates
+    # to SIGKILL if SIGTERM is ignored within ~5s.
     terminate_task(task_id)
     db.mark_finished(task_id, "interrupted", None, "Transfer cancelled by user")
-
-    # Cleanup destination items
-    try:
-        resolved_dest = resolve_safe_path(task["destination"], settings.allowed_roots)
-        for src in task["sources"]:
-            src_name = Path(src).name
-            target = resolved_dest / src_name
-            try:
-                resolved_target = resolve_safe_path(str(target), settings.allowed_roots)
-                # Verify that target is actually inside the destination folder
-                if resolved_target == resolved_dest or not str(resolved_target).startswith(str(resolved_dest) + os.sep if str(resolved_dest) != "/" else "/"):
-                    continue
-                if resolved_target.is_dir():
-                    shutil.rmtree(resolved_target, ignore_errors=True)
-                elif resolved_target.exists() or resolved_target.is_symlink():
-                    resolved_target.unlink(missing_ok=True)
-            except Exception:
-                pass
-    except Exception:
-        pass
-
     return {"success": True}
+
 

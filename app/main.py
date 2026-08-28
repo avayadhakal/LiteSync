@@ -13,7 +13,7 @@ from app.config import get_settings
 from app.routes_browse import router as browse_router
 from app.tasks import db
 from app.tasks.routes import router as tasks_router
-from app.tasks.runner import reconcile_on_startup, run_scheduler
+from app.tasks.runner import reconcile_on_startup, run_scheduler, shutdown_runner
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
@@ -25,6 +25,8 @@ app.include_router(tasks_router)
 
 app.mount("/css", StaticFiles(directory=STATIC_DIR / "css"), name="css")
 app.mount("/js", StaticFiles(directory=STATIC_DIR / "js"), name="js")
+
+_scheduler_task: asyncio.Task | None = None
 
 
 @app.get("/login.html")
@@ -44,7 +46,20 @@ async def root(_user: str = Depends(get_current_user)):
 
 @app.on_event("startup")
 async def on_startup():
+    global _scheduler_task
     settings = get_settings()
     db.init_db(settings.data_dir)
     reconcile_on_startup(settings)
-    asyncio.create_task(run_scheduler(settings))
+    _scheduler_task = asyncio.create_task(run_scheduler(settings))
+
+
+@app.on_event("shutdown")
+async def on_shutdown():
+    global _scheduler_task
+    if _scheduler_task is not None:
+        _scheduler_task.cancel()
+        try:
+            await _scheduler_task
+        except (asyncio.CancelledError, Exception):
+            pass
+    await shutdown_runner()

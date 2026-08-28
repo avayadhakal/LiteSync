@@ -78,10 +78,22 @@
 
   <div class="modal-backdrop hidden" id="confirm-modal">
     <div class="modal">
-      <h2>Are you sure you want to transfer the selected items?</h2>
+      <h2>Transfer items</h2>
       <ul id="confirm-list"></ul>
-      <div>Destination: <span id="confirm-dest" style="color: var(--text-dim);"></span></div>
-      <label class="modal-checkbox"><input type="checkbox" id="delete-checkbox" /> Delete source files after successful copy</label>
+      <div class="modal-hint">Destination: <span id="confirm-dest" style="color: var(--text-dim);"></span></div>
+      <div class="modal-field" style="margin-top: 14px;">
+        <label class="modal-label" style="margin-bottom: 8px;">Operation</label>
+        <div class="modal-radio-group">
+          <label class="modal-radio">
+            <input type="radio" name="transfer-op" value="copy" checked />
+            <span>Copy</span>
+          </label>
+          <label class="modal-radio">
+            <input type="radio" name="transfer-op" value="move" />
+            <span>Move</span>
+          </label>
+        </div>
+      </div>
       <div class="actions">
         <button id="confirm-cancel">Cancel</button>
         <button id="confirm-ok" class="primary">Transfer</button>

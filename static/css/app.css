@@ -468,16 +468,27 @@ tr.task-row:hover { background: var(--panel-alt); }
 }
 .modal h2 { margin-top: 0; font-size: 15px; }
 .modal ul { max-height: 140px; overflow-y: auto; font-size: 13px; color: var(--text-dim); }
-.modal .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
-.modal-checkbox {
+.modal-radio-group {
+  display: flex;
+  gap: 16px;
+  margin-top: 6px;
+}
+.modal-radio {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: var(--text-dim);
-  font-size: 12px;
-  margin-top: 12px;
-  /* no bottom margin — .actions' margin-top already provides the gap to the buttons */
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
 }
+.modal-radio input[type="radio"] {
+  accent-color: var(--accent);
+  cursor: pointer;
+  margin: 0;
+  width: 16px;
+  height: 16px;
+}
+.modal .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 
 .log-view {
   background: #000;

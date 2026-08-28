@@ -47,16 +47,15 @@ def get_task_log_path(task_id: str, data_dir: Path | None = None) -> Path:
         else:
             data_dir = Path("data")
 
-    legacy_log = data_dir / "tasks" / task_id / "log"
-    if legacy_log.exists():
-        return legacy_log
-
     flat_log = data_dir / "tasks" / f"{task_id}.log"
     if flat_log.exists():
         return flat_log
 
-    # Default structure for tasks directory
-    return legacy_log
+    legacy_log = data_dir / "tasks" / task_id / "log"
+    if legacy_log.exists():
+        return legacy_log
+
+    return flat_log
 
 
 def _row_to_dict(row: sqlite3.Row | None) -> dict | None:
@@ -69,16 +68,23 @@ def _row_to_dict(row: sqlite3.Row | None) -> dict | None:
     # Transitional compatibility aliases (derived dynamically, not stored in DB)
     d["task_id"] = task_id
     d["sources"] = [d["source"]]
-    d["delete_source"] = (d["operation"] == "move")
     d["log_path"] = str(get_task_log_path(task_id))
     return d
 
 
-def _connect() -> sqlite3.Connection:
+from contextlib import contextmanager
+
+
+@contextmanager
+def _connect():
     assert _db_path is not None, "init_db() must be called before use"
     conn = sqlite3.connect(_db_path)
     conn.row_factory = sqlite3.Row
-    return conn
+    try:
+        with conn:
+            yield conn
+    finally:
+        conn.close()
 
 
 def _migrate_if_needed(conn: sqlite3.Connection) -> None:
@@ -221,14 +227,11 @@ def insert_task(
     error_message: str | None = None,
     **kwargs,
 ) -> None:
-    """Insert a single task into the database. Supports transitional kwarg aliases."""
+    """Insert a single task into the database."""
     task_id = id or kwargs.get("task_id")
     if not task_id:
         raise ValueError("Task ID is required")
 
-    # Handle transitional kwarg aliases if provided by legacy callers
-    if "delete_source" in kwargs and kwargs["delete_source"]:
-        operation = "move"
     if not source and "sources" in kwargs and kwargs["sources"]:
         source = kwargs["sources"][0]
 

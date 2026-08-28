@@ -104,7 +104,7 @@ class TestDatabaseSchemaAndTasks(unittest.TestCase):
         # Transitional compatibility aliases
         self.assertEqual(task["task_id"], task_id)
         self.assertEqual(task["sources"], ["/mnt/source/file.txt"])
-        self.assertFalse(task["delete_source"])
+        self.assertNotIn("delete_source", task)
         self.assertIn(task_id, task["log_path"])
 
     def test_insert_task_move_operation(self):
@@ -119,15 +119,15 @@ class TestDatabaseSchemaAndTasks(unittest.TestCase):
         task = db.get_task(task_id)
         self.assertIsNotNone(task)
         self.assertEqual(task["operation"], "move")
-        self.assertTrue(task["delete_source"])
+        self.assertNotIn("delete_source", task)
 
-    def test_insert_task_transitional_kwargs(self):
-        task_id = "task_uuid_legacy"
+    def test_insert_task_sources_kwarg(self):
+        task_id = "task_uuid_sources_kwarg"
         db.insert_task(
             task_id=task_id,
             sources=["/mnt/source/legacy.bin"],
             destination="/mnt/dest",
-            delete_source=True,
+            operation="move",
         )
 
         task = db.get_task(task_id)
@@ -135,7 +135,7 @@ class TestDatabaseSchemaAndTasks(unittest.TestCase):
         self.assertEqual(task["id"], task_id)
         self.assertEqual(task["source"], "/mnt/source/legacy.bin")
         self.assertEqual(task["operation"], "move")
-        self.assertTrue(task["delete_source"])
+        self.assertNotIn("delete_source", task)
 
     def test_task_lifecycle_transitions(self):
         task_id = "task_lifecycle"

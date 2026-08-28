@@ -1,5 +1,7 @@
+config.toml
 config.yaml
 data/
 .venv/
 __pycache__/
 *.pyc
+.pytest_cache/

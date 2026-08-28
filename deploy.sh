@@ -12,7 +12,7 @@
 #
 # Re-running the script is safe (idempotent): it updates backend/UI code and
 # pip packages while strictly preserving your existing database (litesync.db),
-# task logs (data/tasks/), and configuration (config.yaml).
+# task logs (data/tasks/), and configuration (config.toml).
 
 set -euo pipefail
 
@@ -36,7 +36,7 @@ die()  { printf '\033[1;31m[x]\033[0m %s\n' "$*" >&2; exit 1; }
 
 # Sanity: make sure we are actually inside the LiteSync repo.
 [[ -d "${SCRIPT_DIR}/app" && -d "${SCRIPT_DIR}/static" \
-   && -f "${SCRIPT_DIR}/requirements.txt" && -f "${SCRIPT_DIR}/config.example.yaml" ]] \
+   && -f "${SCRIPT_DIR}/requirements.txt" && -f "${SCRIPT_DIR}/config.example.toml" ]] \
     || die "deploy.sh must live in (and run from) the LiteSync repository root."
 
 # ---------------------------------------------------------------------------
@@ -76,22 +76,22 @@ install -d -m 0755 "${INSTALL_DIR}"
 if [[ "${SCRIPT_DIR}" != "${INSTALL_DIR}" ]]; then
     log "Staging application code into ${INSTALL_DIR}..."
     cp -r "${SCRIPT_DIR}/app" "${SCRIPT_DIR}/static" "${INSTALL_DIR}/"
-    cp "${SCRIPT_DIR}/requirements.txt" "${SCRIPT_DIR}/config.example.yaml" "${INSTALL_DIR}/"
+    cp "${SCRIPT_DIR}/requirements.txt" "${SCRIPT_DIR}/config.example.toml" "${INSTALL_DIR}/"
     # Drop any stale bytecode that may have come along from a dev machine.
     find "${INSTALL_DIR}/app" -name '__pycache__' -type d -prune -exec rm -rf {} +
 fi
 
-# --- config.yaml (Preserve existing active config; never overwrite) ---
-if [[ -f "${INSTALL_DIR}/config.yaml" ]]; then
-    log "Keeping existing active ${INSTALL_DIR}/config.yaml (credentials & settings preserved)."
+# --- config.toml (Preserve existing active config; never overwrite) ---
+if [[ -f "${INSTALL_DIR}/config.toml" ]]; then
+    log "Keeping existing active ${INSTALL_DIR}/config.toml (credentials & settings preserved)."
     CONFIG_SEEDED=false
-elif [[ -f "${SCRIPT_DIR}/config.yaml" ]]; then
-    log "Found config.yaml in repository — installing it to ${INSTALL_DIR}/config.yaml."
-    install -m 0600 "${SCRIPT_DIR}/config.yaml" "${INSTALL_DIR}/config.yaml"
+elif [[ -f "${SCRIPT_DIR}/config.toml" ]]; then
+    log "Found config.toml in repository — installing it to ${INSTALL_DIR}/config.toml."
+    install -m 0600 "${SCRIPT_DIR}/config.toml" "${INSTALL_DIR}/config.toml"
     CONFIG_SEEDED=false
 else
-    warn "No config.yaml found — seeding from config.example.yaml with a fresh random secret_key."
-    install -m 0600 "${INSTALL_DIR}/config.example.yaml" "${INSTALL_DIR}/config.yaml"
+    warn "No config.toml found — seeding from config.example.toml with a fresh random secret_key."
+    install -m 0600 "${INSTALL_DIR}/config.example.toml" "${INSTALL_DIR}/config.toml"
     CONFIG_SEEDED=true
 fi
 
@@ -118,29 +118,31 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 6. Read host/port/allowed_roots from the staged config.yaml
+# 6. Read host/port/allowed_roots from the staged config.toml
 # ---------------------------------------------------------------------------
 read -r HOST PORT < <("${VENV_PY}" - <<PYEOF
-import yaml
-d = yaml.safe_load(open("${INSTALL_DIR}/config.yaml"))
+import tomllib
+with open("${INSTALL_DIR}/config.toml", "rb") as f:
+    d = tomllib.load(f)
 print(d.get("host", "0.0.0.0"), int(d.get("port", 8000)))
 PYEOF
 )
 
 mapfile -t ALLOWED_ROOTS < <("${VENV_PY}" - <<PYEOF
-import yaml
-d = yaml.safe_load(open("${INSTALL_DIR}/config.yaml"))
+import tomllib
+with open("${INSTALL_DIR}/config.toml", "rb") as f:
+    d = tomllib.load(f)
 for r in (d.get("allowed_roots") or []):
     print(r)
 PYEOF
 )
 
-[[ ${#ALLOWED_ROOTS[@]} -gt 0 ]] || die "config.yaml has no allowed_roots."
+[[ ${#ALLOWED_ROOTS[@]} -gt 0 ]] || die "config.toml has no allowed_roots."
 
 # If we just seeded from the example, bake in a real random secret_key now.
 if [[ "${CONFIG_SEEDED}" == "true" ]]; then
     SECRET="$("${VENV_PY}" -c 'import secrets; print(secrets.token_hex(32))')"
-    sed -i "s|^secret_key:.*|secret_key: \"${SECRET}\"|" "${INSTALL_DIR}/config.yaml"
+    sed -i "s|^secret_key =.*|secret_key = \"${SECRET}\"|" "${INSTALL_DIR}/config.toml"
 fi
 
 # Build the ReadWritePaths lines: the data dir (SQLite + task logs) plus every
@@ -178,7 +180,7 @@ Type=simple
 User=${SERVICE_NAME}
 Group=${SERVICE_NAME}
 WorkingDirectory=${INSTALL_DIR}
-Environment=LITESYNC_CONFIG=${INSTALL_DIR}/config.yaml
+Environment=LITESYNC_CONFIG=${INSTALL_DIR}/config.toml
 Environment=PYTHONUNBUFFERED=1
 ExecStart=${INSTALL_DIR}/.venv/bin/uvicorn app.main:app --host ${HOST} --port ${PORT} --workers 1
 Restart=on-failure
@@ -204,7 +206,7 @@ EOF
 # ---------------------------------------------------------------------------
 log "Setting ownership to ${SERVICE_NAME}:${SERVICE_NAME}..."
 chown -R "${SERVICE_NAME}:${SERVICE_NAME}" "${INSTALL_DIR}"
-chmod 600 "${INSTALL_DIR}/config.yaml"
+chmod 600 "${INSTALL_DIR}/config.toml"
 chmod 755 "${INSTALL_DIR}/data"
 
 log "Enabling & restarting ${SERVICE_NAME}.service with latest code..."
@@ -232,13 +234,13 @@ fi
 # ---------------------------------------------------------------------------
 if [[ "${CONFIG_SEEDED}" == "true" ]]; then
     echo
-    warn "IMPORTANT: ${INSTALL_DIR}/config.yaml was seeded from config.example.yaml"
+    warn "IMPORTANT: ${INSTALL_DIR}/config.toml was seeded from config.example.toml"
     warn "(a random secret_key was generated, but logins/roots are placeholders)."
     echo
     echo "  Finish the setup:"
     echo "    1. Generate a password hash:"
     echo "         cd ${INSTALL_DIR} && sudo -u ${SERVICE_NAME} .venv/bin/python -m app.auth hash \"yourpassword\""
-    echo "    2. Edit ${INSTALL_DIR}/config.yaml:"
+    echo "    2. Edit ${INSTALL_DIR}/config.toml:"
     echo "         - paste the hash into users[].password_hash"
     echo "         - set allowed_roots to your real drives (e.g. /mnt/ssd, /mnt/homelab_nfs)"
     echo "    3. Re-run 'sudo bash deploy.sh' (it regenerates the unit's ReadWritePaths"

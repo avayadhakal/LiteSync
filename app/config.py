@@ -1,19 +1,18 @@
 from __future__ import annotations
 
 import os
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
-import yaml
 
-
-@dataclass
+@dataclass(frozen=True)
 class User:
     username: str
     password_hash: str
 
 
-@dataclass
+@dataclass(frozen=True)
 class Settings:
     allowed_roots: list[Path]
     users: list[User]
@@ -34,19 +33,23 @@ class Settings:
 _settings: Settings | None = None
 
 
-def load_settings() -> Settings:
-    config_path = Path(os.environ.get("LITESYNC_CONFIG", "./config.yaml")).resolve()
+def load_settings(config_path_override: Path | str | None = None) -> Settings:
+    if config_path_override is not None:
+        config_path = Path(config_path_override).resolve()
+    else:
+        config_path = Path(os.environ.get("LITESYNC_CONFIG", "./config.toml")).resolve()
+
     if not config_path.exists():
         raise FileNotFoundError(
-            f"Config file not found at {config_path}. Copy config.example.yaml to "
-            "config.yaml and edit it, or set LITESYNC_CONFIG."
+            f"Config file not found at {config_path}. Copy config.example.toml to "
+            "config.toml and edit it, or set LITESYNC_CONFIG."
         )
 
-    with open(config_path) as f:
-        raw = yaml.safe_load(f)
+    with open(config_path, "rb") as f:
+        raw = tomllib.load(f)
 
-    allowed_roots = [Path(p).resolve() for p in raw["allowed_roots"]]
-    users = [User(username=u["username"], password_hash=u["password_hash"]) for u in raw["users"]]
+    allowed_roots = [Path(p).resolve() for p in raw.get("allowed_roots", [])]
+    users = [User(username=u["username"], password_hash=u["password_hash"]) for u in raw.get("users", [])]
     data_dir = Path(raw.get("data_dir", "./data")).resolve()
 
     return Settings(

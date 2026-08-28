@@ -1,10 +1,262 @@
 (() => {
+  class SelectionState {
+    constructor(include = [], exclude = []) {
+      this.include = new Set(include.map(normalizePath));
+      this.exclude = new Set(exclude.map(normalizePath));
+    }
+
+    clear() {
+      this.include.clear();
+      this.exclude.clear();
+    }
+
+    get size() {
+      return this.getTopLevelIncludes().length;
+    }
+
+    get hasSelection() {
+      return this.include.size > 0;
+    }
+
+    isPathSelected(path) {
+      if (!path) return false;
+      const norm = normalizePath(path);
+      let longestMatchLen = -1;
+      let matchType = null;
+
+      for (const inc of this.include) {
+        if (norm === inc || inc === '/' || norm.startsWith(inc + '/')) {
+          const len = inc === '/' ? 1 : inc.length;
+          if (len > longestMatchLen) {
+            longestMatchLen = len;
+            matchType = 'include';
+          }
+        }
+      }
+
+      for (const exc of this.exclude) {
+        if (norm === exc || exc === '/' || norm.startsWith(exc + '/')) {
+          const len = exc === '/' ? 1 : exc.length;
+          if (len > longestMatchLen) {
+            longestMatchLen = len;
+            matchType = 'exclude';
+          }
+        }
+      }
+
+      return matchType === 'include';
+    }
+
+    isPathIndeterminate(path) {
+      if (!path) return false;
+      const norm = normalizePath(path);
+      const selected = this.isPathSelected(norm);
+
+      if (selected) {
+        for (const exc of this.exclude) {
+          if (exc !== norm && (norm === '/' || exc.startsWith(norm + '/'))) {
+            if (!this.isPathSelected(exc)) {
+              return true;
+            }
+          }
+        }
+        return false;
+      } else {
+        for (const inc of this.include) {
+          if (inc !== norm && (norm === '/' || inc.startsWith(norm + '/'))) {
+            if (this.isPathSelected(inc)) {
+              return true;
+            }
+          }
+        }
+        return false;
+      }
+    }
+
+    _longestAncestor(normPath) {
+      let longestMatch = null;
+      let longestMatchLen = -1;
+      let matchType = null;
+
+      for (const inc of this.include) {
+        if (inc !== normPath && (inc === '/' || normPath.startsWith(inc + '/'))) {
+          const len = inc === '/' ? 1 : inc.length;
+          if (len > longestMatchLen) {
+            longestMatchLen = len;
+            longestMatch = inc;
+            matchType = 'include';
+          }
+        }
+      }
+
+      for (const exc of this.exclude) {
+        if (exc !== normPath && (exc === '/' || normPath.startsWith(exc + '/'))) {
+          const len = exc === '/' ? 1 : exc.length;
+          if (len > longestMatchLen) {
+            longestMatchLen = len;
+            longestMatch = exc;
+            matchType = 'exclude';
+          }
+        }
+      }
+
+      return { match: longestMatch, type: matchType };
+    }
+
+    select(path) {
+      const norm = normalizePath(path);
+      this.exclude.delete(norm);
+
+      for (const exc of Array.from(this.exclude)) {
+        if (norm === '/' ? exc !== '/' : exc.startsWith(norm + '/')) {
+          this.exclude.delete(exc);
+        }
+      }
+      for (const inc of Array.from(this.include)) {
+        if (norm === '/' ? inc !== '/' : inc.startsWith(norm + '/')) {
+          this.include.delete(inc);
+        }
+      }
+
+      const ancestor = this._longestAncestor(norm);
+      if (ancestor.type !== 'include') {
+        this.include.add(norm);
+      }
+    }
+
+    unselect(path) {
+      const norm = normalizePath(path);
+      this.include.delete(norm);
+
+      for (const inc of Array.from(this.include)) {
+        if (norm === '/' ? inc !== '/' : inc.startsWith(norm + '/')) {
+          this.include.delete(inc);
+        }
+      }
+      for (const exc of Array.from(this.exclude)) {
+        if (norm === '/' ? exc !== '/' : exc.startsWith(norm + '/')) {
+          this.exclude.delete(exc);
+        }
+      }
+
+      const ancestor = this._longestAncestor(norm);
+      if (ancestor.type === 'include') {
+        this.exclude.add(norm);
+      }
+    }
+
+    migratePath(oldPath, newPath) {
+      const normOld = normalizePath(oldPath);
+      const normNew = normalizePath(newPath);
+      if (normOld === normNew) return;
+
+      const prefixOld = normOld === '/' ? '/' : normOld + '/';
+
+      const newInclude = new Set();
+      for (const inc of this.include) {
+        if (inc === normOld) {
+          newInclude.add(normNew);
+        } else if (inc.startsWith(prefixOld)) {
+          newInclude.add(normNew + inc.slice(normOld.length));
+        } else {
+          newInclude.add(inc);
+        }
+      }
+      this.include = newInclude;
+
+      const newExclude = new Set();
+      for (const exc of this.exclude) {
+        if (exc === normOld) {
+          newExclude.add(normNew);
+        } else if (exc.startsWith(prefixOld)) {
+          newExclude.add(normNew + exc.slice(normOld.length));
+        } else {
+          newExclude.add(exc);
+        }
+      }
+      this.exclude = newExclude;
+    }
+
+    deletePath(path) {
+      const norm = normalizePath(path);
+      const prefix = norm === '/' ? '/' : norm + '/';
+
+      for (const inc of Array.from(this.include)) {
+        if (inc === norm || inc.startsWith(prefix)) {
+          this.include.delete(inc);
+        }
+      }
+      for (const exc of Array.from(this.exclude)) {
+        if (exc === norm || exc.startsWith(prefix)) {
+          this.exclude.delete(exc);
+        }
+      }
+    }
+
+    getTopLevelIncludes() {
+      const roots = [];
+      for (const inc of this.include) {
+        const ancestor = this._longestAncestor(inc);
+        if (ancestor.type !== 'include') {
+          roots.push(inc);
+        }
+      }
+      return roots.sort();
+    }
+
+    toTransferSources() {
+      const topIncludes = this.getTopLevelIncludes();
+      const result = [];
+
+      for (const root of topIncludes) {
+        const prefix = root === '/' ? '/' : root + '/';
+        const relativeExcludes = [];
+        for (const exc of this.exclude) {
+          if (exc.startsWith(prefix)) {
+            let closestInc = null;
+            let closestLen = -1;
+            for (const inc of this.include) {
+              if (exc.startsWith(inc === '/' ? '/' : inc + '/')) {
+                const len = inc === '/' ? 1 : inc.length;
+                if (len > closestLen) {
+                  closestLen = len;
+                  closestInc = inc;
+                }
+              }
+            }
+            if (closestInc === root) {
+              const rel = root === '/' ? exc.slice(1) : exc.slice(root.length + 1);
+              if (rel) {
+                relativeExcludes.push(rel);
+              }
+            }
+          }
+        }
+
+        if (relativeExcludes.length === 0) {
+          result.push(root);
+        } else {
+          result.push({
+            path: root,
+            excludes: relativeExcludes.sort(),
+          });
+        }
+      }
+
+      return result;
+    }
+  }
+
+  function normalizePath(p) {
+    return String(p || '').replace(/\/+/g, '/').replace(/\/+$/g, '') || '/';
+  }
+
   const state = {
     roots: [],
     source: { path: null, entries: [] },
     dest: { path: null, entries: [] },
-    selection: new Set(),     // absolute paths selected in the SOURCE pane  (drives Transfer)
-    destSelection: new Set(), // absolute paths selected in the DEST pane   (mkdir/rename/delete target)
+    selection: new SelectionState(),     // Selection in the SOURCE pane  (drives Transfer)
+    destSelection: new SelectionState(), // Selection in the DEST pane   (mkdir/rename/delete target)
     historyTab: 'active', // 'active' | 'activity'
     tasks: [],
     activeTaskId: null,
@@ -77,10 +329,6 @@
 
   // --- Pane rendering ---
 
-  function normalizePath(p) {
-    return String(p || '').replace(/\/+/g, '/').replace(/\/+$/g, '') || '/';
-  }
-
   async function loadPane(which, path, forceRefresh = false) {
     const pane = state[which];
     if (path === null) {
@@ -110,7 +358,7 @@
         throw err;
       }
     }
-    // Selections persist across navigation: the Set is keyed by absolute path,
+    // Selections persist across navigation: the SelectionState is keyed by absolute path,
     // so navigating away and back re-checks entries that are still selected.
     // Mutations (rename/delete/transfer-finish) prune stale paths explicitly.
     renderPane(which);
@@ -121,23 +369,6 @@
   // the dest pane supports the same file operations via its own selection.
   function paneSelection(which) {
     return which === 'source' ? state.selection : state.destSelection;
-  }
-
-  // Returns true if path is directly in selSet or if any ancestor directory is in selSet.
-  function isPathSelected(path, selSet) {
-    if (!path || !selSet || selSet.size === 0) return false;
-    const norm = normalizePath(path);
-    for (const selPath of selSet) {
-      if (typeof selPath !== 'string') continue;
-      const normSel = normalizePath(selPath);
-      if (norm === normSel) return true;
-      if (normSel === '/') {
-        if (norm !== '/') return true;
-      } else if (norm.startsWith(normSel + '/')) {
-        return true;
-      }
-    }
-    return false;
   }
 
   function renderPane(which) {
@@ -165,68 +396,19 @@
       // source pane's selection is used to build the Transfer payload.
       const cb = document.createElement('input');
       cb.type = 'checkbox';
-      cb.checked = isPathSelected(entry.path, sel);
-      // Directory tri-state: fully checked when the dir itself (or ancestor) is selected,
-      // indeterminate when only some descendant path is selected.
-      if (entry.is_dir && !cb.checked) {
-        cb.indeterminate = hasSelectedDescendant(entry.path, sel);
+      const isSelected = sel.isPathSelected(entry.path);
+      cb.checked = isSelected;
+      // Directory tri-state: fully checked when the dir itself is selected with no excludes,
+      // indeterminate when partially selected / partially excluded.
+      if (entry.is_dir) {
+        cb.indeterminate = sel.isPathIndeterminate(entry.path);
       }
       cb.addEventListener('click', (e) => {
         e.stopPropagation();
-        const normEntry = normalizePath(entry.path);
         if (cb.checked) {
-          sel.add(entry.path);
-          // When checking a directory, remove explicit descendant selections
-          // since the parent directory covers all descendants hierarchically.
-          if (entry.is_dir) {
-            const prefix = normEntry + '/';
-            for (const p of Array.from(sel)) {
-              if (normalizePath(p).startsWith(prefix)) {
-                sel.delete(p);
-              }
-            }
-          }
+          sel.select(entry.path);
         } else {
-          // Remove direct match from selection set
-          for (const p of Array.from(sel)) {
-            if (normalizePath(p) === normEntry) {
-              sel.delete(p);
-            }
-          }
-
-          // Check if item was checked via ancestor inheritance
-          const ancestorsToRemove = [];
-          for (const selPath of sel) {
-            const normSel = normalizePath(selPath);
-            if (normSel === '/' && normEntry !== '/') {
-              ancestorsToRemove.push(selPath);
-            } else if (normSel !== '/' && normEntry.startsWith(normSel + '/')) {
-              ancestorsToRemove.push(selPath);
-            }
-          }
-
-          // If checked via parent inheritance: remove parent from selection set
-          // and explicitly add all other sibling items in that folder.
-          if (ancestorsToRemove.length > 0) {
-            for (const a of ancestorsToRemove) {
-              sel.delete(a);
-            }
-            for (const sibling of pane.entries) {
-              if (normalizePath(sibling.path) !== normEntry) {
-                sel.add(sibling.path);
-              }
-            }
-          }
-
-          // If unchecking a directory, also remove any descendant paths
-          if (entry.is_dir) {
-            const prefix = normEntry + '/';
-            for (const p of Array.from(sel)) {
-              if (normalizePath(p).startsWith(prefix)) {
-                sel.delete(p);
-              }
-            }
-          }
+          sel.unselect(entry.path);
         }
         renderPane(which);
         updateSelectionUI();
@@ -296,20 +478,6 @@
     body.scrollTop = prevScrollTop;
   }
 
-  function selectionSummary(selSet) {
-    return Array.from(selSet).map((p) => normalizePath(p).split('/').pop() || p);
-  }
-
-  // True when any selected path is a descendant of dirPath (but not dirPath itself).
-  function hasSelectedDescendant(dirPath, selSet) {
-    if (!dirPath || !selSet || selSet.size === 0) return false;
-    const prefix = normalizePath(dirPath) + '/';
-    for (const p of selSet) {
-      if (typeof p === 'string' && normalizePath(p).startsWith(prefix)) return true;
-    }
-    return false;
-  }
-
   function updateSelectionUI() {
     // Only the source pane drives the Transfer button; show its count.
     const count = state.selection.size;
@@ -342,18 +510,19 @@
     const list = el('selection-preview-list');
     const countEl = el('selection-preview-count');
     if (!list || !countEl) return;
-    // Full paths (normalized) so identically-named items from different
-    // locations are distinguishable; basename fallback guards odd inputs.
-    const paths = Array.from(state.selection).map((p) => {
-      const norm = normalizePath(p);
-      return typeof norm === 'string' && norm ? norm : String(p);
-    });
-    countEl.textContent = `${paths.length} selected`;
+    const sources = state.selection.toTransferSources();
+    countEl.textContent = `${sources.length} selected`;
     list.innerHTML = '';
-    for (const path of paths) {
+    for (const item of sources) {
       const li = document.createElement('li');
-      li.textContent = path;
-      li.title = path; // full path on hover when the row is ellipsized
+      if (typeof item === 'string') {
+        li.textContent = item;
+        li.title = item;
+      } else {
+        const text = `${item.path} (excluding: ${item.excludes.join(', ')})`;
+        li.textContent = text;
+        li.title = text;
+      }
       list.appendChild(li);
     }
   }
@@ -544,11 +713,12 @@
 
   function openRenameModal(which) {
     const sel = paneSelection(which);
-    if (sel.size !== 1) {
+    const roots = sel.getTopLevelIncludes();
+    if (roots.length !== 1) {
       toastError('Select exactly one item to rename.');
       return;
     }
-    const selectedPath = Array.from(sel)[0];
+    const selectedPath = roots[0];
     const currentName = normalizePath(selectedPath).split('/').pop();
     el('rename-modal').dataset.pane = which;
     el('rename-modal').dataset.path = selectedPath;
@@ -584,8 +754,7 @@
         body: JSON.stringify({ path: selectedPath, new_name: name }),
       });
       closeModal('rename');
-      sel.delete(selectedPath);
-      sel.add(result.new_path);
+      sel.migratePath(selectedPath, result.new_path);
       updateSelectionUI();
       await loadPane(which, state[which].path, true);
       toastSuccess(`Renamed to: ${name}`);
@@ -598,13 +767,13 @@
 
   function openDeleteModal(which) {
     const sel = paneSelection(which);
-    if (sel.size === 0) {
+    const paths = sel.getTopLevelIncludes();
+    if (paths.length === 0) {
       toastError('Select one or more items to delete.');
       return;
     }
     // Snapshot selection at open time so submitDelete doesn't depend on live state.
     el('delete-modal').dataset.pane = which;
-    const paths = Array.from(sel);
     el('delete-title').textContent =
       paths.length === 1 ? 'Delete this item?' : `Delete ${paths.length} items?`;
     const list = el('delete-list');
@@ -620,7 +789,7 @@
   async function submitDelete() {
     const which = el('delete-modal').dataset.pane || 'source';
     const sel = paneSelection(which);
-    const paths = Array.from(sel);
+    const paths = sel.getTopLevelIncludes();
     if (paths.length === 0) { closeModal('delete'); return; }
     closeModal('delete');
     const failures = [];
@@ -630,7 +799,7 @@
           method: 'POST',
           body: JSON.stringify({ path: p }),
         });
-        sel.delete(p);
+        sel.deletePath(p);
       } catch (err) {
         failures.push(`${normalizePath(p).split('/').pop()}: ${err.message}`);
       }
@@ -658,9 +827,14 @@
   function openConfirmModal() {
     const list = el('confirm-list');
     list.innerHTML = '';
-    for (const path of state.selection) {
+    const sources = state.selection.toTransferSources();
+    for (const item of sources) {
       const li = document.createElement('li');
-      li.textContent = path;
+      if (typeof item === 'string') {
+        li.textContent = item;
+      } else {
+        li.textContent = `${item.path} (excluding ${item.excludes.join(', ')})`;
+      }
       list.appendChild(li);
     }
     el('confirm-dest').textContent = state.dest.path;
@@ -677,8 +851,9 @@
     closeConfirmModal();
     const opRadio = document.querySelector('input[name="transfer-op"]:checked');
     const operation = opRadio ? opRadio.value : 'copy';
+    const sources = state.selection.toTransferSources();
     const body = {
-      sources: Array.from(state.selection),
+      sources: sources,
       destination: state.dest.path,
       operation: operation,
     };
@@ -692,10 +867,11 @@
     }
     const itemCount = Array.isArray(result.task_ids) ? result.task_ids.length : body.sources.length;
     const opLabel = operation === 'move' ? 'move' : 'copy';
+    const sourceSummaries = sources.map((s) => typeof s === 'string' ? normalizePath(s).split('/').pop() : `${normalizePath(s.path).split('/').pop()} (partial)`);
     toastSuccess(`Queued ${itemCount} ${opLabel}${itemCount === 1 ? '' : 's'} → ${body.destination}`);
     logActivity(
       'transfer',
-      `Queued ${itemCount} ${opLabel}${itemCount === 1 ? '' : 's'} (${body.sources.map((p) => normalizePath(p).split('/').pop()).join(', ')}) → ${body.destination}`,
+      `Queued ${itemCount} ${opLabel}${itemCount === 1 ? '' : 's'} (${sourceSummaries.join(', ')}) → ${body.destination}`,
       'info'
     );
     // Reset the form to defaults after a successful queue (matches the
@@ -796,18 +972,12 @@
   function pruneCompletedSelection(task) {
     // Sources of a successfully finished task were moved or copied,
     // so keeping them selected points at stale paths.
-    // Normalize both sides (task sources may carry trailing slashes that
-    // pane-entry paths never have) before comparing against selection keys.
-    if (!task || !Array.isArray(task.sources)) return false;
+    if (!task) return false;
     let changed = false;
-    for (const src of task.sources) {
-      const normalized = normalizePath(src);
-      for (const key of state.selection) {
-        if (normalizePath(key) === normalized) {
-          state.selection.delete(key);
-          changed = true;
-        }
-      }
+    const sources = Array.isArray(task.sources) ? task.sources : (task.source ? [task.source] : []);
+    for (const src of sources) {
+      state.selection.deletePath(src);
+      changed = true;
     }
     return changed;
   }

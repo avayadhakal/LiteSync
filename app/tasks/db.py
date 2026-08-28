@@ -20,7 +20,8 @@ CREATE TABLE IF NOT EXISTS tasks (
     started_at    TEXT,
     ended_at      TEXT,
     exit_code     INTEGER,
-    error_message TEXT
+    error_message TEXT,
+    excludes      TEXT DEFAULT '[]'
 );
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_created_at ON tasks(created_at DESC);
@@ -69,6 +70,16 @@ def _row_to_dict(row: sqlite3.Row | None) -> dict | None:
     d["task_id"] = task_id
     d["sources"] = [d["source"]]
     d["log_path"] = str(get_task_log_path(task_id))
+    raw_exc = d.get("excludes")
+    if isinstance(raw_exc, str):
+        try:
+            d["excludes"] = json.loads(raw_exc)
+        except Exception:
+            d["excludes"] = []
+    elif isinstance(raw_exc, list):
+        d["excludes"] = raw_exc
+    else:
+        d["excludes"] = []
     return d
 
 
@@ -100,6 +111,8 @@ def _migrate_if_needed(conn: sqlite3.Connection) -> None:
 
     # If already using target schema (has 'source' and 'operation', does not have 'sources')
     if "source" in columns and "operation" in columns and "sources" not in columns:
+        if "excludes" not in columns:
+            cursor.execute("ALTER TABLE tasks ADD COLUMN excludes TEXT DEFAULT '[]'")
         return
 
     # Old schema detected, perform migration
@@ -225,6 +238,7 @@ def insert_task(
     ended_at: str | None = None,
     exit_code: int | None = None,
     error_message: str | None = None,
+    excludes: list[str] | None = None,
     **kwargs,
 ) -> None:
     """Insert a single task into the database."""
@@ -235,14 +249,17 @@ def insert_task(
     if not source and "sources" in kwargs and kwargs["sources"]:
         source = kwargs["sources"][0]
 
+    exc_list = excludes if excludes is not None else kwargs.get("excludes", [])
+    exc_json = json.dumps(exc_list) if isinstance(exc_list, list) else (str(exc_list) if exc_list else "[]")
+
     ts = created_at or now_iso()
     with _lock, _connect() as conn:
         conn.execute(
             """
             INSERT INTO tasks
                 (id, source, destination, operation, status,
-                 created_at, started_at, ended_at, exit_code, error_message)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 created_at, started_at, ended_at, exit_code, error_message, excludes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 task_id,
@@ -255,6 +272,7 @@ def insert_task(
                 ended_at,
                 exit_code,
                 error_message,
+                exc_json,
             ),
         )
 

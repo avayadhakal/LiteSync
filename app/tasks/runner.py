@@ -18,19 +18,36 @@ _current_task_id: str | None = None
 _wake = asyncio.Event()
 
 
-def build_rsync_argv(source: str, destination: str) -> list[str]:
+def build_rsync_argv(
+    source: str,
+    destination: str,
+    excludes: list[str] | None = None,
+    operation: str = "copy",
+) -> list[str]:
     """Construct rsync arguments without shell wrapping.
     Always includes --ignore-existing to guard against silently overwriting destination files."""
-    return [
+    argv = [
         "rsync",
         "-avh",
         "--progress",
         "--partial",
         "--inplace",
         "--ignore-existing",
-        source,
-        destination,
     ]
+    if operation == "move" and excludes:
+        argv.append("--remove-source-files")
+
+    if excludes:
+        src_name = Path(source).name
+        for exc in excludes:
+            exc_clean = exc.strip()
+            if exc_clean:
+                # Anchored exclude relative to the transferred source directory
+                # Passed as separate argv list entries, never string-interpolated or shell-joined
+                argv.append(f"--exclude=/{src_name}/{exc_clean}")
+
+    argv.extend([source, destination])
+    return argv
 
 
 def queue_task(
@@ -39,6 +56,7 @@ def queue_task(
     destination: str,
     operation: str = "copy",
     created_by: str = "",
+    excludes: list[str] | None = None,
 ) -> str:
     """Persist a single-source task as 'queued'. Nothing is launched here —
     the background scheduler independently picks queued rows up."""
@@ -48,6 +66,7 @@ def queue_task(
         source=source,
         destination=destination,
         operation=operation,
+        excludes=excludes or [],
     )
     return task_id
 
@@ -110,7 +129,11 @@ def _can_atomic_rename(source: str, destination: str) -> bool:
 def _try_atomic_move(task: dict, log_path: Path) -> bool:
     """Attempt instant same-filesystem move via os.rename.
     Writes deterministic 100% completion log line and populates all lifecycle fields identically to rsync.
-    Returns True if successfully renamed, False if unsafe or cross-filesystem."""
+    Returns True if successfully renamed, False if unsafe, cross-filesystem, or has exclusions."""
+    if task.get("excludes"):
+        # Excludes require selective transfer via rsync, cannot atomic move the whole tree
+        return False
+
     source = task["source"]
     destination = task["destination"]
     task_id = task["id"]
@@ -173,7 +196,13 @@ async def _run_task(task: dict, settings: Settings) -> None:
         db.mark_finished(task_id, "failed", 1, err)
         return
 
-    argv = build_rsync_argv(task["source"], task["destination"])
+    excludes = task.get("excludes", [])
+    argv = build_rsync_argv(
+        task["source"],
+        task["destination"],
+        excludes=excludes,
+        operation=task["operation"],
+    )
     log_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
@@ -223,14 +252,27 @@ async def _run_task(task: dict, settings: Settings) -> None:
     code = proc.returncode
     if code == 0:
         if task["operation"] == "move":
-            # Only delete source after rsync exits successfully with exit code 0
-            try:
-                if src_path.is_dir() and not src_path.is_symlink():
-                    shutil.rmtree(src_path, ignore_errors=True)
-                elif src_path.exists() or src_path.is_symlink():
-                    src_path.unlink(missing_ok=True)
-            except Exception:
-                pass
+            if excludes:
+                # With --remove-source-files, individual transferred files are removed.
+                # Prune empty directories bottom-up, keeping non-empty dirs with excluded files.
+                try:
+                    for root, dirs, files in os.walk(str(src_path), topdown=False):
+                        if not dirs and not files and root != str(src_path):
+                            try:
+                                os.rmdir(root)
+                            except OSError:
+                                pass
+                except Exception:
+                    pass
+            else:
+                # Only delete entire source directory/file after rsync exits successfully with exit code 0
+                try:
+                    if src_path.is_dir() and not src_path.is_symlink():
+                        shutil.rmtree(src_path, ignore_errors=True)
+                    elif src_path.exists() or src_path.is_symlink():
+                        src_path.unlink(missing_ok=True)
+                except Exception:
+                    pass
         db.mark_finished(task_id, "succeeded", code, None)
     elif code is not None and code < 0:
         db.mark_finished(task_id, "failed", code, f"rsync killed by signal {-code}")

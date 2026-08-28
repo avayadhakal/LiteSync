@@ -44,6 +44,7 @@ class TestDatabaseSchemaAndTasks(unittest.TestCase):
                 "ended_at": "TEXT",
                 "exit_code": "INTEGER",
                 "error_message": "TEXT",
+                "excludes": "TEXT",
             }
             self.assertEqual(task_cols, expected_task_cols)
 

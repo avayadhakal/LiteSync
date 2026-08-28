@@ -23,8 +23,15 @@ router = APIRouter(prefix="/api")
 _LINE_SPLIT = re.compile(r"[\r\n]")
 
 
+from typing import Union
+
+class TransferSourceItem(BaseModel):
+    path: str
+    excludes: list[str] = []
+
+
 class TransferRequest(BaseModel):
-    sources: list[str]
+    sources: list[Union[str, TransferSourceItem]]
     destination: str
     operation: str = "copy"
 
@@ -39,11 +46,42 @@ async def create_transfer(body: TransferRequest, user: str = Depends(get_current
     if body.operation not in ("copy", "move"):
         raise HTTPException(status_code=400, detail="Invalid operation. Must be 'copy' or 'move'")
 
-    resolved_sources = [str(resolve_safe_path(s, settings.allowed_roots)) for s in body.sources]
     resolved_destination = resolve_safe_path(body.destination, settings.allowed_roots)
-
     if not resolved_destination.is_dir():
         raise HTTPException(status_code=400, detail="Destination must be an existing directory")
+
+    items_to_queue: list[tuple[str, list[str]]] = []
+    for item in body.sources:
+        if isinstance(item, str):
+            src_str = item
+            exc_list = []
+        else:
+            src_str = item.path
+            exc_list = item.excludes
+
+        resolved_src = str(resolve_safe_path(src_str, settings.allowed_roots))
+        validated_excludes: list[str] = []
+        for exc in exc_list:
+            if not isinstance(exc, str):
+                raise HTTPException(status_code=400, detail="Exclude item must be a string")
+            exc_trimmed = exc.strip()
+            if not exc_trimmed:
+                continue
+            if exc_trimmed.startswith("/") or exc_trimmed.startswith("\\"):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Exclude path must be relative without leading slash: {exc_trimmed}",
+                )
+            # Check for directory traversal escapes
+            parts = [p for p in re.split(r"[/\\]", exc_trimmed) if p]
+            if ".." in parts:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Exclude path cannot contain directory traversal '..': {exc_trimmed}",
+                )
+            validated_excludes.append(exc_trimmed)
+
+        items_to_queue.append((resolved_src, validated_excludes))
 
     # Fire and forget: expand the batch into one queued task per source so
     # every selected item gets its own progress card, log, SSE stream, and
@@ -55,8 +93,9 @@ async def create_transfer(body: TransferRequest, user: str = Depends(get_current
             destination=str(resolved_destination),
             operation=body.operation,
             created_by=user,
+            excludes=excludes,
         )
-        for source in resolved_sources
+        for source, excludes in items_to_queue
     ]
 
     # Nudge the scheduler so the queue starts immediately (it polls the DB

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# deploy.sh — LiteSync Raspberry Pi deployment helper
+# install.sh — LiteSync Raspberry Pi installation & deployment helper
 #
 # Stages LiteSync from this git repository into /opt/litesync, creates the
 # dedicated `litesync` system user, manages the virtual environment, generates
@@ -8,13 +8,26 @@
 #
 # Usage (on the Pi, from the cloned repo):
 #     git clone <your-repo-url> LiteSync && cd LiteSync
-#     sudo bash deploy.sh
+#     sudo bash install.sh
 #
 # Re-running the script is safe (idempotent): it updates backend/UI code and
 # pip packages while strictly preserving your existing database (litesync.db),
 # task logs (data/tasks/), and configuration (config.toml).
 
 set -euo pipefail
+
+for arg in "$@"; do
+    case "${arg}" in
+        -h|--help)
+            echo "Usage: sudo bash install.sh"
+            echo
+            echo "Stages LiteSync into /opt/litesync, creates the system user, installs"
+            echo "dependencies, sets up the virtual environment, generates a hardened"
+            echo "systemd service, and starts LiteSync."
+            exit 0
+            ;;
+    esac
+done
 
 # ---------------------------------------------------------------------------
 # 0. Root check
@@ -37,7 +50,7 @@ die()  { printf '\033[1;31m[x]\033[0m %s\n' "$*" >&2; exit 1; }
 # Sanity: make sure we are actually inside the LiteSync repo.
 [[ -d "${SCRIPT_DIR}/app" && -d "${SCRIPT_DIR}/static" \
    && -f "${SCRIPT_DIR}/requirements.txt" && -f "${SCRIPT_DIR}/config.example.toml" ]] \
-    || die "deploy.sh must live in (and run from) the LiteSync repository root."
+    || die "install.sh must live in (and run from) the LiteSync repository root."
 
 # ---------------------------------------------------------------------------
 # 1. Stop service gracefully before updating code (if already running)
@@ -147,7 +160,7 @@ fi
 
 # Build the ReadWritePaths lines: the data dir (SQLite + task logs) plus every
 # configured allowed_root (rsync needs to write destinations there, and the
-# delete-after-copy feature needs to delete sources there). ProtectSystem=strict
+# move/delete operations need to delete sources there). ProtectSystem=strict
 # leaves everything else read-only.
 RW_LINES="ReadWritePaths=${INSTALL_DIR}/data"
 declare -A _seen=("${INSTALL_DIR}/data"=1)
@@ -194,7 +207,7 @@ ProtectHome=true
 
 # ProtectSystem=strict makes the whole filesystem read-only except the paths
 # below. The data dir needs write (SQLite + logs); every allowed_root needs
-# write (rsync destination writes + delete-after-copy source pruning).
+# write (rsync destination writes + delete/move source operations).
 ${RW_LINES}
 
 [Install]
@@ -243,8 +256,8 @@ if [[ "${CONFIG_SEEDED}" == "true" ]]; then
     echo "    2. Edit ${INSTALL_DIR}/config.toml:"
     echo "         - paste the hash into users[].password_hash"
     echo "         - set allowed_roots to your real drives (e.g. /mnt/ssd, /mnt/homelab_nfs)"
-    echo "    3. Re-run 'sudo bash deploy.sh' (it regenerates the unit's ReadWritePaths"
+    echo "    3. Re-run 'sudo bash install.sh' (it regenerates the unit's ReadWritePaths"
     echo "       to match the new roots WITHOUT touching your edited config), or simply:"
-    echo "         sudo bash deploy.sh"
+    echo "         sudo bash install.sh"
     echo
 fi

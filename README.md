@@ -31,25 +31,26 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1
 
 Visit `http://<host>:8000/`.
 
-## Deploying on a Raspberry Pi as a service
+## Automated Installation & Service Setup (Raspberry Pi)
+
+LiteSync includes an automated installer that stages the application to `/opt/litesync`, creates the `litesync` system user, manages the virtual environment, configures a hardened systemd service, and starts it:
 
 ```sh
-sudo useradd --system --home /opt/litesync --shell /usr/sbin/nologin litesync
-sudo mkdir -p /opt/litesync
-sudo cp -r . /opt/litesync
-cd /opt/litesync
-sudo python3 -m venv .venv
-sudo .venv/bin/pip install -r requirements.txt
-sudo chown -R litesync:litesync /opt/litesync
+# Clone and install
+git clone <your-repo-url> LiteSync
+cd LiteSync
+sudo bash install.sh
 ```
 
-Edit `litesync.service`'s `ReadWritePaths` line to also list every directory
-under `allowed_roots` in `config.toml`, then:
+Re-running `sudo bash install.sh` is safe and idempotent: it updates application code and dependencies while strictly preserving your existing database (`litesync.db`), task logs (`data/tasks/`), and configuration (`config.toml`).
+
+## Uninstallation
+
+To completely remove LiteSync and its systemd service from the system:
 
 ```sh
-sudo cp litesync.service /etc/systemd/system/litesync.service
-sudo systemctl daemon-reload
-sudo systemctl enable --now litesync
+sudo bash uninstall.sh            # Purges service, files, and user
+sudo bash uninstall.sh --keep-data # Uninstalls but preserves data/ and config.toml
 ```
 
 ## Notes

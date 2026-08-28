@@ -33,6 +33,8 @@ Minimal-overhead Raspberry Pi web app for dual-pane local directory browsing and
 │   └── tasks/<task_id>.log   # Deterministic flat task logs
 ├── config.example.toml
 ├── config.toml               # Gitignored (chmod 600)
+├── install.sh                # Automated installer & deployment helper
+├── uninstall.sh              # Automated service and file uninstaller
 ├── requirements.txt
 ├── litesync.service          # systemd unit (NoNewPrivileges=true, ProtectSystem=strict)
 └── README.md

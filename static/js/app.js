@@ -324,6 +324,105 @@
     }
   }
 
+  async function copyDownloadLink(path) {
+    try {
+      const data = await api(`/api/download/link?path=${encodeURIComponent(path)}`);
+      const fullUrl = new URL(data.url, window.location.origin).href;
+      await copyToClipboard(fullUrl);
+      toastSuccess('Download link copied');
+      return true;
+    } catch (err) {
+      toastError(err.message || 'Failed to copy link');
+      return false;
+    }
+  }
+
+  function attachLongPress(element, onLongPress) {
+    let startX = 0;
+    let startY = 0;
+    let timer = null;
+    let longPressed = false;
+    const MOVE_THRESHOLD = 10; // 10px
+
+    const cancel = () => {
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+    };
+
+    element.addEventListener('touchstart', (e) => {
+      if (e.touches.length !== 1) return;
+      const touch = e.touches[0];
+      startX = touch.clientX;
+      startY = touch.clientY;
+      longPressed = false;
+
+      cancel();
+      timer = setTimeout(() => {
+        longPressed = true;
+        timer = null;
+        onLongPress();
+      }, 500);
+    }, { passive: true });
+
+    element.addEventListener('touchmove', (e) => {
+      if (!timer || e.touches.length !== 1) return;
+      const touch = e.touches[0];
+      const dx = Math.abs(touch.clientX - startX);
+      const dy = Math.abs(touch.clientY - startY);
+      if (dx > MOVE_THRESHOLD || dy > MOVE_THRESHOLD) {
+        cancel();
+      }
+    }, { passive: true });
+
+    const endOrCancel = () => {
+      cancel();
+    };
+
+    element.addEventListener('touchend', endOrCancel, { passive: true });
+    element.addEventListener('touchcancel', endOrCancel, { passive: true });
+
+    return () => {
+      const wasTriggered = longPressed;
+      longPressed = false;
+      return wasTriggered;
+    };
+  }
+
+  function openItemDetailsModal(entry) {
+    const modal = el('item-details-modal');
+    if (!modal) return;
+
+    el('item-details-name').textContent = entry.name;
+    el('item-details-path').textContent = entry.path;
+
+    const copyBtn = el('item-details-copy');
+    if (copyBtn) {
+      if (entry.is_dir) {
+        copyBtn.classList.add('hidden');
+      } else {
+        copyBtn.classList.remove('hidden');
+        copyBtn.textContent = 'Copy URL';
+        copyBtn.disabled = false;
+        copyBtn.onclick = async (e) => {
+          e.stopPropagation();
+          const success = await copyDownloadLink(entry.path);
+          if (success) {
+            closeItemDetailsModal();
+          }
+        };
+      }
+    }
+
+    modal.classList.remove('hidden');
+  }
+
+  function closeItemDetailsModal() {
+    const modal = el('item-details-modal');
+    if (modal) modal.classList.add('hidden');
+  }
+
   // --- Pane rendering ---
 
   async function loadPane(which, path, forceRefresh = false) {
@@ -415,6 +514,7 @@
       const name = document.createElement('span');
       name.className = 'name';
       name.textContent = entry.name;
+      name.title = entry.name;
       row.appendChild(name);
 
       if (!entry.is_dir) {
@@ -429,19 +529,14 @@
         copyBtn.title = 'Copy download link';
         copyBtn.addEventListener('click', async (e) => {
           e.stopPropagation();
-          try {
-            const data = await api(`/api/download/link?path=${encodeURIComponent(entry.path)}`);
-            const fullUrl = new URL(data.url, window.location.origin).href;
-            await copyToClipboard(fullUrl);
+          const success = await copyDownloadLink(entry.path);
+          if (success) {
             copyBtn.innerHTML = '✓';
             copyBtn.style.color = 'var(--success)';
-            toastSuccess('Download link copied');
             setTimeout(() => {
               copyBtn.innerHTML = '📋';
               copyBtn.style.color = '';
             }, 1500);
-          } catch (err) {
-            toastError(err.message || 'Failed to copy link');
           }
         });
         row.appendChild(copyBtn);
@@ -449,23 +544,17 @@
 
       row.title = entry.path;
 
-      if (window.matchMedia('(hover: none)').matches) {
-        let touchTimer = null;
-        row.addEventListener('touchstart', (e) => {
-          if (e.target.tagName === 'INPUT' || e.target.closest('.btn-copy-path')) return;
-          touchTimer = setTimeout(() => {
-            showToast(entry.path, 'info');
-          }, 500);
-        }, { passive: true });
-        const clearTouch = () => { if (touchTimer) clearTimeout(touchTimer); };
-        row.addEventListener('touchend', clearTouch, { passive: true });
-        row.addEventListener('touchmove', clearTouch, { passive: true });
-        row.addEventListener('touchcancel', clearTouch, { passive: true });
-      }
+      // Attach long-press listener strictly to filename area
+      const isLongPressed = attachLongPress(name, () => {
+        openItemDetailsModal(entry);
+      });
 
       if (entry.is_dir) {
         row.addEventListener('click', (e) => {
           if (e.target.tagName === 'INPUT' || e.target.closest('.btn-copy-path')) return;
+          if (isLongPressed()) {
+            return;
+          }
           loadPane(which, entry.path);
         });
       }
@@ -1529,7 +1618,30 @@
     const detailsModal = el('activity-details-modal');
     if (detailsModal) {
       detailsModal.addEventListener('click', (e) => {
-        if (e.target === detailsModal) closeActivityDetails();
+        if (e.target === detailsModal) {
+          e.stopPropagation();
+          e.preventDefault();
+          closeActivityDetails();
+        }
+      });
+    }
+
+    // Item details modal wiring
+    const itemCloseBtn = el('item-details-close');
+    if (itemCloseBtn) {
+      itemCloseBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeItemDetailsModal();
+      });
+    }
+    const itemModal = el('item-details-modal');
+    if (itemModal) {
+      itemModal.addEventListener('click', (e) => {
+        if (e.target === itemModal) {
+          e.stopPropagation();
+          e.preventDefault();
+          closeItemDetailsModal();
+        }
       });
     }
 
@@ -1571,6 +1683,7 @@
       if (e.key === 'Escape') {
         closeSelectionPreview();
         closeActivityDetails();
+        closeItemDetailsModal();
       }
     });
 

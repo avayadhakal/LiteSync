@@ -1634,25 +1634,27 @@
       const streamData = activeStreams.get(task.task_id);
       const currentPct = streamData ? streamData.pct : 0;
       const currentDetail = streamData && streamData.currentFile
-        ? `Copying: ${streamData.currentFile} - ${currentPct}%`
+        ? `Copying: ${streamData.currentFile}`
         : (task.status === 'queued' ? 'Queued...' : 'Starting transfer...');
 
       card.innerHTML = `
-        <div class="card-top">
+        <div class="card-top" style="display: flex; justify-content: space-between; align-items: center;">
           <span class="card-title" title="${escapeHtml(primaryTitle)}">${escapeHtml(primaryTitle)}</span>
-          <button class="btn-sm btn-danger cancel-btn" data-id="${task.task_id}">Cancel</button>
+          <div style="display: flex; align-items: center;">
+            <div id="progress-text-${task.task_id}" style="color: #94a3b8; font-size: 13px; font-weight: 600; margin-right: 12px;">
+              ${currentPct}%
+            </div>
+            <button class="btn-sm btn-danger cancel-btn" data-id="${task.task_id}">Cancel</button>
+          </div>
         </div>
         <div class="card-path truncate" title="${escapeHtml(sourceText)} ➔ ${escapeHtml(task.destination)}">
           ${escapeHtml(sourceText)} ➔ ${escapeHtml(task.destination)}
         </div>
-        <div class="bg-gray-800 rounded h-5 relative flex items-center justify-center overflow-hidden" style="position: relative;">
-          <div class="bg-blue-600 rounded absolute inset-0" id="progress-fill-${task.task_id}" style="width: ${currentPct}%; transition: width 0.2s ease;"></div>
-          <span class="absolute inset-0 flex items-center justify-center font-semibold text-xs text-white drop-shadow z-10 pointer-events-none" id="progress-text-${task.task_id}">
-            ${currentPct}%
-          </span>
-        </div>
-        <div class="card-details truncate" id="progress-detail-${task.task_id}">
+        <div class="card-details truncate" id="progress-detail-${task.task_id}" style="margin-top: 4px;">
           ${escapeHtml(currentDetail)}
+        </div>
+        <div class="bg-gray-800 relative overflow-hidden" style="height: 8px; border-radius: 4px; margin-top: 4px;">
+          <div class="absolute inset-0" id="progress-fill-${task.task_id}" style="background: var(--accent-dim); width: ${currentPct}%; transition: width 0.2s ease; border-radius: 4px;"></div>
         </div>
       `;
 
@@ -1721,8 +1723,8 @@
           if (textEl) textEl.textContent = `${pct}%`;
           if (detailEl) {
             detailEl.textContent = streamData.currentFile
-              ? `Copying: ${streamData.currentFile} - ${pct}%`
-              : `Syncing: ${pct}%`;
+              ? `Copying: ${streamData.currentFile}`
+              : `Syncing...`;
           }
         }
       } else {
@@ -1739,7 +1741,7 @@
         if (!isRsyncSystemLine) {
           streamData.currentFile = trimmed;
           if (detailEl) {
-            detailEl.textContent = `Copying: ${streamData.currentFile} - ${streamData.pct}%`;
+            detailEl.textContent = `Copying: ${streamData.currentFile}`;
           }
         }
       }

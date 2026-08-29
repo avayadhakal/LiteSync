@@ -79,6 +79,7 @@ password_hash = "$2b$12$pihash"
         self.assertEqual(settings.data_dir, Path("./data").resolve())
         self.assertEqual(settings.host, "0.0.0.0")
         self.assertEqual(settings.port, 8000)
+        self.assertEqual(settings.max_upload_size_mb, 5120)
 
     def test_missing_config_file(self):
         non_existent = self.config_dir / "does_not_exist.toml"

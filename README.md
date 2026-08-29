@@ -3,7 +3,8 @@
 Ultra-lightweight dual-pane file transfer web app for a Raspberry Pi. Browse a
 source and destination directory side by side, select files/folders, and hand
 the transfer to `rsync` running in the background so it survives
-closing the browser.
+closing the browser. Also supports direct, streamed browser-to-filesystem file uploads
+with real-time byte-level progress.
 
 ## Requirements
 
@@ -58,4 +59,5 @@ sudo bash uninstall.sh --keep-data # Uninstalls but preserves data/ and config.t
 - Only directories listed under `allowed_roots` in `config.toml` can be
   browsed or used as a transfer source/destination.
 - Transfers run in the background as asynchronous subprocesses and survive browser disconnects.
+- Browser file uploads stream straight to destination disks in chunks with collision guards and real-time progress (`max_upload_size_mb` configurable in `config.toml`, default 5 GB).
 - Configuration is loaded via Python's built-in `tomllib` from `config.toml` (or the path set in `LITESYNC_CONFIG`).

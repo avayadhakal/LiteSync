@@ -6,7 +6,8 @@ Minimal-overhead Raspberry Pi web app for dual-pane local directory browsing and
 * **Auth**: Built-in lightweight auth (TOML hashed passwords, signed session cookies).
 * **Security**: Filesystem constrained to admin-configured "allowed roots". `fsops.resolve_safe_path()` strictly validates all paths against traversal/symlink escapes.
 * **Transfer Engine**: Background asyncio subprocess worker. Survives browser closures. Logs pipe directly to per-task files, streamed to UI via SSE.
-* **UI Paradigms**: Single-page application (SPA). Independent transfer cards (1 per source). Contextual modals for file mutation. Toast notifications. SQLite persistent activity log.
+* **Browser Uploads**: Direct browser-to-filesystem multipart streaming straight to destination directory. Fully decoupled from `tasks` table and background runner.
+* **UI Paradigms**: Single-page application (SPA). Independent transfer cards (1 per source). Real-time byte upload progress card. Contextual modals for file mutation. Toast notifications. SQLite persistent activity log.
 
 ## 2. Project Structure
 ```text
@@ -14,10 +15,10 @@ Minimal-overhead Raspberry Pi web app for dual-pane local directory browsing and
 ├── app/
 │   ├── __init__.py
 │   ├── main.py               # FastAPI app, static mounts, routers, startup poller/reconciliation
-│   ├── config.py             # Loads config.toml -> Settings object via tomllib
+│   ├── config.py             # Loads config.toml -> Settings object via tomllib (max_upload_size_mb)
 │   ├── auth.py               # bcrypt password hashing, signed cookies, login/lockout logic
 │   ├── fsops.py              # resolve_safe_path(), list_directory() — path validation
-│   ├── routes_browse.py      # /api/roots, /api/browse, /api/mkdir | rename | delete, /api/download
+│   ├── routes_browse.py      # /api/roots, /api/browse, /api/mkdir | rename | delete, /api/download, /api/upload
 │   └── tasks/
 │       ├── __init__.py
 │       ├── db.py             # sqlite3 wrapper (init, CRUD, next_queued_task, activity log)
@@ -85,6 +86,7 @@ CREATE INDEX idx_activity_created ON activity(created_at DESC);
 | POST | `/api/mkdir` | `{path, name}` → `Path.mkdir()`. Rejects slashes/collisions. |
 | POST | `/api/rename` | `{path, new_name}` → `Path.rename()`. Refuses renaming roots. |
 | POST | `/api/delete` | `{path}` → `shutil.rmtree()` / `unlink()`. Refuses deleting roots. |
+| POST | `/api/upload` | `{path, files}` → Streamed multipart write straight to disk (`.litesync-upload-<hex>.tmp` → `os.rename`). |
 | POST | `/api/transfer` | `{sources: [{path, excludes}], destination, operation}` → Queues 1 task **per source**. |
 | GET | `/api/tasks`, `/{id}` | Task history pagination and detail retrieval. |
 | GET | `/api/tasks/{id}/stream` | SSE: yields live log tail, closes with `status` event. |
@@ -92,6 +94,14 @@ CREATE INDEX idx_activity_created ON activity(created_at DESC);
 | DELETE | `/api/tasks/{id}`, `/tasks` | Deletes task history records and log files. |
 | GET | `/api/activity` | Retrieves authoritative activity log entries newest first. |
 | DELETE | `/api/activity` | Clears activity log table. |
+
+### Browser Upload Subsystem (Streamed Multipart)
+
+1. **Direct-to-Disk Streaming:** Bypasses the tasks table, background scheduler, and SSE stream.
+2. **Memory Boundedness:** FastAPI/Starlette SpooledTemporaryFile rolls to disk past 1MB, streamed in 1MB chunks to `dest_dir/.litesync-upload-<hex>.tmp`.
+3. **Collision Safety:** Validates bare filename, checks existence, writes to temp file, performs zero-`await` existence verification, and executes atomic `os.rename()`.
+4. **Client Disconnect Handling:** Catches `ClientDisconnect`, immediately unlinks temporary files, and returns HTTP 499 with zero Activity Log entries (silent abandonment).
+5. **Activity Log:** Success records `[⬆] UPLOADED <name> → <dest_dir>`; genuine failures record `[✗] UPLOAD FAILED <name> → <dest_dir> (<error>)`.
 
 ### Transfer Engine (Asyncio Subprocess)
 
@@ -107,7 +117,7 @@ CREATE INDEX idx_activity_created ON activity(created_at DESC);
 
 * **CSS Variables:** Layout dimensions (`--left-width`, `--top-height`, `--bottom-height`) applied to `:root`. JS `initResizers()` updates CSS vars on drag.
 * **Mobile View (`max-width: 768px`):** Panes stack vertically. Pane headers wrap dynamically.
-* **Dual-Pane Logic:** Both Source and Dest panes share identical toolbars (`📁+`, `✏️`, `🗑️`). Selections are isolated.
+* **Dual-Pane Logic:** Both Source and Dest panes share identical toolbars (`⬆️`, `📁+`, `✏️`, `🗑️`). Selections are isolated.
 
 ### File Mutation Modals & Toasts
 
@@ -115,9 +125,10 @@ CREATE INDEX idx_activity_created ON activity(created_at DESC);
 * **Toasts (`.toast-stack`):** Top-right fixed position. Auto-dismiss (4s) or click-to-dismiss. Slide-in animations.
 * **Activity Log (SQLite):** Persistent across browsers and reloads. Color-coded by severity. Replaces the legacy localStorage model.
 
-### Active Transfers UI
+### Uploads & Active Transfers UI
 
-* **Unbatched Cards:** Multi-item transfers spawn individual `.transfer-card` elements (one per item). Queued items show `Queued...` and can be canceled before execution.
+* **Floating Upload Progress Card (`.upload-card`):** Self-contained multi-file progress card in bottom-right corner with stacked progress rows and independent `[✕]` cancel buttons (`xhr.abort()`).
+* **Unbatched Transfer Cards:** Multi-item transfers spawn individual `.transfer-card` elements (one per item). Queued items show `Queued...` and can be canceled before execution.
 * **Selection Action Bar:** Hidden when count is 0; contains Summary, View, Clear, and Transfer controls.
 * **Transfer Confirmation Modal:** Contains operation options (`copy` vs `move`) directly under destination path.
 * **Contextual View Popover:** Displays full paths of selected items and exclusions with overflow scrolling.

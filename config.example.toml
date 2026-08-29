@@ -23,6 +23,9 @@ download_expiry = 86400
 # If omitted, a distinct key is derived automatically from secret_key.
 # download_secret_key = "OPTIONAL_SEPARATE_DOWNLOAD_SECRET"
 
+# Maximum browser upload size in megabytes. Default: 5120 (5 GB).
+# max_upload_size_mb = 5120
+
 # Set true only if the app is served over HTTPS.
 secure_cookie = false
 

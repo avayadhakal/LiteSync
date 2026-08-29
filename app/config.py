@@ -26,6 +26,7 @@ class Settings:
     port: int
     download_expiry: int = 86400
     download_secret_key: str | None = None
+    max_upload_size_mb: int = 5120
 
     def find_user(self, username: str) -> User | None:
         for user in self.users:
@@ -71,6 +72,7 @@ def load_settings(config_path_override: Path | str | None = None) -> Settings:
         port=int(raw.get("port", 8000)),
         download_expiry=int(raw.get("download_expiry", 86400)),
         download_secret_key=raw.get("download_secret_key"),
+        max_upload_size_mb=int(raw.get("max_upload_size_mb", 5120)),
     )
 
 

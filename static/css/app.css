@@ -138,7 +138,7 @@ input[type="text"], input[type="password"] {
 @media (min-width: 769px) {
   #source-pane { width: var(--left-width, 50%); flex: none; }
   #dest-pane { flex: 1; }
-  .history { height: var(--bottom-height, 320px); flex: none; }
+  .history { height: var(--bottom-height, 30vh); flex: none; }
 }
 
 /* Mobile: vertical stacking; the vertical splitter becomes a
@@ -148,7 +148,7 @@ input[type="text"], input[type="password"] {
   #source-pane { height: var(--top-height, 50%); flex: none; }
   #dest-pane { flex: 1 1 0; min-height: 0; }
   .splitter-v { width: auto; height: 6px; cursor: row-resize; }
-  .history { height: var(--bottom-height, 280px); flex: none; min-height: 0; }
+  .history { height: var(--bottom-height, 30vh); flex: none; min-height: 0; }
 }
 
 /* Pane header — single-row grid: Label | Path (flexible) | Actions */

@@ -1802,7 +1802,24 @@
 
   function initResizers() {
     const root = document.documentElement;
-    const drag = (handle, onMove) => {
+    const clamp = (val, min, max) => Math.min(Math.max(val, min), max);
+
+    // Initialize from LocalStorage or Defaults
+    try {
+      const dualRatio = parseFloat(localStorage.getItem('litesync_dual_pane_ratio')) || 50;
+      const bottomRatio = parseFloat(localStorage.getItem('litesync_bottom_pane_ratio')) || 30;
+      
+      const clampedDual = clamp(dualRatio, 15, 85);
+      const clampedBottom = clamp(bottomRatio, 15, 85);
+
+      root.style.setProperty('--left-width', `${clampedDual}%`);
+      root.style.setProperty('--top-height', `${clampedDual}%`);
+      root.style.setProperty('--bottom-height', `${clampedBottom}vh`);
+    } catch (e) {
+      // Ignore localStorage errors and fallback to CSS defaults if needed
+    }
+
+    const drag = (handle, onMove, onEnd) => {
       handle.addEventListener('pointerdown', (e) => {
         e.preventDefault();
         handle.setPointerCapture(e.pointerId);
@@ -1812,6 +1829,7 @@
           handle.classList.remove('splitter-dragging');
           handle.removeEventListener('pointermove', move);
           handle.removeEventListener('pointerup', up);
+          if (onEnd) onEnd();
         };
         handle.addEventListener('pointermove', move);
         handle.addEventListener('pointerup', up);
@@ -1819,23 +1837,37 @@
     };
 
     const panesEl = document.querySelector('.panes');
+    let lastDualPct = null;
     drag(el('vertical-splitter'), (e) => {
       // Desktop (row): drag adjusts left pane width.
       // Mobile (column): drag adjusts top pane height.
       if (getComputedStyle(panesEl).flexDirection === 'column') {
         const rect = panesEl.getBoundingClientRect();
         const pct = ((e.clientY - rect.top) / rect.height) * 100;
-        root.style.setProperty('--top-height', `${pct}%`);
+        lastDualPct = clamp(pct, 15, 85);
+        root.style.setProperty('--top-height', `${lastDualPct}%`);
       } else {
         const pct = (e.clientX / window.innerWidth) * 100;
-        root.style.setProperty('--left-width', `${pct}%`);
+        lastDualPct = clamp(pct, 15, 85);
+        root.style.setProperty('--left-width', `${lastDualPct}%`);
+      }
+    }, () => {
+      if (lastDualPct !== null) {
+        localStorage.setItem('litesync_dual_pane_ratio', lastDualPct);
       }
     });
 
     const historyEl = document.querySelector('.history');
+    let lastBottomPct = null;
     drag(el('horizontal-splitter'), (e) => {
       const height = historyEl.getBoundingClientRect().bottom - e.clientY;
-      root.style.setProperty('--bottom-height', `${height}px`);
+      const pct = (height / window.innerHeight) * 100;
+      lastBottomPct = clamp(pct, 15, 85);
+      root.style.setProperty('--bottom-height', `${lastBottomPct}vh`);
+    }, () => {
+      if (lastBottomPct !== null) {
+        localStorage.setItem('litesync_bottom_pane_ratio', lastBottomPct);
+      }
     });
   }
 

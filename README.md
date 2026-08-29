@@ -60,4 +60,5 @@ sudo bash uninstall.sh --keep-data # Uninstalls but preserves data/ and config.t
   browsed or used as a transfer source/destination.
 - Transfers run in the background as asynchronous subprocesses and survive browser disconnects.
 - Browser file uploads stream straight to destination disks in chunks with collision guards and real-time progress (`max_upload_size_mb` configurable in `config.toml`, default 5 GB).
+  - *Note:* Large uploads are temporarily spooled to a disk-backed directory (`data/tmp`) before being atomically moved to their destination to prevent RAM exhaustion. Ensure the drive hosting `data/tmp` has sufficient free space for your maximum upload size.
 - Configuration is loaded via Python's built-in `tomllib` from `config.toml` (or the path set in `LITESYNC_CONFIG`).

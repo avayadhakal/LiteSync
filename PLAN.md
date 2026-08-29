@@ -98,7 +98,7 @@ CREATE INDEX idx_activity_created ON activity(created_at DESC);
 ### Browser Upload Subsystem (Streamed Multipart)
 
 1. **Direct-to-Disk Streaming:** Bypasses the tasks table, background scheduler, and SSE stream.
-2. **Memory Boundedness:** FastAPI/Starlette SpooledTemporaryFile rolls to disk past 1MB, streamed in 1MB chunks to `dest_dir/.litesync-upload-<hex>.tmp`.
+2. **Memory Boundedness:** FastAPI/Starlette SpooledTemporaryFile rolls to disk past 1MB. By default on many systems (like Raspberry Pi), `/tmp` is a RAM-backed `tmpfs`, which would cause large uploads to exhaust memory. LiteSync intercepts this by forcefully configuring `tempfile.tempdir` and the systemd `TMPDIR` environment variable to spool these temporary files to a disk-backed location (`data/tmp`), from which they are safely streamed in 1MB chunks to `dest_dir/.litesync-upload-<hex>.tmp`.
 3. **Collision Safety:** Validates bare filename, checks existence, writes to temp file, performs zero-`await` existence verification, and executes atomic `os.rename()`.
 4. **Client Disconnect Handling:** Catches `ClientDisconnect`, immediately unlinks temporary files, and returns HTTP 499 with zero Activity Log entries (silent abandonment).
 5. **Activity Log:** Success records `[⬆] UPLOADED <name> → <dest_dir>`; genuine failures record `[✗] UPLOAD FAILED <name> → <dest_dir> (<error>)`.

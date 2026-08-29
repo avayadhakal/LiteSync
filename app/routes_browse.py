@@ -130,14 +130,14 @@ async def download_file(
     litesync_session: str | None = Cookie(default=None),
     authorization: str | None = Header(default=None),
 ):
-    """Single HTTP file endpoint for browser downloads and VLC/mpv streaming.
+    """Single HTTP file endpoint for browser downloads and streaming.
 
     Accepts either a valid signed URL or an authenticated session.
     Derives filename strictly from the server-validated path.
     """
     settings = get_settings()
 
-    # 1. Signed URL authentication (VLC / external media players / direct link)
+    # 1. Signed URL authentication (direct link)
     if signature is not None and expires is not None:
         now = int(time.time())
         if expires < now:

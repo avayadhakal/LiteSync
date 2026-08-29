@@ -712,17 +712,28 @@ tr.task-row:hover { background: var(--panel-alt); }
   word-break: break-all;
 }
 
-/* Toast notifications container (top-right) */
+/* Toast notifications container (bottom-right desktop, bottom-center mobile) */
 .toast-stack {
   position: fixed;
-  top: 16px;
-  right: 16px;
+  bottom: 24px;
+  right: 24px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  z-index: 200;
+  z-index: 10000;
   pointer-events: none;
+  max-width: 320px;
 }
+@media (max-width: 768px) {
+  .toast-stack {
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+    max-width: none;
+    align-items: stretch;
+  }
+}
+
 .toast {
   background: var(--panel);
   border: 1px solid var(--border);
@@ -738,18 +749,35 @@ tr.task-row:hover { background: var(--panel-alt); }
   animation: toast-in 0.18s ease-out;
   word-break: break-word;
 }
+@media (max-width: 768px) {
+  .toast, .upload-card {
+    min-width: 0;
+    max-width: none;
+    width: 100%;
+    animation: toast-in-mobile 0.18s ease-out;
+  }
+}
 .toast.success { border-left-color: var(--success); }
 .toast.error   { border-left-color: var(--danger); }
 .toast.info    { border-left-color: var(--accent); }
 .toast.warn    { border-left-color: var(--warn); }
-.toast.toast-out {
+.toast.toast-out, .upload-card.toast-out {
   opacity: 0;
   transform: translateX(20px);
   transition: opacity 0.2s ease, transform 0.2s ease;
 }
+@media (max-width: 768px) {
+  .toast.toast-out, .upload-card.toast-out {
+    transform: translateY(20px);
+  }
+}
 @keyframes toast-in {
   from { opacity: 0; transform: translateX(20px); }
   to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes toast-in-mobile {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 /* In-flight upload progress card (toast stack component) */
@@ -769,11 +797,6 @@ tr.task-row:hover { background: var(--panel-alt); }
   display: flex;
   flex-direction: column;
   gap: 8px;
-}
-.upload-card.toast-out {
-  opacity: 0;
-  transform: translateX(20px);
-  transition: opacity 0.2s ease, transform 0.2s ease;
 }
 .upload-card-header {
   font-weight: 600;

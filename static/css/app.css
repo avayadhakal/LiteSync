@@ -72,8 +72,12 @@ button {
   border-radius: 6px;
   padding: 6px 12px;
   cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
 }
-button:hover { border-color: var(--accent); }
+button:hover { 
+  border-color: var(--accent); 
+  background: rgba(255, 255, 255, 0.05);
+}
 button.primary { background: var(--accent-dim); border-color: var(--accent); }
 button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
 button.danger-outline { border-color: var(--danger); }
@@ -192,6 +196,7 @@ input[type="text"], input[type="password"] {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis; /* Keeps long paths from pushing UI out of bounds */
+  opacity: 0.6;
 }
 
 /* Mobile: stacked layout — label + actions on row 1, full-width path below */
@@ -234,8 +239,9 @@ input[type="text"], input[type="password"] {
   font-size: 16px;
   cursor: pointer;
   border-bottom: 1px solid transparent;
+  transition: background 0.2s ease;
 }
-.entry:hover { background: var(--panel-alt); }
+.entry:hover { background: rgba(255, 255, 255, 0.05); }
 .entry .name {
   flex: 1;
   min-width: 0;
@@ -253,7 +259,7 @@ input[type="text"], input[type="password"] {
 .entry .name::-webkit-scrollbar {
   display: none;
 }
-.entry .size { color: var(--text-dim); font-size: 12px; }
+.entry .size { color: var(--text-dim); font-size: 12px; opacity: 0.6; }
 
 .btn-copy-path {
   opacity: 0.6;
@@ -496,10 +502,11 @@ input[type="text"], input[type="password"] {
 .history h2 { font-size: 13px; color: var(--text-dim); margin: 0 0 8px; text-transform: uppercase; letter-spacing: 0.04em; }
 
 table { width: 100%; border-collapse: collapse; font-size: 12px; }
-th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--border); }
+th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+td:not(:first-child) { opacity: 0.6; }
 th { color: var(--text-dim); font-weight: 500; }
-tr.task-row { cursor: pointer; }
-tr.task-row:hover { background: var(--panel-alt); }
+tr.task-row { cursor: pointer; transition: background 0.2s ease; }
+tr.task-row:hover { background: rgba(255, 255, 255, 0.05); }
 
 .badge { padding: 2px 8px; border-radius: 10px; font-size: 11px; }
 .badge.queued, .badge.running { background: var(--accent-dim); color: var(--text); }
@@ -573,9 +580,11 @@ tr.task-row:hover { background: var(--panel-alt); }
   border-radius: 4px;
   font-size: 12px;
   cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
 }
 .tab-btn:hover {
   color: var(--text);
+  background: rgba(255, 255, 255, 0.05);
 }
 .tab-btn.active {
   background: var(--panel-alt);
@@ -616,11 +625,11 @@ tr.task-row:hover { background: var(--panel-alt); }
   color: var(--text-dim);
   font-size: 13px;
   line-height: 1;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.2s ease, color 0.2s ease;
 }
 .icon-btn:hover {
   color: var(--text);
-  background: var(--panel-alt); /* Subtle hover state */
+  background: rgba(255, 255, 255, 0.05); /* Subtle hover state */
 }
 .icon-btn:active {
   background: var(--border);
@@ -672,6 +681,7 @@ tr.task-row:hover { background: var(--panel-alt); }
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  opacity: 0.6;
 }
 
 .card-details {
@@ -680,6 +690,7 @@ tr.task-row:hover { background: var(--panel-alt); }
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  opacity: 0.6;
 }
 
 /* Tailwind-style utility classes */

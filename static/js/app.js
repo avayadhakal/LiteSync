@@ -1367,14 +1367,18 @@
     const copyRadio = document.querySelector('input[name="transfer-op"][value="copy"]');
     if (copyRadio) copyRadio.checked = true;
     el('confirm-modal').classList.remove('hidden');
-    const layoutBtn = el('layout-toggle-btn');
-    if (layoutBtn) layoutBtn.disabled = true;
+    const btnSingle = el('btn-single-pane');
+    const btnDual = el('btn-dual-pane');
+    if (btnSingle) btnSingle.disabled = true;
+    if (btnDual) btnDual.disabled = true;
   }
 
   function closeConfirmModal() {
     el('confirm-modal').classList.add('hidden');
-    const layoutBtn = el('layout-toggle-btn');
-    if (layoutBtn) layoutBtn.disabled = false;
+    const btnSingle = el('btn-single-pane');
+    const btnDual = el('btn-dual-pane');
+    if (btnSingle) btnSingle.disabled = false;
+    if (btnDual) btnDual.disabled = false;
   }
 
   async function submitTransfer() {
@@ -1801,17 +1805,38 @@
     });
 
     // Layout toggle
-    if (state.singlePane) document.body.classList.add('single-pane');
-    el('layout-toggle-btn').addEventListener('click', () => {
-      state.singlePane = !state.singlePane;
+    const btnSingle = el('btn-single-pane');
+    const btnDual = el('btn-dual-pane');
+
+    const updateLayoutUI = () => {
       if (state.singlePane) {
         document.body.classList.add('single-pane');
-        localStorage.removeItem('litesync-dual-pane'); // defaults to single pane
+        btnSingle.classList.add('active');
+        btnDual.classList.remove('active');
+        localStorage.removeItem('litesync-dual-pane');
       } else {
         document.body.classList.remove('single-pane');
+        btnDual.classList.add('active');
+        btnSingle.classList.remove('active');
         localStorage.setItem('litesync-dual-pane', 'true');
       }
-      updateSelectionUI(); // Re-evaluate transfer-btn disabled state
+      updateSelectionUI();
+    };
+    
+    updateLayoutUI();
+
+    btnSingle.addEventListener('click', () => {
+      if (!state.singlePane) {
+        state.singlePane = true;
+        updateLayoutUI();
+      }
+    });
+
+    btnDual.addEventListener('click', () => {
+      if (state.singlePane) {
+        state.singlePane = false;
+        updateLayoutUI();
+      }
     });
 
     // Both panes expose Upload / New Folder / Rename / Delete via [data-pane-action][data-pane]

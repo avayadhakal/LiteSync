@@ -31,10 +31,30 @@ header, .controls { flex: none; }
 
 header {
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  padding: 10px 16px;
+  align-items: center;
+  padding: 0 16px;
+  height: 48px;
   border-bottom: 1px solid var(--border);
+}
+
+.nav-left, .nav-center, .nav-right {
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+
+.nav-left {
+  justify-content: flex-start;
+}
+
+.nav-center {
+  justify-content: center;
+}
+
+.nav-right {
+  justify-content: flex-end;
+  gap: 12px;
 }
 
 header h1 {
@@ -1163,4 +1183,62 @@ body.single-pane #source-pane {
 /* Hide checkboxes in modal picker */
 #transfer-picker-body .entry input[type="checkbox"] {
   display: none;
+}
+
+/* Segmented Control */
+.segmented-control {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.segmented-control button {
+  background: transparent;
+  color: #94a3b8;
+  border: none;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.segmented-control button:hover:not(.active) {
+  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.05);
+}
+.segmented-control button.active {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.btn-logout {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.user-display {
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+  .user-display {
+    display: none;
+  }
+  
+  .toggle-label {
+    display: none;
+  }
+  
+  .nav-left, .nav-center, .nav-right {
+    gap: 8px;
+    align-items: center;
+  }
 }

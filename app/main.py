@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import tempfile
 from pathlib import Path
 
 from fastapi import Depends, FastAPI
@@ -49,6 +50,15 @@ async def on_startup():
     global _scheduler_task
     settings = get_settings()
     db.init_db(settings.data_dir)
+    
+    # Secondary/defensive fix for upload spooling. 
+    # In production, the systemd unit's Environment=TMPDIR=/opt/litesync/data/tmp
+    # is the primary mechanism to keep large spooled uploads out of RAM (tmpfs).
+    # This tempfile override provides a fallback for dev/debug non-systemd invocations.
+    tmp_dir = settings.data_dir / "tmp"
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    tempfile.tempdir = str(tmp_dir)
+    
     reconcile_on_startup(settings)
     _scheduler_task = asyncio.create_task(run_scheduler(settings))
 

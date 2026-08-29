@@ -8,6 +8,7 @@ User=litesync
 Group=litesync
 WorkingDirectory=/opt/litesync
 Environment=LITESYNC_CONFIG=/opt/litesync/config.toml
+Environment=TMPDIR=/opt/litesync/data/tmp
 ExecStart=/opt/litesync/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1
 Restart=on-failure
 RestartSec=5

@@ -204,6 +204,7 @@ RestartSec=5
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
+PrivateTmp=true
 
 # ProtectSystem=strict makes the whole filesystem read-only except the paths
 # below. The data dir needs write (SQLite + logs); every allowed_root needs

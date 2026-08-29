@@ -95,8 +95,9 @@ class MockEvent {
   preventDefault() { this._defaultPrevented = true; }
 }
 
-// 1. Test attachLongPress fires on 500ms hold
 (async () => {
+// 1. Test attachLongPress fires on 500ms hold
+await (async () => {
   let timerHandler = null;
   const originalSetTimeout = global.setTimeout;
   const originalClearTimeout = global.clearTimeout;
@@ -396,7 +397,7 @@ class MockEvent {
 })();
 
 // 8. Test Copy URL in bottom sheet calls API/clipboard and auto-closes sheet on success
-(async () => {
+await (async () => {
   const modal = new MockElement('div', 'item-details-modal');
   modal.classList.remove('hidden');
   const copyBtn = new MockElement('button', 'item-details-copy');
@@ -508,4 +509,5 @@ class MockEvent {
   console.log('✓ Test 10: Close button and backdrop tap dismiss bottom sheet with isolated events passed');
 })();
 
-console.log('\nAll LiteSync Filename Visibility JavaScript unit tests passed successfully!');
+
+})().catch(e => { console.error(e); process.exit(1); }).then(() => console.log("\nAll LiteSync Filename Visibility JavaScript unit tests passed successfully!"));

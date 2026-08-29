@@ -117,6 +117,7 @@ CREATE INDEX idx_activity_created ON activity(created_at DESC);
 
 * **CSS Variables:** Layout dimensions (`--left-width`, `--top-height`, `--bottom-height`) applied to `:root`. JS `initResizers()` updates CSS vars on drag.
 * **Mobile View (`max-width: 768px`):** Panes stack vertically. Pane headers wrap dynamically.
+* **Layout Toggle:** Persistent single-pane or dual-pane layout mode. Single-pane hides the destination pane for simpler workflows and merges destination picking into the Transfer modal.
 * **Dual-Pane Logic:** Both Source and Dest panes share identical toolbars (`⬆️`, `📁+`, `✏️`, `🗑️`). Selections are isolated.
 
 ### File Mutation Modals & Toasts

@@ -1,7 +1,7 @@
 # LiteSync
 
-Ultra-lightweight dual-pane file transfer web app for a Raspberry Pi. Browse a
-source and destination directory side by side, select files/folders, and hand
+Ultra-lightweight single/dual-pane file transfer web app for a Raspberry Pi. Browse a
+source and destination directory (with a single-pane layout for simpler management, or side by side), select files/folders, and hand
 the transfer to `rsync` running in the background so it survives
 closing the browser. Also supports direct, streamed browser-to-filesystem file uploads
 with real-time byte-level progress.

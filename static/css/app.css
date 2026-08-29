@@ -1124,3 +1124,20 @@ tr.task-row:hover { background: var(--panel-alt); }
 
 
 
+
+/* Single-pane layout */
+body.single-pane #dest-pane {
+  display: none !important;
+}
+body.single-pane #vertical-splitter {
+  display: none !important;
+}
+body.single-pane #source-pane {
+  flex: 1 !important;
+  width: auto !important;
+}
+
+/* Hide checkboxes in modal picker */
+#transfer-picker-body .entry input[type="checkbox"] {
+  display: none;
+}

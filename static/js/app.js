@@ -261,8 +261,10 @@
     tasks: [],
     activeTaskId: null,
     finishedTaskIds: new Set(), // task ids whose completion was already handled
-    historyLoaded: false,
     activity: [], // [{id, kind, message, created_at}] newest-first
+    singlePane: (typeof localStorage !== 'undefined' ? localStorage.getItem('litesync-dual-pane') : null) !== 'true',
+    pickerDest: { path: null, entries: [] },
+    pickerDestSelection: new SelectionState(), // Selection object for modal picker, just to keep renderPane happy
   };
 
   const el = (id) => document.getElementById(id);
@@ -464,16 +466,25 @@
   // Per-pane selection accessor. The source pane drives Transfer submissions;
   // the dest pane supports the same file operations via its own selection.
   function paneSelection(which) {
+    if (which === 'pickerDest') return state.pickerDestSelection;
     return which === 'source' ? state.selection : state.destSelection;
   }
 
   function renderPane(which) {
     const pane = state[which];
     const sel = paneSelection(which);
-    el(`${which}-path`).textContent = pane.path === null ? '(select a root)' : pane.path;
-    const body = el(`${which}-body`);
+    const pathElId = which === 'pickerDest' ? 'transfer-picker-path' : `${which}-path`;
+    const bodyElId = which === 'pickerDest' ? 'transfer-picker-body' : `${which}-body`;
+    el(pathElId).textContent = pane.path === null ? '(select a root)' : pane.path;
+    const body = el(bodyElId);
+    if (!body) return;
     const prevScrollTop = body.scrollTop;
     body.innerHTML = '';
+
+    if (which === 'pickerDest') {
+      const okBtn = el('confirm-ok');
+      if (okBtn) okBtn.disabled = pane.path === null;
+    }
 
     if (pane.path !== null) {
       const up = document.createElement('div');
@@ -567,7 +578,7 @@
   function updateSelectionUI() {
     // Only the source pane drives the Transfer button; show its count.
     const count = state.selection.size;
-    el('transfer-btn').disabled = !(count > 0 && state.dest.path);
+    el('transfer-btn').disabled = !(count > 0 && (state.dest.path || state.singlePane));
 
     // Inline selection summary in the .controls footer. Hiding the whole badge
     // wrapper (not just its children) prevents an empty-pill artifact at 0 selected
@@ -1317,7 +1328,7 @@
 
   // --- Transfer flow ---
 
-  function openConfirmModal() {
+  async function openConfirmModal() {
     const list = el('confirm-list');
     list.innerHTML = '';
     const sources = state.selection.toTransferSources();
@@ -1330,20 +1341,52 @@
       }
       list.appendChild(li);
     }
-    el('confirm-dest').textContent = state.dest.path;
+    
+    if (state.singlePane) {
+      el('transfer-static-dest-view').classList.add('hidden');
+      el('transfer-picker-container').classList.remove('hidden');
+      el('transfer-op-field').classList.remove('hidden');
+      
+      let targetPath = localStorage.getItem('litesync-last-destination');
+      if (!targetPath) targetPath = null;
+      try {
+        await loadPane('pickerDest', targetPath);
+      } catch (e) {
+        await loadPane('pickerDest', null);
+      }
+      el('confirm-ok').disabled = state.pickerDest.path === null;
+    } else {
+      el('transfer-static-dest-view').classList.remove('hidden');
+      el('transfer-picker-container').classList.add('hidden');
+      el('transfer-op-field').classList.remove('hidden');
+      el('transfer-change-dest-btn').classList.add('hidden');
+      el('confirm-dest').textContent = state.dest.path || '(select a destination)';
+      el('confirm-ok').disabled = state.dest.path === null;
+    }
+
     const copyRadio = document.querySelector('input[name="transfer-op"][value="copy"]');
     if (copyRadio) copyRadio.checked = true;
     el('confirm-modal').classList.remove('hidden');
+    const layoutBtn = el('layout-toggle-btn');
+    if (layoutBtn) layoutBtn.disabled = true;
   }
 
   function closeConfirmModal() {
     el('confirm-modal').classList.add('hidden');
+    const layoutBtn = el('layout-toggle-btn');
+    if (layoutBtn) layoutBtn.disabled = false;
   }
 
   async function submitTransfer() {
     closeConfirmModal();
     const opRadio = document.querySelector('input[name="transfer-op"]:checked');
     const operation = opRadio ? opRadio.value : 'copy';
+    
+    if (state.singlePane && state.pickerDest.path) {
+      state.dest.path = state.pickerDest.path;
+      localStorage.setItem('litesync-last-destination', state.dest.path);
+    }
+    
     const sources = state.selection.toTransferSources();
     const body = {
       sources: sources,
@@ -1755,6 +1798,20 @@
     el('logout-btn').addEventListener('click', async () => {
       await api('/api/logout', { method: 'POST' });
       window.location.href = '/login.html';
+    });
+
+    // Layout toggle
+    if (state.singlePane) document.body.classList.add('single-pane');
+    el('layout-toggle-btn').addEventListener('click', () => {
+      state.singlePane = !state.singlePane;
+      if (state.singlePane) {
+        document.body.classList.add('single-pane');
+        localStorage.removeItem('litesync-dual-pane'); // defaults to single pane
+      } else {
+        document.body.classList.remove('single-pane');
+        localStorage.setItem('litesync-dual-pane', 'true');
+      }
+      updateSelectionUI(); // Re-evaluate transfer-btn disabled state
     });
 
     // Both panes expose Upload / New Folder / Rename / Delete via [data-pane-action][data-pane]

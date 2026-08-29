@@ -696,12 +696,16 @@
     if (!ts) return '';
     const d = new Date(ts);
     if (isNaN(d.getTime())) return String(ts);
+    const now = new Date();
+    const isToday = d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    if (isToday) {
+      return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    }
     return d.toLocaleString(undefined, {
       month: 'short',
       day: 'numeric',
-      hour: '2-digit',
+      hour: 'numeric',
       minute: '2-digit',
-      second: '2-digit',
     });
   }
 
@@ -738,96 +742,119 @@
     let secondaryHtml = '';
 
     if (op === 'move') {
-      badgeText = 'MOVED';
+      badgeText = 'Moved';
       if (status === 'succeeded') {
         icon = '✓';
         statusClass = 'status-succeeded';
         const dst = data.destination ? normalizePath(data.destination).split('/').pop() || data.destination : '';
-        secondaryHtml = `→ ${escapeHtml(dst || data.destination || '')} <span class="activity-tag">[source deleted]</span>`;
+        secondaryHtml = `→ <span style="font-family: ui-monospace, monospace;">${escapeHtml(dst || data.destination || '')}</span> <span class="activity-tag">[source deleted]</span>`;
       } else if (status === 'interrupted') {
         icon = '⊘';
-        badgeText = 'INTERRUPTED — MOVE';
+        badgeText = 'Interrupted — Move';
         statusClass = 'status-interrupted';
         secondaryHtml = escapeHtml(data.summary || data.error || 'cancelled by user');
       } else {
         icon = '✗';
-        badgeText = 'FAILED — MOVE';
+        badgeText = 'Failed — Move';
         statusClass = 'status-failed';
         secondaryHtml = escapeHtml(data.summary || data.error || 'rsync exited with error');
       }
     } else if (op === 'copy' || op === 'transfer') {
-      badgeText = 'COPIED';
+      badgeText = 'Copied';
       if (status === 'succeeded') {
         icon = '✓';
         statusClass = 'status-succeeded';
         const dst = data.destination ? normalizePath(data.destination).split('/').pop() || data.destination : '';
-        secondaryHtml = `→ ${escapeHtml(dst || data.destination || '')}`;
+        secondaryHtml = `→ <span style="font-family: ui-monospace, monospace;">${escapeHtml(dst || data.destination || '')}</span>`;
       } else if (status === 'interrupted') {
         icon = '⊘';
-        badgeText = 'INTERRUPTED — COPY';
+        badgeText = 'Interrupted — Copy';
         statusClass = 'status-interrupted';
         secondaryHtml = escapeHtml(data.summary || data.error || 'cancelled by user');
       } else {
         icon = '✗';
-        badgeText = 'FAILED — COPY';
+        badgeText = 'Failed — Copy';
         statusClass = 'status-failed';
         secondaryHtml = escapeHtml(data.summary || data.error || 'rsync exited with error');
       }
     } else if (op === 'mkdir') {
       icon = '+';
-      badgeText = 'CREATED FOLDER';
+      badgeText = 'Created Folder';
       statusClass = status === 'failed' ? 'status-failed' : 'status-succeeded';
       primaryText = data.summary || data.name || data.path;
       if (status === 'failed') {
         icon = '✗';
-        badgeText = 'FAILED — NEW FOLDER';
+        badgeText = 'Failed — New Folder';
         secondaryHtml = escapeHtml(data.error || 'Failed to create directory');
       }
     } else if (op === 'rename') {
       icon = '→';
-      badgeText = 'RENAMED';
+      badgeText = 'Renamed';
       statusClass = status === 'failed' ? 'status-failed' : 'status-succeeded';
-      primaryText = data.summary || (data.old_name ? `${data.old_name} → ${data.new_name}` : data.name);
+      primaryText = data.summary || (data.old_name ? `<span style="font-family: ui-monospace, monospace;">${escapeHtml(data.old_name)}</span> → <span style="font-family: ui-monospace, monospace;">${escapeHtml(data.new_name)}</span>` : data.name);
       if (status === 'failed') {
         icon = '✗';
-        badgeText = 'FAILED — RENAME';
+        badgeText = 'Failed — Rename';
         secondaryHtml = escapeHtml(data.error || 'Failed to rename');
       }
     } else if (op === 'delete') {
       icon = '🗑';
-      badgeText = 'DELETED';
+      badgeText = 'Deleted';
       statusClass = status === 'failed' ? 'status-failed' : 'status-succeeded';
       primaryText = data.name || (data.path ? normalizePath(data.path).split('/').pop() : 'item');
       if (status === 'failed') {
         icon = '✗';
-        badgeText = 'FAILED — DELETE';
+        badgeText = 'Failed — Delete';
         secondaryHtml = escapeHtml(data.error || 'Failed to delete');
       }
     } else if (op === 'upload') {
       const dst = data.destination ? normalizePath(data.destination) : '';
       if (status === 'succeeded') {
         icon = '⬆';
-        badgeText = 'UPLOADED';
+        badgeText = 'Uploaded';
         statusClass = 'status-succeeded';
         primaryText = data.name || (data.path ? normalizePath(data.path).split('/').pop() : 'file');
-        secondaryHtml = dst ? `→ ${escapeHtml(dst)}` : '';
+        secondaryHtml = dst ? `→ <span style="font-family: ui-monospace, monospace;">${escapeHtml(dst)}</span>` : '';
       } else {
         icon = '✗';
-        badgeText = 'UPLOAD FAILED';
+        badgeText = 'Upload Failed';
         statusClass = 'status-failed';
         primaryText = data.name || 'file';
         const reason = data.error || data.summary || 'Upload failed';
-        secondaryHtml = dst ? `→ ${escapeHtml(dst)}<br><span style="color: var(--danger); font-size: 11px;">${escapeHtml(reason)}</span>` : `<span style="color: var(--danger); font-size: 11px;">${escapeHtml(reason)}</span>`;
+        secondaryHtml = dst ? `→ <span style="font-family: ui-monospace, monospace;">${escapeHtml(dst)}</span><br><span style="color: var(--danger); font-size: 11px;">${escapeHtml(reason)}</span>` : `<span style="color: var(--danger); font-size: 11px;">${escapeHtml(reason)}</span>`;
       }
     } else {
-      badgeText = (entry.kind || 'INFO').toUpperCase();
+      badgeText = (entry.kind || 'Info').charAt(0).toUpperCase() + (entry.kind || 'Info').slice(1).toLowerCase();
       statusClass = 'status-info';
       primaryText = data.summary || data.name || String(entry.message);
+    }
+
+    if (op !== 'rename' && (!data.summary || data.name || data.path)) {
+       // Wrap primaryText in monospace if it's likely a file/path name and not a summary sentence
+       if (!data.summary || primaryText === data.name || primaryText === data.path || (primaryText !== 'Operation' && primaryText !== 'file' && primaryText !== 'item' && String(primaryText).indexOf(' ') === -1)) {
+          primaryText = `<span style="font-family: ui-monospace, monospace;">${escapeHtml(primaryText)}</span>`;
+       } else {
+          primaryText = escapeHtml(primaryText);
+       }
+    } else if (op !== 'rename') {
+       primaryText = escapeHtml(primaryText);
+    }
+
+    let badgeClass = 'badge-info';
+    if (status === 'failed') {
+      badgeClass = 'badge-danger';
+    } else if (status === 'interrupted') {
+      badgeClass = 'badge-warning';
+    } else {
+      if (op === 'delete' || op === 'removed') badgeClass = 'badge-danger';
+      else if (op === 'upload' || op === 'copy' || op === 'transfer') badgeClass = 'badge-success';
+      else if (op === 'rename' || op === 'move') badgeClass = 'badge-info';
     }
 
     return {
       icon,
       badgeText,
+      badgeClass,
       statusClass,
       primaryText,
       secondaryHtml,
@@ -856,21 +883,18 @@
       card.className = `activity-card ${info.statusClass}`;
       card.setAttribute('role', 'button');
       card.setAttribute('tabindex', '0');
-
+      
       card.innerHTML = `
-        <div class="activity-card-header">
-          <div class="activity-badge-group">
-            <span class="activity-status-icon">${info.icon}</span>
-            <span class="activity-op-badge">${escapeHtml(info.badgeText)}</span>
-          </div>
-          <div class="activity-meta">
-            <span class="activity-time">${escapeHtml(formatActivityTime(entry.created_at || entry.ts))}</span>
-            <button class="activity-details-btn" title="View Details">Details</button>
+        <div class="log-info">
+          <span class="badge ${info.badgeClass}">${escapeHtml(info.badgeText)}</span>
+          <div class="log-text">
+            <span class="activity-primary-line" title="Operation">${info.primaryText}</span>
+            ${info.secondaryHtml ? `<span class="activity-secondary-line">${info.secondaryHtml}</span>` : ''}
           </div>
         </div>
-        <div class="activity-card-body">
-          <div class="activity-primary-line" title="${escapeHtml(info.primaryText)}">${escapeHtml(info.primaryText)}</div>
-          ${info.secondaryHtml ? `<div class="activity-secondary-line">${info.secondaryHtml}</div>` : ''}
+        <div class="log-meta">
+          <span class="activity-time">${escapeHtml(formatActivityTime(entry.created_at || entry.ts))}</span>
+          <button class="activity-details-btn" title="View Details">Details</button>
         </div>
       `;
 
@@ -893,6 +917,23 @@
       }
 
       container.appendChild(card);
+    }
+    filterActivity();
+  }
+
+  function filterActivity() {
+    const searchInput = el('activity-search');
+    if (!searchInput) return;
+    const query = searchInput.value.toLowerCase();
+    const container = el('activity-container');
+    if (!container) return;
+    const cards = container.querySelectorAll('.activity-card');
+    for (const card of cards) {
+      if (card.textContent.toLowerCase().includes(query)) {
+        card.classList.remove('hidden');
+      } else {
+        card.classList.add('hidden');
+      }
     }
   }
 
@@ -1453,7 +1494,10 @@
     activeContainer.classList.toggle('hidden', !isActiveTab);
     activityContainer.classList.toggle('hidden', !isActivityTab);
 
-    el('clear-activity-btn').classList.toggle('hidden', !isActivityTab || state.activity.length === 0);
+    const utils = el('activity-utils');
+    if (utils) {
+      utils.classList.toggle('hidden', !isActivityTab);
+    }
 
     if (isActiveTab) {
       renderActiveTransfers();
@@ -1895,6 +1939,11 @@
       if (!ok) return;
       await clearActivity();
     });
+
+    const searchInput = el('activity-search');
+    if (searchInput) {
+      searchInput.addEventListener('input', filterActivity);
+    }
 
     // Activity details modal wiring
     const detailsCloseBtn = el('activity-details-close');

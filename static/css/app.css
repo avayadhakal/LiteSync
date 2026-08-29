@@ -374,12 +374,11 @@ input[type="text"], input[type="password"] {
 }
 .btn-ghost-danger {
   background: transparent;
-  border: 1px solid transparent;
-  color: var(--text-dim);
+  border: 1px solid var(--danger);
+  color: var(--danger);
 }
 .btn-ghost-danger:hover {
-  color: var(--danger);
-  border-color: var(--danger);
+  background: rgba(225, 86, 86, 0.1);
 }
 
 /* Selected-items preview popover — floats directly above the selection badge. */
@@ -896,72 +895,86 @@ tr.task-row:hover { background: var(--panel-alt); }
 .activity-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
   flex: 1;          /* Fill the expanded panel height */
   min-height: 0;
   overflow-y: auto; /* Scroll log entries independently of the tabs bar */
 }
 
 .activity-card {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--border);
-  border-radius: 6px;
-  padding: 8px 12px;
-  font-size: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  cursor: pointer;
-  transition: background 0.12s, border-color 0.12s;
-}
-.activity-card:hover {
-  background: var(--panel-alt);
-}
-.activity-card.status-succeeded { border-left-color: var(--success); }
-.activity-card.status-failed    { border-left-color: var(--danger); }
-.activity-card.status-interrupted { border-left-color: var(--warn); }
-.activity-card.status-info      { border-left-color: var(--accent); }
-
-.activity-card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.activity-card:hover {
+  background: var(--panel-alt);
 }
 
-.activity-badge-group {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.activity-status-icon {
-  font-weight: 700;
-  font-size: 13px;
-  line-height: 1;
-}
-.status-succeeded .activity-status-icon { color: var(--success); }
-.status-failed .activity-status-icon    { color: var(--danger); }
-.status-interrupted .activity-status-icon { color: var(--warn); }
-.status-info .activity-status-icon      { color: var(--accent); }
-
-.activity-op-badge {
-  font-weight: 700;
-  font-size: 12px;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-}
-.status-succeeded .activity-op-badge { color: var(--success); }
-.status-failed .activity-op-badge    { color: var(--danger); }
-.status-interrupted .activity-op-badge { color: var(--warn); }
-.status-info .activity-op-badge      { color: var(--accent); }
-
-.activity-meta {
+.log-info {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex: none;
+  min-width: 0;
+  flex: 1;
+}
+
+.log-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex: 1;
+}
+
+.log-meta {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.badge-danger {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+.badge-success {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+.badge-info {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+.badge-warning {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.activity-utils {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.activity-search-input {
+  height: 32px;
+  padding: 0 10px;
+  font-size: 13px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.2);
+  color: #fff;
 }
 
 .activity-time {
@@ -985,13 +998,6 @@ tr.task-row:hover { background: var(--panel-alt); }
 .activity-details-btn:hover {
   color: var(--text);
   border-color: var(--accent);
-}
-
-.activity-card-body {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
 }
 
 .activity-primary-line {

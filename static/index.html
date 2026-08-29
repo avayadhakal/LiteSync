@@ -82,8 +82,10 @@
     <div class="tabs-bar">
       <button class="tab-btn active" id="tab-active-btn" data-tab="active">Active Operations</button>
       <button class="tab-btn" id="tab-activity-btn" data-tab="activity">Activity Log</button>
-      <span class="spacer" style="flex: 1;"></span>
-      <button class="btn-sm btn-danger-solid hidden" id="clear-activity-btn">Clear Log</button>
+    </div>
+    <div class="activity-utils hidden" id="activity-utils">
+      <input type="search" id="activity-search" class="activity-search-input" placeholder="Filter logs...">
+      <button class="btn-sm btn-ghost-danger hidden" id="clear-activity-btn">Clear Log</button>
     </div>
     <div id="active-transfers-container" class="cards-container"></div>
     <div id="activity-container" class="activity-list hidden"></div>

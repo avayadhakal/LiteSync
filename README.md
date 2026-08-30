@@ -1,16 +1,58 @@
-# LiteSync
+<div align="center">
 
-Ultra-lightweight single/dual-pane file transfer web app for a Raspberry Pi. Browse a
-source and destination directory (with a single-pane layout for simpler management, or side by side), select files/folders, and hand
-the transfer to a dual-engine backend (`rsync` or native `os.copy_file_range` kernel copies) running in the background so it survives
-closing the browser. Also supports direct, streamed browser-to-filesystem file uploads
-with real-time byte-level progress.
+  <!-- Badges -->
+  <p>
+    <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.11+-3776AB.svg?style=flat-square&logo=python&logoColor=white" alt="Python Version"></a>
+    <a href="https://fastapi.tiangolo.com/"><img src="https://img.shields.io/badge/FastAPI-005571?style=flat-square&logo=fastapi" alt="FastAPI"></a>
+    <a href="#"><img src="https://img.shields.io/badge/platform-Raspberry%20Pi%20%7C%20Linux-C51A4A.svg?style=flat-square&logo=raspberry-pi&logoColor=white" alt="Platform"></a>
+    <a href="#"><img src="https://img.shields.io/badge/engine-rsync%20%2B%20kernel%20copy-blue.svg?style=flat-square" alt="Engine"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square" alt="License"></a>
+  </p>
+
+  <br />
+
+  <!-- Logo -->
+  <img src="docs/logo.svg" width="96" height="96" alt="LiteSync Logo" />
+
+  <!-- Title & Subtitle -->
+  <h1>LiteSync</h1>
+  <p><b>Ultra-lightweight single/dual-pane file transfer web app for Raspberry Pi.</b></p>
+  <p><i>Browse directories, manage transfers with a dual-engine backend (<code>rsync</code> or zero-copy <code>os.copy_file_range</code>), and stream uploads straight to disk.</i></p>
+
+  <br />
+
+  <!-- Primary Hero Screenshot -->
+  <a href="docs/screenshots/hero-dual-pane.jpg">
+    <img src="docs/screenshots/hero-dual-pane.jpg" alt="LiteSync Interface" width="100%" />
+  </a>
+
+</div>
+
+---
+
+## Features
+
+<div align="center">
+  <a href="docs/screenshots/transfer-modal.jpg">
+    <img src="docs/screenshots/transfer-modal.jpg" alt="Transfer Modal with Exclusions" width="80%" />
+  </a>
+</div>
+
+* **Dual-Pane & Single-Pane Views:** Side-by-side local browsing or simplified single-pane view for mobile devices.
+* **Dual Transfer Engine:** Seamlessly toggle between zero-copy Linux Kernel transfers (`os.copy_file_range`) and resumable `rsync` processes.
+* **Persistent Background Work:** Transfers execute as isolated background processes and survive browser disconnects.
+* **Direct-to-Disk Streamed Uploads:** High-speed multipart uploads routed directly to disk to prevent RAM exhaustion on host hardware.
+* **Contextual Exclusion Rules:** Exclude subfolders visually with automatic `rsync` fallback enforcement.
+
+---
 
 ## Requirements
 
 - Python 3.11+
 - `rsync` installed on the host
 - `python3-venv`
+
+---
 
 ## Setup (development or Pi)
 
@@ -28,41 +70,3 @@ python -m app.auth hash "yourpassword"                      # -> password_hash
 chmod 600 config.toml
 
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1
-```
-
-Visit `http://<host>:8000/`.
-
-## Automated Installation & Service Setup (Raspberry Pi)
-
-LiteSync includes an automated installer that stages the application to `/opt/litesync`, creates the `litesync` system user, manages the virtual environment, configures a hardened systemd service, and starts it:
-
-```sh
-# Clone and install
-git clone <your-repo-url> LiteSync
-cd LiteSync
-sudo bash install.sh
-```
-
-Re-running `sudo bash install.sh` is safe and idempotent: it updates application code and dependencies while strictly preserving your existing database (`litesync.db`), task logs (`data/tasks/`), and configuration (`config.toml`).
-
-## Uninstallation
-
-To completely remove LiteSync and its systemd service from the system:
-
-```sh
-sudo bash uninstall.sh            # Purges service, files, and user
-sudo bash uninstall.sh --keep-data # Uninstalls but preserves data/ and config.toml
-```
-
-## Notes
-
-- Only directories listed under `allowed_roots` in `config.toml` can be
-  browsed or used as a transfer source/destination.
-- Dual-Backend Transfer Engine:
-  - Users can explicitly toggle the transfer method in the UI between the ultra-fast zero-copy **Kernel engine** (`os.copy_file_range`) and the standard **rsync engine**.
-  - Rsync remains enabled by default for high-reliability, interrupt-safe resumability, and is automatically forced for transfers containing folder exclusions.
-  - Same-filesystem moves instantly execute atomic `os.rename()` bypassing both backends entirely.
-- Transfers run in the background as asynchronous subprocesses (or thread-pools) and survive browser disconnects.
-- Browser file uploads stream straight to destination disks in chunks with collision guards and real-time progress (`max_upload_size_mb` configurable in `config.toml`, default 5 GB).
-  - *Note:* Large uploads are temporarily spooled to a disk-backed directory (`data/tmp`) before being atomically moved to their destination to prevent RAM exhaustion. Ensure the drive hosting `data/tmp` has sufficient free space for your maximum upload size.
-- Configuration is loaded via Python's built-in `tomllib` from `config.toml` (or the path set in `LITESYNC_CONFIG`).

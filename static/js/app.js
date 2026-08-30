@@ -1468,7 +1468,7 @@
       label.style.cursor = 'not-allowed';
       toggle.checked = true;
       toggle.disabled = true;
-      hint.textContent = 'Required when excluding files.';
+      hint.textContent = 'Required for excludes.';
       return;
     }
     
@@ -1479,7 +1479,7 @@
     if (toggle.checked) {
       hint.textContent = 'Resumes on restart.';
     } else {
-      hint.textContent = 'Faster, but restarts on failure.';
+      hint.textContent = 'Faster, but no resume.';
     }
   }
 

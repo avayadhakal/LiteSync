@@ -352,7 +352,7 @@ input[type="text"], input[type="password"] {
 .selection-inline {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   flex: none;
   min-width: 0;
   position: relative;
@@ -360,13 +360,17 @@ input[type="text"], input[type="password"] {
   background: var(--panel-alt);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 6px; /* match the app's standard control radius */
-  padding: 3px 8px;
+  padding: 3px 12px;
 }
 .selection-inline-count {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text);
   white-space: nowrap;
+}
+.selection-inline .btn-sm {
+  padding: 4px 10px;
+  font-size: 13px;
 }
 /* Ghost buttons — transparent until hovered, to reduce visual noise. */
 .selection-view-btn {

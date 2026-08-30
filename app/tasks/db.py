@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     source        TEXT NOT NULL,
     destination   TEXT NOT NULL,
     operation     TEXT NOT NULL,
-    status        TEXT NOT NULL,
+    status        TEXT NOT NULL, -- queued, running, paused, succeeded, failed, interrupted
     created_at    TEXT NOT NULL,
     started_at    TEXT,
     ended_at      TEXT,
@@ -286,6 +286,22 @@ def mark_running(task_id: str) -> None:
         )
 
 
+def mark_paused(task_id: str) -> None:
+    with _lock, _connect() as conn:
+        conn.execute(
+            "UPDATE tasks SET status='paused' WHERE id=?",
+            (task_id,),
+        )
+
+
+def mark_queued(task_id: str) -> None:
+    with _lock, _connect() as conn:
+        conn.execute(
+            "UPDATE tasks SET status='queued' WHERE id=?",
+            (task_id,),
+        )
+
+
 def mark_finished(task_id: str, status: str, exit_code: int | None, error_message: str | None = None) -> None:
     with _lock, _connect() as conn:
         row = conn.execute(
@@ -381,7 +397,7 @@ def next_queued_task() -> dict | None:
 
 def list_running_tasks() -> list[dict]:
     with _connect() as conn:
-        rows = conn.execute("SELECT * FROM tasks WHERE status IN ('queued', 'running')").fetchall()
+        rows = conn.execute("SELECT * FROM tasks WHERE status IN ('queued', 'running', 'paused')").fetchall()
     return [_row_to_dict(r) for r in rows if r is not None]
 
 

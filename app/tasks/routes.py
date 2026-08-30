@@ -15,7 +15,7 @@ from app.auth import get_current_user
 from app.config import get_settings
 from app.fsops import resolve_safe_path
 from app.tasks import db
-from app.tasks.runner import queue_task, terminate_task, wake_scheduler
+from app.tasks.runner import queue_task, terminate_task, wake_scheduler, pause_task_runner, terminate_paused_task
 
 router = APIRouter(prefix="/api")
 
@@ -153,7 +153,7 @@ async def stream_task(task_id: str, _user: str = Depends(get_current_user)):
             current = db.get_task(task_id)
             if current is None:
                 break
-            if current["status"] not in ("queued", "running"):
+            if current["status"] not in ("queued", "running", "paused"):
                 yield f"event: status\ndata: {json.dumps({'status': current['status']})}\n\n"
                 break
 
@@ -167,7 +167,7 @@ async def delete_task(task_id: str, _user: str = Depends(get_current_user)):
     task = db.get_task(task_id)
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
-    if task["status"] in ("queued", "running"):
+    if task["status"] in ("queued", "running", "paused"):
         raise HTTPException(status_code=400, detail="Cannot delete an active task")
 
     db.delete_task(task_id)
@@ -184,7 +184,7 @@ async def delete_all_completed_tasks(_user: str = Depends(get_current_user)):
     settings = get_settings()
     tasks = db.list_tasks(limit=1000)
     for task in tasks:
-        if task["status"] not in ("queued", "running"):
+        if task["status"] not in ("queued", "running", "paused"):
             t_id = task["id"]
             db.delete_task(t_id)
             flat_log = settings.data_dir / "tasks" / f"{t_id}.log"
@@ -198,20 +198,49 @@ async def cancel_task(task_id: str, _user: str = Depends(get_current_user)):
     task = db.get_task(task_id)
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
-    if task["status"] not in ("queued", "running"):
+    if task["status"] not in ("queued", "running", "paused"):
         raise HTTPException(status_code=400, detail="Task is not active")
 
     if task["status"] == "queued":
-        # Simply take it out of the queue; the scheduler only picks rows
-        # with status='queued', so it is skipped. Nothing copied yet, so the
-        # filesystem stays completely untouched.
         db.mark_finished(task_id, "interrupted", None, "Transfer cancelled by user")
         return {"success": True}
 
-    # Running: gracefully stop the rsync child. The scheduler watchdog escalates
-    # to SIGKILL if SIGTERM is ignored within ~5s.
+    if task["status"] == "paused":
+        terminate_paused_task(task_id)
+        db.mark_finished(task_id, "interrupted", None, "Transfer cancelled by user")
+        return {"success": True}
+
     terminate_task(task_id)
     db.mark_finished(task_id, "interrupted", None, "Transfer cancelled by user")
+    return {"success": True}
+
+@router.post("/tasks/{task_id}/pause")
+async def pause_task(task_id: str, _user: str = Depends(get_current_user)):
+    task = db.get_task(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if task["status"] != "running":
+        raise HTTPException(status_code=400, detail="Task is not currently running")
+    if not task.get("use_rsync"):
+        raise HTTPException(status_code=400, detail="Cannot pause a kernel-copy task")
+
+    success = pause_task_runner(task_id)
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to pause task")
+    
+    db.mark_paused(task_id)
+    return {"success": True}
+
+@router.post("/tasks/{task_id}/resume")
+async def resume_task(task_id: str, _user: str = Depends(get_current_user)):
+    task = db.get_task(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if task["status"] != "paused":
+        raise HTTPException(status_code=400, detail="Task is not paused")
+
+    db.mark_queued(task_id)
+    wake_scheduler()
     return {"success": True}
 
 

@@ -1669,7 +1669,7 @@
   }
 
   const TERMINAL_STATUSES = new Set(['succeeded', 'failed', 'interrupted']);
-  const ACTIVE_STATUSES = new Set(['queued', 'running']);
+  const ACTIVE_STATUSES = new Set(['queued', 'running', 'paused']);
 
   async function loadHistory() {
     try {
@@ -1764,9 +1764,9 @@
     // Filter active/queued tasks strictly, then order by priority:
     // running (actively copying) cards first, queued cards after.
     // FIFO (created_at ascending) as the tie-breaker within each block.
-    const statusRank = (task) => (task.status === 'running' ? 0 : 1);
+    const statusRank = (task) => (task.status === 'running' ? 0 : (task.status === 'paused' ? 1 : 2));
     const activeTasks = state.tasks
-      .filter((task) => task.status === 'queued' || task.status === 'running')
+      .filter((task) => task.status === 'queued' || task.status === 'running' || task.status === 'paused')
       .sort((a, b) => {
         const rankDiff = statusRank(a) - statusRank(b);
         if (rankDiff !== 0) return rankDiff;
@@ -1779,6 +1779,12 @@
       if (!activeTaskIds.has(id)) {
         streamObj.source.close();
         activeStreams.delete(id);
+      }
+    }
+
+    for (const task of activeTasks) {
+      if (!activeStreams.has(task.task_id) && (task.status === 'queued' || task.status === 'running' || task.status === 'paused')) {
+        attachTaskStream(task);
       }
     }
 
@@ -1798,9 +1804,9 @@
       const sourceText = task.source || (Array.isArray(task.sources) ? task.sources.join(', ') : (task.sources || ''));
       const streamData = activeStreams.get(task.task_id);
       const currentPct = streamData ? streamData.pct : 0;
-      const currentDetail = streamData && streamData.currentFile
+      const currentDetail = task.status === 'paused' ? 'Paused' : (streamData && streamData.currentFile
         ? `Copying: ${streamData.currentFile}`
-        : (task.status === 'queued' ? 'Queued...' : 'Starting transfer...');
+        : (task.status === 'queued' ? 'Queued...' : 'Starting transfer...'));
 
       card.innerHTML = `
         <div class="card-top" style="display: flex; justify-content: space-between; align-items: center;">
@@ -1809,6 +1815,8 @@
             <div id="progress-text-${task.task_id}" style="color: #94a3b8; font-size: 13px; font-weight: 600; margin-right: 12px;">
               ${currentPct}%
             </div>
+            ${task.status === 'running' && task.use_rsync ? `<button class="btn-sm btn-secondary pause-btn" data-id="${task.task_id}" style="margin-right: 8px;">Pause</button>` : ''}
+            ${task.status === 'paused' ? `<button class="btn-sm btn-primary resume-btn" data-id="${task.task_id}" style="margin-right: 8px;">Resume</button>` : ''}
             <button class="btn-sm btn-danger cancel-btn" data-id="${task.task_id}">Cancel</button>
           </div>
         </div>
@@ -1822,6 +1830,32 @@
           <div class="absolute inset-0" id="progress-fill-${task.task_id}" style="background: var(--accent-dim); width: ${currentPct}%; transition: width 0.2s ease; border-radius: 4px;"></div>
         </div>
       `;
+
+      const pauseBtn = card.querySelector('.pause-btn');
+      if (pauseBtn) {
+        pauseBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          try {
+            await api(`/api/tasks/${task.task_id}/pause`, { method: 'POST' });
+            loadHistory();
+          } catch (err) {
+            toastError(`Failed to pause task: ${err.message}`);
+          }
+        });
+      }
+
+      const resumeBtn = card.querySelector('.resume-btn');
+      if (resumeBtn) {
+        resumeBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          try {
+            await api(`/api/tasks/${task.task_id}/resume`, { method: 'POST' });
+            loadHistory();
+          } catch (err) {
+            toastError(`Failed to resume task: ${err.message}`);
+          }
+        });
+      }
 
       const cancelBtn = card.querySelector('.cancel-btn');
       if (cancelBtn) {

@@ -115,7 +115,10 @@ CREATE INDEX idx_activity_created ON activity(created_at DESC);
 4. **Conflict Resolution:** Safely implements `skip`, `overwrite`, or `rename` fallback via pre-flight checks and `fsops.compute_next_available_name` computed precisely at execution run-time (not at job submission time).
 5. **Same-Filesystem Fast Path:** If `os.stat(src).st_dev == dest.st_dev` AND `operation == "move"` without excludes, `runner.py` bypasses both backends and executes an instant atomic `os.rename()`. Writes instant `100%` summary to log, marks `succeeded`.
 6. **Lifecycle & Pruning:** On move with exclusions, rsync runs with `--remove-source-files`, followed by bottom-up empty directory pruning.
-6. **Cancellation & Startup Reconciliation:** Active transfers can be forcefully cancelled via an injected threading flag (kernel) or `SIGTERM` (rsync). Stale `running` tasks are automatically marked `interrupted` if the server is restarted mid-transfer.
+7. **Cancellation & Startup Reconciliation:** Active transfers can be forcefully cancelled via an injected threading flag (kernel) or `SIGTERM` (rsync). Stale `running` or `paused` tasks are automatically marked `interrupted` if the server is restarted mid-transfer.
+8. **Pause & Resume Architecture:** Active `rsync` transfers can be instantly paused via the UI. This triggers a `SIGSTOP` signal to the `rsync` subprocess, freezing it efficiently at the OS level while preserving all progress, state, and open file descriptors.
+   - A deterministic concurrency token (`_current_run_token`) securely isolates the rapid resume lifecycle (via `SIGCONT`), preventing asynchronous race conditions.
+   - Resuming a task natively bypasses all initial pre-flight overwrite checks, seamlessly reattaching to the process so data transmission continues exactly where it left off.
 
 ## 5. Frontend Architecture (Vanilla HTML/CSS/JS)
 

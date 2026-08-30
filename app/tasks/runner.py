@@ -16,9 +16,39 @@ from app.fsops import compute_next_available_name
 # the SSE stream never interrupts them.
 _current_proc: asyncio.subprocess.Process | None = None
 _current_task_id: str | None = None
+_current_run_token: object | None = None
 _current_kernel_task_id: str | None = None
 _kernel_cancel_flag: bool = False
 _wake = asyncio.Event()
+_paused_procs: dict[str, asyncio.subprocess.Process] = {}
+
+def pause_task_runner(task_id: str) -> bool:
+    global _current_proc, _current_task_id, _current_run_token
+    if _current_task_id == task_id and _current_proc is not None and _current_proc.returncode is None:
+        import signal
+        try:
+            _current_proc.send_signal(signal.SIGSTOP)
+        except ProcessLookupError:
+            return False
+        _paused_procs[task_id] = _current_proc
+        _current_proc = None
+        _current_task_id = None
+        _current_run_token = None
+        wake_scheduler()
+        return True
+    return False
+
+def terminate_paused_task(task_id: str) -> bool:
+    if task_id in _paused_procs:
+        proc = _paused_procs.pop(task_id)
+        if proc.returncode is None:
+            try:
+                proc.kill()
+            except ProcessLookupError:
+                pass
+        return True
+    return False
+
 
 
 def build_rsync_argv(
@@ -285,120 +315,145 @@ def _sync_kernel_copy_worker(src_str: str, target_path_str: str, log_fh, overwri
 async def _run_task(task: dict, settings: Settings) -> None:
     """Execute one queued task, stream output to deterministic task log file,
     and finalize the DB row."""
-    global _current_proc, _current_task_id, _current_kernel_task_id, _kernel_cancel_flag
+    global _current_proc, _current_task_id, _current_run_token, _current_kernel_task_id, _kernel_cancel_flag
+    
+    my_run_token = object()
 
     task_id = task["id"]
     log_path = db.get_task_log_path(task_id, settings.data_dir)
+    log_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Guard against a cancel that landed between mark_running and spawn.
     latest = db.get_task(task_id)
     if latest is None or latest["status"] != "running":
         return
 
-    # Fast path: atomic rename on same filesystem for move operations
-    if task["operation"] == "move":
-        if _try_atomic_move(task, log_path):
-            return
-
-    src_path = Path(task["source"])
-    dst_dir = Path(task["destination"])
-    target_path = dst_dir / src_path.name
-
-    on_conflict = task.get("on_conflict", "skip")
-    drop_ignore = False
-
-    if on_conflict == "rename":
-        target_path = compute_next_available_name(target_path)
-    elif on_conflict == "overwrite":
-        if target_path.exists() and target_path.is_file():
-            try:
-                target_path.unlink()
-            except OSError:
-                pass
-        drop_ignore = True
-    elif on_conflict == "skip":
-        # Overwrite guard (ONLY for skip)
-        if target_path.exists() and target_path.is_file():
-            log_path.parent.mkdir(parents=True, exist_ok=True)
-            err = f"Destination item already exists: {target_path.name}"
-            try:
-                with open(log_path, "wb") as log_fh:
-                    log_fh.write(f"Error: {err}\n".encode("utf-8"))
-            except OSError:
-                pass
-            db.mark_finished(task_id, "failed", 1, err)
-            return
-
-    excludes = task.get("excludes", [])
-    use_rsync = task.get("use_rsync", False)
-
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        log_fh = open(log_path, "wb")
-    except OSError as e:
-        db.mark_finished(task_id, "failed", None, f"Failed to open log file: {e}")
-        return
-
-    # Determine if we can use kernel copy
-    if not use_rsync and not excludes:
-        _current_kernel_task_id = task_id
-        _kernel_cancel_flag = False
+    # Check for resume
+    if task_id in _paused_procs:
+        proc = _paused_procs.pop(task_id)
+        import signal
         try:
-            await asyncio.to_thread(_sync_kernel_copy_worker, task["source"], str(target_path), log_fh, drop_ignore)
-            code = 0
-        except InterruptedError:
-            db.mark_finished(task_id, "interrupted", None, "Transfer cancelled by user")
+            proc.send_signal(signal.SIGCONT)
+        except ProcessLookupError:
+            db.mark_finished(task_id, "interrupted", None, "Process exited while paused")
             return
-        except Exception as e:
-            try:
-                log_fh.write(f"Error: {e}\n".encode("utf-8"))
-            except OSError:
-                pass
-            code = 1
-        finally:
-            log_fh.close()
-            _current_kernel_task_id = None
-            _kernel_cancel_flag = False
-
-        latest = db.get_task(task_id)
-        if latest is None or latest["status"] != "running":
+        
+        _current_proc = proc
+        _current_task_id = task_id
+        _current_run_token = my_run_token
+        
+        try:
+            log_fh = open(log_path, "ab")
+        except OSError as e:
+            db.mark_finished(task_id, "failed", None, f"Failed to open log file: {e}")
             return
+    else:
+        # Fast path: atomic rename on same filesystem for move operations
+        if task["operation"] == "move":
+            if _try_atomic_move(task, log_path):
+                return
 
-        if code == 0:
-            if task["operation"] == "move":
+        src_path = Path(task["source"])
+        dst_dir = Path(task["destination"])
+        target_path = dst_dir / src_path.name
+
+        on_conflict = task.get("on_conflict", "skip")
+        drop_ignore = False
+
+        if on_conflict == "rename":
+            target_path = compute_next_available_name(target_path)
+        elif on_conflict == "overwrite":
+            if target_path.exists() and target_path.is_file():
                 try:
-                    if src_path.is_dir() and not src_path.is_symlink():
-                        shutil.rmtree(src_path, ignore_errors=True)
-                    elif src_path.exists() or src_path.is_symlink():
-                        src_path.unlink(missing_ok=True)
-                except Exception:
+                    target_path.unlink()
+                except OSError:
                     pass
-            db.mark_finished(task_id, "succeeded", code, None)
-        else:
-            db.mark_finished(task_id, "failed", code, "Kernel copy failed")
-        return
+            drop_ignore = True
+        elif on_conflict == "skip":
+            # Overwrite guard (ONLY for skip)
+            if target_path.exists() and target_path.is_file():
+                log_path.parent.mkdir(parents=True, exist_ok=True)
+                err = f"Destination item already exists: {target_path.name}"
+                try:
+                    with open(log_path, "wb") as log_fh:
+                        log_fh.write(f"Error: {err}\n".encode("utf-8"))
+                except OSError:
+                    pass
+                db.mark_finished(task_id, "failed", 1, err)
+                return
 
-    argv = build_rsync_argv(
-        task["source"],
-        str(target_path),
-        excludes=excludes,
-        operation=task["operation"],
-        drop_ignore_existing=drop_ignore,
-    )
+        excludes = task.get("excludes", [])
+        use_rsync = task.get("use_rsync", False)
 
-    try:
-        proc = await asyncio.create_subprocess_exec(
-            *argv,
-            stdout=log_fh,
-            stderr=asyncio.subprocess.STDOUT,
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            log_fh = open(log_path, "wb")
+        except OSError as e:
+            db.mark_finished(task_id, "failed", None, f"Failed to open log file: {e}")
+            return
+
+        # Determine if we can use kernel copy
+        if not use_rsync and not excludes:
+            _current_kernel_task_id = task_id
+            _kernel_cancel_flag = False
+            try:
+                await asyncio.to_thread(_sync_kernel_copy_worker, task["source"], str(target_path), log_fh, drop_ignore)
+                code = 0
+            except InterruptedError:
+                db.mark_finished(task_id, "interrupted", None, "Transfer cancelled by user")
+                return
+            except Exception as e:
+                try:
+                    log_fh.write(f"Error: {e}\n".encode("utf-8"))
+                except OSError:
+                    pass
+                code = 1
+            finally:
+                log_fh.close()
+                _current_kernel_task_id = None
+                _kernel_cancel_flag = False
+
+            latest = db.get_task(task_id)
+            if latest is None or latest["status"] != "running":
+                return
+
+            if code == 0:
+                if task["operation"] == "move":
+                    try:
+                        if src_path.is_dir() and not src_path.is_symlink():
+                            shutil.rmtree(src_path, ignore_errors=True)
+                        elif src_path.exists() or src_path.is_symlink():
+                            src_path.unlink(missing_ok=True)
+                    except Exception:
+                        pass
+                db.mark_finished(task_id, "succeeded", code, None)
+            else:
+                db.mark_finished(task_id, "failed", code, "Kernel copy failed")
+            return
+
+        argv = build_rsync_argv(
+            task["source"],
+            str(target_path),
+            excludes=excludes,
+            operation=task["operation"],
+            drop_ignore_existing=drop_ignore,
         )
-    except (FileNotFoundError, OSError) as e:
-        log_fh.close()
-        db.mark_finished(task_id, "failed", None, f"Failed to start rsync: {e}")
-        return
 
-    _current_proc = proc
-    _current_task_id = task_id
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *argv,
+                stdout=log_fh,
+                stderr=asyncio.subprocess.STDOUT,
+            )
+        except (FileNotFoundError, OSError) as e:
+            log_fh.close()
+            db.mark_finished(task_id, "failed", None, f"Failed to start rsync: {e}")
+            return
+
+        _current_proc = proc
+        _current_task_id = task_id
+        _current_run_token = my_run_token
+
     try:
         while True:
             try:
@@ -407,17 +462,27 @@ async def _run_task(task: dict, settings: Settings) -> None:
             except asyncio.TimeoutError:
                 if proc.returncode is not None:
                     break
+                
+                # Check if this run loop was detached (e.g. paused)
+                if _current_run_token is not my_run_token:
+                    break
+                    
                 latest = db.get_task(task_id)
-                if latest is None or latest["status"] != "running":
+                if latest is None or latest["status"] == "interrupted":
                     # Cancel was requested (SIGTERM already sent) -> escalate to SIGKILL if not dead
                     try:
                         proc.kill()
                     except ProcessLookupError:
                         pass
+                elif latest["status"] != "running":
+                    # Catch-all for paused, queued, failed, succeeded
+                    break
     finally:
         log_fh.close()
-        _current_proc = None
-        _current_task_id = None
+        if _current_run_token is my_run_token:
+            _current_proc = None
+            _current_task_id = None
+            _current_run_token = None
 
     # Finalize only if nobody (e.g. cancel route or shutdown) already finalized it
     latest = db.get_task(task_id)
@@ -479,10 +544,10 @@ async def run_scheduler(settings: Settings) -> None:
 
 
 def reconcile_on_startup(settings: Settings) -> None:
-    """Startup reconciliation: mark any leftover 'running' tasks as 'interrupted'.
+    """Startup reconciliation: mark any leftover 'running' or 'paused' tasks as 'interrupted'.
     Queued tasks remain queued and will resume."""
     for task in db.list_running_tasks():
-        if task["status"] == "running":
+        if task["status"] in ("running", "paused"):
             db.mark_finished(
                 task["id"],
                 "interrupted",
@@ -501,6 +566,20 @@ async def shutdown_runner() -> None:
     if _current_kernel_task_id is not None:
         _kernel_cancel_flag = True
         task_id = _current_kernel_task_id
+        
+    for p_id, p in list(_paused_procs.items()):
+        if p.returncode is None:
+            try:
+                p.kill()
+                await p.wait()
+            except ProcessLookupError:
+                pass
+        db.mark_finished(
+            p_id,
+            "interrupted",
+            None,
+            "Server shut down during transfer",
+        )
         
     if proc is not None and proc.returncode is None:
         proc.terminate()

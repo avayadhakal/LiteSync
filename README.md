@@ -44,6 +44,7 @@
 
 * **Dual-Pane & Single-Pane Views:** Side-by-side local browsing or a simplified single-pane view for mobile devices.
 * **Dual Transfer Engine:** Seamlessly toggle between zero-copy Linux kernel transfers (`os.copy_file_range`) and resumable `rsync` processes.
+* **Pause & Resume:** Instantly pause active `rsync` transfers and resume them later without losing progress, seamlessly picking up exactly where they left off.
 * **Persistent Background Work:** Transfers execute as isolated background processes and survive browser disconnects.
 * **Direct-to-Disk Streamed Uploads:** Browser uploads are streamed to disk to prevent large files from exhausting system RAM.
 * **Smart Conflict Resolution:** Pre-flight modal resolution explicitly handles name collisions with `Skip`, `Keep Both` (sequential append like `_1`, `_2`), or `Replace`.

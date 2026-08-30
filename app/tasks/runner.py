@@ -8,6 +8,7 @@ from pathlib import Path
 
 from app.config import Settings
 from app.tasks import db
+from app.fsops import compute_next_available_name
 
 # --- In-process scheduler state (event-loop owned) ---------------------------
 # At most ONE transfer is ever running; everything else waits as 'queued' rows
@@ -22,33 +23,44 @@ _wake = asyncio.Event()
 
 def build_rsync_argv(
     source: str,
-    destination: str,
+    target_path: str,
     excludes: list[str] | None = None,
     operation: str = "copy",
+    drop_ignore_existing: bool = False,
 ) -> list[str]:
     """Construct rsync arguments without shell wrapping.
-    Always includes --ignore-existing to guard against silently overwriting destination files."""
+    Optionally drops --ignore-existing to allow overwriting."""
     argv = [
         "rsync",
         "-avh",
         "--progress",
         "--partial",
         "--inplace",
-        "--ignore-existing",
     ]
+    if not drop_ignore_existing:
+        argv.append("--ignore-existing")
+
     if operation == "move" and excludes:
         argv.append("--remove-source-files")
 
+    src_p = Path(source)
+    is_dir = src_p.is_dir()
+
     if excludes:
-        src_name = Path(source).name
         for exc in excludes:
             exc_clean = exc.strip()
             if exc_clean:
                 # Anchored exclude relative to the transferred source directory
                 # Passed as separate argv list entries, never string-interpolated or shell-joined
-                argv.append(f"--exclude=/{src_name}/{exc_clean}")
+                if is_dir:
+                    argv.append(f"--exclude=/{exc_clean}")
+                else:
+                    argv.append(f"--exclude=/{exc_clean}")
 
-    argv.extend([source, destination])
+    if is_dir:
+        argv.extend([f"{source}/", target_path])
+    else:
+        argv.extend([source, target_path])
     return argv
 
 
@@ -59,6 +71,7 @@ def queue_task(
     operation: str = "copy",
     excludes: list[str] | None = None,
     use_rsync: bool = False,
+    on_conflict: str = "skip",
 ) -> str:
     """Persist a single-source task as 'queued'. Nothing is launched here —
     the background scheduler independently picks queued rows up."""
@@ -70,6 +83,7 @@ def queue_task(
         operation=operation,
         excludes=excludes or [],
         use_rsync=use_rsync,
+        on_conflict=on_conflict,
     )
     return task_id
 
@@ -165,12 +179,11 @@ def _try_atomic_move(task: dict, log_path: Path) -> bool:
 
 
 
-def _sync_kernel_copy_worker(src_str: str, dst_dir_str: str, log_fh) -> None:
+def _sync_kernel_copy_worker(src_str: str, target_path_str: str, log_fh, overwrite: bool = False) -> None:
     """Synchronous worker to perform kernel copy (falling back to chunked read/write)."""
     global _kernel_cancel_flag
     src_p = Path(src_str)
-    dst_dir = Path(dst_dir_str)
-    target_path = dst_dir / src_p.name
+    target_path = Path(target_path_str)
 
     def copy_func(src_file, dst_file):
         if _kernel_cancel_flag:
@@ -181,7 +194,13 @@ def _sync_kernel_copy_worker(src_str: str, dst_dir_str: str, log_fh) -> None:
         
         # Guard against overwrite
         if dst_path.exists():
-            return
+            if not overwrite:
+                return
+            else:
+                try:
+                    dst_path.unlink()
+                except OSError:
+                    pass
             
         try:
             # Attempt kernel copy
@@ -285,17 +304,30 @@ async def _run_task(task: dict, settings: Settings) -> None:
     dst_dir = Path(task["destination"])
     target_path = dst_dir / src_path.name
 
-    # Overwrite guard: if target already exists as a file, fail cleanly without overwriting
-    if target_path.exists() and target_path.is_file():
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        err = f"Destination item already exists: {target_path.name}"
-        try:
-            with open(log_path, "wb") as log_fh:
-                log_fh.write(f"Error: {err}\n".encode("utf-8"))
-        except OSError:
-            pass
-        db.mark_finished(task_id, "failed", 1, err)
-        return
+    on_conflict = task.get("on_conflict", "skip")
+    drop_ignore = False
+
+    if on_conflict == "rename":
+        target_path = compute_next_available_name(target_path)
+    elif on_conflict == "overwrite":
+        if target_path.exists() and target_path.is_file():
+            try:
+                target_path.unlink()
+            except OSError:
+                pass
+        drop_ignore = True
+    elif on_conflict == "skip":
+        # Overwrite guard (ONLY for skip)
+        if target_path.exists() and target_path.is_file():
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            err = f"Destination item already exists: {target_path.name}"
+            try:
+                with open(log_path, "wb") as log_fh:
+                    log_fh.write(f"Error: {err}\n".encode("utf-8"))
+            except OSError:
+                pass
+            db.mark_finished(task_id, "failed", 1, err)
+            return
 
     excludes = task.get("excludes", [])
     use_rsync = task.get("use_rsync", False)
@@ -312,7 +344,7 @@ async def _run_task(task: dict, settings: Settings) -> None:
         _current_kernel_task_id = task_id
         _kernel_cancel_flag = False
         try:
-            await asyncio.to_thread(_sync_kernel_copy_worker, task["source"], task["destination"], log_fh)
+            await asyncio.to_thread(_sync_kernel_copy_worker, task["source"], str(target_path), log_fh, drop_ignore)
             code = 0
         except InterruptedError:
             db.mark_finished(task_id, "interrupted", None, "Transfer cancelled by user")
@@ -348,9 +380,10 @@ async def _run_task(task: dict, settings: Settings) -> None:
 
     argv = build_rsync_argv(
         task["source"],
-        task["destination"],
+        str(target_path),
         excludes=excludes,
         operation=task["operation"],
+        drop_ignore_existing=drop_ignore,
     )
 
     try:

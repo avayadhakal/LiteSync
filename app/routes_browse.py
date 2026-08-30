@@ -20,7 +20,7 @@ from starlette.types import Send
 
 from app.auth import get_current_user, read_session_cookie, verify_password
 from app.config import get_download_signing_key, get_settings
-from app.fsops import list_directory, resolve_safe_path
+from app.fsops import list_directory, resolve_safe_path, compute_next_available_name
 from app.tasks import db
 
 router = APIRouter(prefix="/api")
@@ -340,6 +340,10 @@ async def upload_files(
     if not dest_dir.is_dir():
         raise HTTPException(status_code=400, detail="Destination path must be an existing directory")
 
+    on_conflict_val = form.get("on_conflict") or "skip"
+    if not isinstance(on_conflict_val, str) or on_conflict_val not in ("skip", "overwrite", "rename"):
+        raise HTTPException(status_code=400, detail="Invalid on_conflict parameter")
+
     # Collect UploadFile items from form
     files: list[UploadFile] = []
     for _key, value in form.multi_items():
@@ -379,20 +383,26 @@ async def upload_files(
 
         # 3. Initial collision check before disk copy
         if final_resolved.exists():
-            err_msg = "A file or directory with that name already exists"
-            db.add_activity(
-                kind="upload",
-                message={
-                    "operation": "upload",
-                    "status": "failed",
-                    "name": filename,
-                    "path": str(final_resolved),
-                    "destination": str(dest_dir),
-                    "summary": f"{filename} → {dest_dir}",
-                    "error": err_msg,
-                },
-            )
-            raise HTTPException(status_code=400, detail=f"A file or directory named '{filename}' already exists")
+            if on_conflict_val == "skip":
+                err_msg = "A file or directory with that name already exists"
+                db.add_activity(
+                    kind="upload",
+                    message={
+                        "operation": "upload",
+                        "status": "failed",
+                        "name": filename,
+                        "path": str(final_resolved),
+                        "destination": str(dest_dir),
+                        "summary": f"{filename} → {dest_dir}",
+                        "error": err_msg,
+                    },
+                )
+                raise HTTPException(status_code=400, detail=f"A file or directory named '{filename}' already exists")
+            elif on_conflict_val == "rename":
+                final_resolved = compute_next_available_name(final_resolved)
+                filename = final_resolved.name
+            elif on_conflict_val == "overwrite":
+                pass
 
         # 4. Check Starlette-declared file size if available
         if file.size is not None and file.size > max_upload_bytes:
@@ -453,21 +463,33 @@ async def upload_files(
 
         # 6. Synchronous final collision check and atomic rename (NO await, zero event loop yield)
         if final_resolved.exists():
-            temp_path.unlink(missing_ok=True)
-            err_msg = "A file or directory with that name already exists"
-            db.add_activity(
-                kind="upload",
-                message={
-                    "operation": "upload",
-                    "status": "failed",
-                    "name": filename,
-                    "path": str(final_resolved),
-                    "destination": str(dest_dir),
-                    "summary": f"{filename} → {dest_dir}",
-                    "error": err_msg,
-                },
-            )
-            raise HTTPException(status_code=400, detail=f"A file or directory named '{filename}' already exists")
+            if on_conflict_val == "skip":
+                temp_path.unlink(missing_ok=True)
+                err_msg = "A file or directory with that name already exists"
+                db.add_activity(
+                    kind="upload",
+                    message={
+                        "operation": "upload",
+                        "status": "failed",
+                        "name": filename,
+                        "path": str(final_resolved),
+                        "destination": str(dest_dir),
+                        "summary": f"{filename} → {dest_dir}",
+                        "error": err_msg,
+                    },
+                )
+                raise HTTPException(status_code=400, detail=f"A file or directory named '{filename}' already exists")
+            elif on_conflict_val == "rename":
+                final_resolved = compute_next_available_name(final_resolved)
+                filename = final_resolved.name
+            elif on_conflict_val == "overwrite":
+                try:
+                    if final_resolved.is_dir() and not final_resolved.is_symlink():
+                        shutil.rmtree(final_resolved, ignore_errors=True)
+                    else:
+                        final_resolved.unlink(missing_ok=True)
+                except OSError:
+                    pass
 
         try:
             os.rename(temp_path, final_resolved)

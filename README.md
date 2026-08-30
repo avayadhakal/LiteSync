@@ -46,6 +46,7 @@
 * **Dual Transfer Engine:** Seamlessly toggle between zero-copy Linux kernel transfers (`os.copy_file_range`) and resumable `rsync` processes.
 * **Persistent Background Work:** Transfers execute as isolated background processes and survive browser disconnects.
 * **Direct-to-Disk Streamed Uploads:** Browser uploads are streamed to disk to prevent large files from exhausting system RAM.
+* **Smart Conflict Resolution:** Pre-flight modal resolution explicitly handles name collisions with `Skip`, `Keep Both` (sequential append like `_1`, `_2`), or `Replace`.
 * **Contextual Exclusion Rules:** Exclude subfolders visually, with automatic `rsync` fallback enforcement.
 * **Same-Filesystem Moves:** Moves on the same filesystem use atomic `os.rename()` instead of invoking either transfer engine.
 * **Real-Time Progress:** Transfers and uploads expose progress information through the web interface.

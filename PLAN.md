@@ -58,7 +58,8 @@ CREATE TABLE tasks (
   exit_code     INTEGER,
   error_message TEXT,
   excludes      TEXT DEFAULT '[]',
-  use_rsync     INTEGER DEFAULT 1
+  use_rsync     INTEGER DEFAULT 1,
+  on_conflict   TEXT DEFAULT 'skip'        -- 'skip' | 'overwrite' | 'rename'
 );
 CREATE INDEX idx_tasks_status ON tasks(status);
 CREATE INDEX idx_tasks_created_at ON tasks(created_at DESC);
@@ -87,8 +88,8 @@ CREATE INDEX idx_activity_created ON activity(created_at DESC);
 | POST | `/api/mkdir` | `{path, name}` → `Path.mkdir()`. Rejects slashes/collisions. |
 | POST | `/api/rename` | `{path, new_name}` → `Path.rename()`. Refuses renaming roots. |
 | POST | `/api/delete` | `{path}` → `shutil.rmtree()` / `unlink()`. Refuses deleting roots. |
-| POST | `/api/upload` | `{path, files}` → Streamed multipart write straight to disk (`.litesync-upload-<hex>.tmp` → `os.rename`). |
-| POST | `/api/transfer` | `{sources: [{path, excludes}], destination, operation, use_rsync}` → Queues 1 task **per source**. |
+| POST | `/api/upload` | `{path, on_conflict, files}` → Streamed multipart write straight to disk (`.litesync-upload-<hex>.tmp` → `os.rename`). |
+| POST | `/api/transfer` | `{sources: [{path, excludes}], destination, operation, use_rsync, on_conflict}` → Queues 1 task **per source**. |
 | GET | `/api/tasks`, `/{id}` | Task history pagination and detail retrieval. |
 | GET | `/api/tasks/{id}/stream` | SSE: yields live log tail, closes with `status` event. |
 | POST | `/api/tasks/{id}/cancel` | Cancels active transfer or unqueues pending task. |
@@ -100,7 +101,7 @@ CREATE INDEX idx_activity_created ON activity(created_at DESC);
 
 1. **Direct-to-Disk Streaming:** Bypasses the tasks table, background scheduler, and SSE stream.
 2. **Memory Boundedness:** FastAPI/Starlette SpooledTemporaryFile rolls to disk past 1MB. By default on many systems (like Raspberry Pi), `/tmp` is a RAM-backed `tmpfs`, which would cause large uploads to exhaust memory. LiteSync intercepts this by forcefully configuring `tempfile.tempdir` and the systemd `TMPDIR` environment variable to spool these temporary files to a disk-backed location (`data/tmp`), from which they are safely streamed in 1MB chunks to `dest_dir/.litesync-upload-<hex>.tmp`.
-3. **Collision Safety:** Validates bare filename, checks existence, writes to temp file, performs zero-`await` existence verification, and executes atomic `os.rename()`.
+3. **Collision Safety:** Validates bare filename, writes to temp file, and enforces `on_conflict` policy (`skip`, `overwrite`, `rename`) natively during the atomic `os.rename()` resolution via `fsops.compute_next_available_name`.
 4. **Client Disconnect Handling:** Catches `ClientDisconnect`, immediately unlinks temporary files, and returns HTTP 499 with zero Activity Log entries (silent abandonment).
 5. **Activity Log:** Success records `[⬆] UPLOADED <name> → <dest_dir>`; genuine failures record `[✗] UPLOAD FAILED <name> → <dest_dir> (<error>)`.
 
@@ -111,8 +112,9 @@ CREATE INDEX idx_activity_created ON activity(created_at DESC);
    - **Kernel Copy:** If `use_rsync` is false (and no exclusions are selected), executes a fast, zero-copy native kernel transfer via `os.copy_file_range` running synchronously in an `asyncio.to_thread` pool. Falls back gracefully to chunked `read()`/`write()` if cross-device boundaries prevent syscall copies.
    - **Rsync:** If `use_rsync` is true (the default) or if exclusions exist, spawns an `rsync` subprocess (`asyncio.create_subprocess_exec`) for resumable transfers.
 3. **Direct Logging:** Process `stdout`/`stderr` or dynamic kernel percentages are piped directly into `data/tasks/<task_id>.log` to maintain real-time animated frontend progress bars for both backends.
-4. **Same-Filesystem Fast Path:** If `os.stat(src).st_dev == dest.st_dev` AND `operation == "move"` without excludes, `runner.py` bypasses both backends and executes an instant atomic `os.rename()`. Writes instant `100%` summary to log, marks `succeeded`.
-5. **Lifecycle & Pruning:** On move with exclusions, rsync runs with `--remove-source-files`, followed by bottom-up empty directory pruning.
+4. **Conflict Resolution:** Safely implements `skip`, `overwrite`, or `rename` fallback via pre-flight checks and `fsops.compute_next_available_name` computed precisely at execution run-time (not at job submission time).
+5. **Same-Filesystem Fast Path:** If `os.stat(src).st_dev == dest.st_dev` AND `operation == "move"` without excludes, `runner.py` bypasses both backends and executes an instant atomic `os.rename()`. Writes instant `100%` summary to log, marks `succeeded`.
+6. **Lifecycle & Pruning:** On move with exclusions, rsync runs with `--remove-source-files`, followed by bottom-up empty directory pruning.
 6. **Cancellation & Startup Reconciliation:** Active transfers can be forcefully cancelled via an injected threading flag (kernel) or `SIGTERM` (rsync). Stale `running` tasks are automatically marked `interrupted` if the server is restarted mid-transfer.
 
 ## 5. Frontend Architecture (Vanilla HTML/CSS/JS)

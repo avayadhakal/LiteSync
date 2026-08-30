@@ -340,22 +340,23 @@ class TestSelectionModel(unittest.TestCase):
         """Rsync invocation receives exclude patterns as separate argv list entries, never shell-joined."""
         argv = runner.build_rsync_argv(
             source=str(self.source_dir),
-            destination=str(self.dest_dir),
+            target_path=str(self.dest_dir),
             excludes=["2026/movie.mkv", "cache/temp"],
             operation="copy",
         )
-        expected_src_name = self.source_dir.name
-        self.assertIn(f"--exclude=/{expected_src_name}/2026/movie.mkv", argv)
-        self.assertIn(f"--exclude=/{expected_src_name}/cache/temp", argv)
+        self.assertIn("--exclude=/2026/movie.mkv", argv)
+        self.assertIn("--exclude=/cache/temp", argv)
         self.assertNotIn("--remove-source-files", argv)
-        self.assertEqual(argv[-2], str(self.source_dir))
+        
+        # We now append '/' to directories in build_rsync_argv
+        self.assertEqual(argv[-2], f"{self.source_dir}/")
         self.assertEqual(argv[-1], str(self.dest_dir))
 
     def test_rsync_argv_move_with_excludes_includes_remove_source_files(self):
         """When moving with excludes, rsync argv includes --remove-source-files."""
         argv = runner.build_rsync_argv(
             source=str(self.source_dir),
-            destination=str(self.dest_dir),
+            target_path=str(self.dest_dir),
             excludes=["exclude.txt"],
             operation="move",
         )

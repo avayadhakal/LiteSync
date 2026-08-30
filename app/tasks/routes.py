@@ -35,6 +35,7 @@ class TransferRequest(BaseModel):
     destination: str
     operation: str = "copy"
     use_rsync: bool = False
+    on_conflict: str = "skip"
 
 
 @router.post("/transfer")
@@ -46,6 +47,9 @@ async def create_transfer(body: TransferRequest, user: str = Depends(get_current
 
     if body.operation not in ("copy", "move"):
         raise HTTPException(status_code=400, detail="Invalid operation. Must be 'copy' or 'move'")
+
+    if body.on_conflict not in ("skip", "overwrite", "rename"):
+        raise HTTPException(status_code=400, detail="Invalid on_conflict. Must be 'skip', 'overwrite', or 'rename'")
 
     resolved_destination = resolve_safe_path(body.destination, settings.allowed_roots)
     if not resolved_destination.is_dir():
@@ -95,6 +99,7 @@ async def create_transfer(body: TransferRequest, user: str = Depends(get_current
             operation=body.operation,
             excludes=excludes,
             use_rsync=body.use_rsync or bool(excludes),
+            on_conflict=body.on_conflict,
         )
         for source, excludes in items_to_queue
     ]

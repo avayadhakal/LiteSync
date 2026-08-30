@@ -1222,8 +1222,30 @@
     }
   }
 
-  function startUploads(pane, destPath, files) {
+  function startUploads(pane, destPath, files, resolvedConflictChoice = null) {
     if (!files || files.length === 0) return;
+
+    if (!resolvedConflictChoice) {
+      api(`/api/browse?path=${encodeURIComponent(destPath)}`).then(data => {
+        const existingNames = new Set(data.entries.map(e => e.name));
+        const fileNames = Array.from(files).map(f => f.name);
+        
+        const conflicts = fileNames.filter(name => existingNames.has(name));
+        if (conflicts.length > 0) {
+          showConflictModal(conflicts, (choice) => {
+            if (choice) {
+              startUploads(pane, destPath, files, choice);
+            }
+          });
+          return;
+        }
+        startUploads(pane, destPath, files, 'skip');
+      }).catch(e => {
+        startUploads(pane, destPath, files, 'skip');
+      });
+      return;
+    }
+
     const stack = el('toast-stack');
     if (!stack) return;
 
@@ -1374,6 +1396,7 @@
 
       const fd = new FormData();
       fd.append('path', destPath);
+      fd.append('on_conflict', resolvedConflictChoice || 'skip');
       fd.append('files', item.file, item.file.name);
       xhr.send(fd);
     });
@@ -1491,7 +1514,36 @@
     if (btnDual) btnDual.disabled = false;
   }
 
-  async function submitTransfer() {
+  function showConflictModal(conflicts, onResolve) {
+    const modal = el('conflict-modal');
+    const list = el('conflict-list');
+    list.innerHTML = '';
+    for (const c of conflicts) {
+      const li = document.createElement('li');
+      li.textContent = c;
+      list.appendChild(li);
+    }
+    
+    const cleanup = () => {
+      modal.classList.add('hidden');
+      el('conflict-cancel').onclick = null;
+      el('conflict-rename').onclick = null;
+      el('conflict-overwrite').onclick = null;
+    };
+    
+    el('conflict-cancel').onclick = () => { cleanup(); onResolve(null); };
+    el('conflict-rename').onclick = () => { cleanup(); onResolve('rename'); };
+    el('conflict-overwrite').onclick = () => { cleanup(); onResolve('overwrite'); };
+    
+    modal.classList.remove('hidden');
+  }
+
+  async function submitTransfer(resolvedConflictChoice = null) {
+    if (resolvedConflictChoice === null && arguments.length === 0) {
+      resolvedConflictChoice = null; // explicit
+    } else if (resolvedConflictChoice instanceof Event) {
+      resolvedConflictChoice = null; // event object from click
+    }
     closeConfirmModal();
     const opRadio = document.querySelector('input[name="transfer-op"]:checked');
     const operation = opRadio ? opRadio.value : 'copy';
@@ -1503,6 +1555,32 @@
     
     const sources = state.selection.toTransferSources();
 
+    if (!resolvedConflictChoice) {
+      try {
+        const targetPath = state.dest.path;
+        if (targetPath) {
+          const data = await api(`/api/browse?path=${encodeURIComponent(targetPath)}`);
+          const existingNames = new Set(data.entries.map(e => e.name));
+          const sourceNames = sources.map(item => {
+            const p = typeof item === 'string' ? item : item.path;
+            return p.replace(/\/+$/, '').split('/').pop();
+          });
+          
+          const conflicts = sourceNames.filter(name => existingNames.has(name));
+          if (conflicts.length > 0) {
+            showConflictModal(conflicts, (choice) => {
+              if (choice) {
+                submitTransfer(choice);
+              }
+            });
+            return;
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+
     const toggle = el('transfer-rsync-toggle');
     const use_rsync = toggle ? toggle.checked : false;
 
@@ -1510,7 +1588,8 @@
       sources: sources,
       destination: state.dest.path,
       operation: operation,
-      use_rsync: use_rsync
+      use_rsync: use_rsync,
+      on_conflict: resolvedConflictChoice || 'skip'
     };
 
     let result;
@@ -1965,15 +2044,7 @@
   // --- Init ---
 
   async function init() {
-    const who = await api('/api/whoami');
-    el('whoami').textContent = who.username;
-
-    el('logout-btn').addEventListener('click', async () => {
-      await api('/api/logout', { method: 'POST' });
-      window.location.href = '/login.html';
-    });
-
-    // Layout toggle
+    // Determine layout state and update UI immediately before any async yielding
     const btnSingle = el('btn-single-pane');
     const btnDual = el('btn-dual-pane');
 
@@ -1989,10 +2060,27 @@
         btnSingle.classList.remove('active');
         localStorage.setItem('litesync-dual-pane', 'true');
       }
-      updateSelectionUI();
-    if (typeof updateTransferMethodUI === 'function' && el('confirm-modal') && !el('confirm-modal').classList.contains('hidden')) {
-      updateTransferMethodUI();
-    }
+      
+      // Update destination picker visibility if the modal is currently open
+      const confirmModal = el('confirm-modal');
+      if (confirmModal && !confirmModal.classList.contains('hidden')) {
+        if (state.singlePane) {
+          el('transfer-static-dest-view').classList.add('hidden');
+          el('transfer-picker-container').classList.remove('hidden');
+          el('transfer-options-field').classList.remove('hidden');
+        } else {
+          el('transfer-static-dest-view').classList.remove('hidden');
+          el('transfer-picker-container').classList.add('hidden');
+          // Hide operation radio buttons if moving is invalid across filesystems,
+          // though typically dual pane transfer defaults to copy unless we compute it.
+          // For simplicity, we just unhide the options field and let selection logic handle it.
+          el('transfer-options-field').classList.remove('hidden'); 
+        }
+      }
+      updateSelectionUI(); // re-evaluates transfer button state since singlePane changes it
+      if (typeof updateTransferMethodUI === 'function' && el('confirm-modal') && !el('confirm-modal').classList.contains('hidden')) {
+        updateTransferMethodUI();
+      }
     };
     
     updateLayoutUI();
@@ -2009,6 +2097,14 @@
         state.singlePane = false;
         updateLayoutUI();
       }
+    });
+
+    const who = await api('/api/whoami');
+    el('whoami').textContent = who.username;
+
+    el('logout-btn').addEventListener('click', async () => {
+      await api('/api/logout', { method: 'POST' });
+      window.location.href = '/login.html';
     });
 
     // Both panes expose Upload / New Folder / Rename / Delete via [data-pane-action][data-pane]

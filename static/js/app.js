@@ -1822,17 +1822,22 @@
     const drag = (handle, onMove, onEnd) => {
       handle.addEventListener('pointerdown', (e) => {
         e.preventDefault();
-        handle.setPointerCapture(e.pointerId);
+        e.target.setPointerCapture(e.pointerId);
         handle.classList.add('splitter-dragging');
         const move = (ev) => onMove(ev);
-        const up = () => {
+        const up = (ev) => {
           handle.classList.remove('splitter-dragging');
           handle.removeEventListener('pointermove', move);
           handle.removeEventListener('pointerup', up);
+          handle.removeEventListener('pointercancel', up);
+          if (e.target.hasPointerCapture(e.pointerId)) {
+            e.target.releasePointerCapture(e.pointerId);
+          }
           if (onEnd) onEnd();
         };
         handle.addEventListener('pointermove', move);
         handle.addEventListener('pointerup', up);
+        handle.addEventListener('pointercancel', up);
       });
     };
 

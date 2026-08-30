@@ -461,6 +461,9 @@
     // Mutations (rename/delete/transfer-finish) prune stale paths explicitly.
     renderPane(which);
     updateSelectionUI();
+    if (typeof updateTransferMethodUI === 'function' && el('confirm-modal') && !el('confirm-modal').classList.contains('hidden')) {
+      updateTransferMethodUI();
+    }
   }
 
   // Per-pane selection accessor. The source pane drives Transfer submissions;
@@ -519,6 +522,9 @@
         }
         renderPane(which);
         updateSelectionUI();
+    if (typeof updateTransferMethodUI === 'function' && el('confirm-modal') && !el('confirm-modal').classList.contains('hidden')) {
+      updateTransferMethodUI();
+    }
       });
       row.appendChild(cb);
 
@@ -1136,6 +1142,9 @@
       closeModal('rename');
       sel.migratePath(selectedPath, result.new_path);
       updateSelectionUI();
+    if (typeof updateTransferMethodUI === 'function' && el('confirm-modal') && !el('confirm-modal').classList.contains('hidden')) {
+      updateTransferMethodUI();
+    }
       await loadPane(which, state[which].path, true);
       toastSuccess(`Renamed to: ${name}`);
       await loadActivity();
@@ -1184,6 +1193,9 @@
       }
     }
     updateSelectionUI();
+    if (typeof updateTransferMethodUI === 'function' && el('confirm-modal') && !el('confirm-modal').classList.contains('hidden')) {
+      updateTransferMethodUI();
+    }
     await loadPane(which, state[which].path, true);
 
     if (failures.length === 0) {
@@ -1386,7 +1398,7 @@
     if (state.singlePane) {
       el('transfer-static-dest-view').classList.add('hidden');
       el('transfer-picker-container').classList.remove('hidden');
-      el('transfer-op-field').classList.remove('hidden');
+      el('transfer-options-field').classList.remove('hidden');
       
       let targetPath = localStorage.getItem('litesync-last-destination');
       if (!targetPath) targetPath = null;
@@ -1399,19 +1411,76 @@
     } else {
       el('transfer-static-dest-view').classList.remove('hidden');
       el('transfer-picker-container').classList.add('hidden');
-      el('transfer-op-field').classList.remove('hidden');
+      el('transfer-options-field').classList.remove('hidden');
       el('transfer-change-dest-btn').classList.add('hidden');
       el('confirm-dest').textContent = state.dest.path || '(select a destination)';
       el('confirm-ok').disabled = state.dest.path === null;
     }
 
+
     const copyRadio = document.querySelector('input[name="transfer-op"][value="copy"]');
     if (copyRadio) copyRadio.checked = true;
+    
+    el('transfer-rsync-toggle').checked = true;
+    updateTransferMethodUI();
+
     el('confirm-modal').classList.remove('hidden');
     const btnSingle = el('btn-single-pane');
     const btnDual = el('btn-dual-pane');
     if (btnSingle) btnSingle.disabled = true;
     if (btnDual) btnDual.disabled = true;
+  }
+
+
+  function _getMatchedRoot(pathStr) {
+    if (!pathStr) return null;
+    const norm = normalizePath(pathStr);
+    let best = null;
+    for (const r of state.roots) {
+      const normR = normalizePath(r);
+      if (norm === normR || norm.startsWith(normR + '/')) {
+        if (!best || r.length > best.length) {
+          best = r;
+        }
+      }
+    }
+    return best;
+  }
+
+  function updateTransferMethodUI() {
+    const rsyncWrapper = el('transfer-rsync-wrapper');
+    if (!rsyncWrapper) return;
+    
+    const opRadio = document.querySelector('input[name="transfer-op"]:checked');
+    const operation = opRadio ? opRadio.value : 'copy';
+    
+    const sources = state.selection.toTransferSources();
+    const hasExclusions = sources.some(s => typeof s !== 'string' && s.excludes && s.excludes.length > 0);
+    
+    const toggle = el('transfer-rsync-toggle');
+    const hint = el('transfer-rsync-hint');
+    const label = el('transfer-rsync-label');
+    
+    rsyncWrapper.classList.remove('hidden');
+    
+    if (hasExclusions) {
+      label.style.opacity = '0.7';
+      label.style.cursor = 'not-allowed';
+      toggle.checked = true;
+      toggle.disabled = true;
+      hint.textContent = 'Required when excluding files.';
+      return;
+    }
+    
+    // Normal copy or move
+    label.style.opacity = '1';
+    label.style.cursor = 'pointer';
+    toggle.disabled = false;
+    if (toggle.checked) {
+      hint.textContent = 'Resumes on restart.';
+    } else {
+      hint.textContent = 'Faster, but restarts on failure.';
+    }
   }
 
   function closeConfirmModal() {
@@ -1433,11 +1502,17 @@
     }
     
     const sources = state.selection.toTransferSources();
+
+    const toggle = el('transfer-rsync-toggle');
+    const use_rsync = toggle ? toggle.checked : false;
+
     const body = {
       sources: sources,
       destination: state.dest.path,
       operation: operation,
+      use_rsync: use_rsync
     };
+
     let result;
     try {
       result = await api('/api/transfer', { method: 'POST', body: JSON.stringify(body) });
@@ -1452,9 +1527,17 @@
     // selection Clear button flow): empty the selection, redraw the source
     // pane so checkbox ticks clear, and restore the operation selection.
     state.selection.clear();
+
     const copyRadio = document.querySelector('input[name="transfer-op"][value="copy"]');
     if (copyRadio) copyRadio.checked = true;
+    
+    el('transfer-rsync-toggle').checked = true;
+    updateTransferMethodUI();
+
     updateSelectionUI();
+    if (typeof updateTransferMethodUI === 'function' && el('confirm-modal') && !el('confirm-modal').classList.contains('hidden')) {
+      updateTransferMethodUI();
+    }
     renderPane('source');
     setHistoryTab('active');
     // Auto-refresh destination pane on start
@@ -1567,6 +1650,9 @@
       //    the pane refresh so the re-rendered DOM reads pruned selection state.
       pruneCompletedSelection(task);
       updateSelectionUI();
+    if (typeof updateTransferMethodUI === 'function' && el('confirm-modal') && !el('confirm-modal').classList.contains('hidden')) {
+      updateTransferMethodUI();
+    }
     }
     // 2) Surface a toast notification (activity log entry is recorded by the backend).
     const title = task ? getPrimaryTitle(task.source || task.sources) : 'Transfer';
@@ -1904,6 +1990,9 @@
         localStorage.setItem('litesync-dual-pane', 'true');
       }
       updateSelectionUI();
+    if (typeof updateTransferMethodUI === 'function' && el('confirm-modal') && !el('confirm-modal').classList.contains('hidden')) {
+      updateTransferMethodUI();
+    }
     };
     
     updateLayoutUI();
@@ -2031,6 +2120,9 @@
       state.selection.clear();
       closeSelectionPreview();
       updateSelectionUI();
+    if (typeof updateTransferMethodUI === 'function' && el('confirm-modal') && !el('confirm-modal').classList.contains('hidden')) {
+      updateTransferMethodUI();
+    }
       renderPane('source');
       toastSuccess('Selection cleared.');
     });

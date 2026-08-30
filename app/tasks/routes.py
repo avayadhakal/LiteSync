@@ -34,6 +34,7 @@ class TransferRequest(BaseModel):
     sources: list[Union[str, TransferSourceItem]]
     destination: str
     operation: str = "copy"
+    use_rsync: bool = False
 
 
 @router.post("/transfer")
@@ -93,6 +94,7 @@ async def create_transfer(body: TransferRequest, user: str = Depends(get_current
             destination=str(resolved_destination),
             operation=body.operation,
             excludes=excludes,
+            use_rsync=body.use_rsync or bool(excludes),
         )
         for source, excludes in items_to_queue
     ]

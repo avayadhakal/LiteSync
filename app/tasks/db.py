@@ -21,7 +21,8 @@ CREATE TABLE IF NOT EXISTS tasks (
     ended_at      TEXT,
     exit_code     INTEGER,
     error_message TEXT,
-    excludes      TEXT DEFAULT '[]'
+    excludes      TEXT DEFAULT '[]',
+    use_rsync     INTEGER DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_created_at ON tasks(created_at DESC);
@@ -101,6 +102,8 @@ def _migrate_if_needed(conn: sqlite3.Connection) -> None:
     if "source" in columns and "operation" in columns and "sources" not in columns:
         if "excludes" not in columns:
             cursor.execute("ALTER TABLE tasks ADD COLUMN excludes TEXT DEFAULT '[]'")
+        if "use_rsync" not in columns:
+            cursor.execute("ALTER TABLE tasks ADD COLUMN use_rsync INTEGER DEFAULT 0")
         return
 
     # Old schema detected, perform migration
@@ -177,7 +180,9 @@ def _migrate_if_needed(conn: sqlite3.Connection) -> None:
             started_at    TEXT,
             ended_at      TEXT,
             exit_code     INTEGER,
-            error_message TEXT
+            error_message TEXT,
+            excludes      TEXT DEFAULT '[]',
+            use_rsync     INTEGER DEFAULT 0
         );
     """)
 
@@ -186,8 +191,8 @@ def _migrate_if_needed(conn: sqlite3.Connection) -> None:
             """
             INSERT INTO tasks
                 (id, source, destination, operation, status,
-                 created_at, started_at, ended_at, exit_code, error_message)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 created_at, started_at, ended_at, exit_code, error_message, excludes, use_rsync)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', 0)
             """,
             (
                 t["id"],
@@ -227,6 +232,7 @@ def insert_task(
     exit_code: int | None = None,
     error_message: str | None = None,
     excludes: list[str] | None = None,
+    use_rsync: bool = False,
     **kwargs,
 ) -> None:
     """Insert a single task into the database."""
@@ -246,8 +252,8 @@ def insert_task(
             """
             INSERT INTO tasks
                 (id, source, destination, operation, status,
-                 created_at, started_at, ended_at, exit_code, error_message, excludes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 created_at, started_at, ended_at, exit_code, error_message, excludes, use_rsync)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 task_id,
@@ -261,6 +267,7 @@ def insert_task(
                 exit_code,
                 error_message,
                 exc_json,
+                1 if use_rsync else 0,
             ),
         )
 

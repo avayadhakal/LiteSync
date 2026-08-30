@@ -15,6 +15,8 @@ from app.tasks import db
 # the SSE stream never interrupts them.
 _current_proc: asyncio.subprocess.Process | None = None
 _current_task_id: str | None = None
+_current_kernel_task_id: str | None = None
+_kernel_cancel_flag: bool = False
 _wake = asyncio.Event()
 
 
@@ -56,6 +58,7 @@ def queue_task(
     destination: str,
     operation: str = "copy",
     excludes: list[str] | None = None,
+    use_rsync: bool = False,
 ) -> str:
     """Persist a single-source task as 'queued'. Nothing is launched here —
     the background scheduler independently picks queued rows up."""
@@ -66,6 +69,7 @@ def queue_task(
         destination=destination,
         operation=operation,
         excludes=excludes or [],
+        use_rsync=use_rsync,
     )
     return task_id
 
@@ -76,15 +80,14 @@ def wake_scheduler() -> None:
 
 
 def terminate_task(task_id: str) -> bool:
-    """Send SIGTERM to the active rsync child of the given running task.
-
-    Returns True if a live process was found. The scheduler watchdog
-    escalates to SIGKILL if the child ignores SIGTERM.
-    """
-    global _current_proc, _current_task_id
+    """Send SIGTERM to the active rsync child of the given running task, or flag the kernel copy to stop."""
+    global _current_proc, _current_task_id, _current_kernel_task_id, _kernel_cancel_flag
     proc = _current_proc
     if _current_task_id == task_id and proc is not None and proc.returncode is None:
         proc.terminate()
+        return True
+    if _current_kernel_task_id == task_id:
+        _kernel_cancel_flag = True
         return True
     return False
 
@@ -161,10 +164,109 @@ def _try_atomic_move(task: dict, log_path: Path) -> bool:
     return True
 
 
+
+def _sync_kernel_copy_worker(src_str: str, dst_dir_str: str, log_fh) -> None:
+    """Synchronous worker to perform kernel copy (falling back to chunked read/write)."""
+    global _kernel_cancel_flag
+    src_p = Path(src_str)
+    dst_dir = Path(dst_dir_str)
+    target_path = dst_dir / src_p.name
+
+    def copy_func(src_file, dst_file):
+        if _kernel_cancel_flag:
+            raise InterruptedError("Transfer cancelled by user")
+        
+        src_path = Path(src_file)
+        dst_path = Path(dst_file)
+        
+        # Guard against overwrite
+        if dst_path.exists():
+            return
+            
+        try:
+            # Attempt kernel copy
+            if hasattr(os, 'copy_file_range'):
+                src_fd = os.open(src_path, os.O_RDONLY)
+                try:
+                    # preserve mode if possible
+                    mode = src_path.stat().st_mode
+                    dst_fd = os.open(dst_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
+                    try:
+                        src_size = src_path.stat().st_size
+                        copied = 0
+                        last_pct = -1
+                        while copied < src_size:
+                            if _kernel_cancel_flag:
+                                raise InterruptedError("Transfer cancelled by user")
+                            # Max 32MB per syscall to ensure we can stream progress
+                            n = os.copy_file_range(src_fd, dst_fd, min(src_size - copied, 32 * 1024 * 1024), offset_src=copied, offset_dst=copied)
+                            if n == 0:
+                                break
+                            copied += n
+                            
+                            if src_size > 0:
+                                pct = int((copied / src_size) * 100)
+                                if pct != last_pct:
+                                    last_pct = pct
+                                    try:
+                                        log_fh.write(f" {pct}%\n".encode("utf-8"))
+                                        log_fh.flush()
+                                    except OSError:
+                                        pass
+                        return
+                    finally:
+                        os.close(dst_fd)
+                finally:
+                    os.close(src_fd)
+        except OSError:
+            pass
+
+        # Fallback to chunked read/write
+        chunk_size = 1024 * 1024
+        try:
+            src_size = src_path.stat().st_size
+        except OSError:
+            src_size = 0
+        copied = 0
+        last_pct = -1
+        with open(src_path, "rb") as in_f:
+            with open(dst_path, "wb") as out_f:
+                while True:
+                    if _kernel_cancel_flag:
+                        raise InterruptedError("Transfer cancelled by user")
+                    chunk = in_f.read(chunk_size)
+                    if not chunk:
+                        break
+                    out_f.write(chunk)
+                    copied += len(chunk)
+                    
+                    if src_size > 0:
+                        pct = int((copied / src_size) * 100)
+                        if pct != last_pct:
+                            last_pct = pct
+                            try:
+                                log_fh.write(f" {pct}%\n".encode("utf-8"))
+                                log_fh.flush()
+                            except OSError:
+                                pass
+
+    if src_p.is_dir():
+        shutil.copytree(src_p, target_path, copy_function=copy_func, dirs_exist_ok=True)
+    else:
+        copy_func(src_p, target_path)
+        
+    try:
+        log_fh.write(f"{src_p.name}\n".encode("utf-8"))
+        log_fh.write(b"            100%    0.00kB/s    0:00:00 (xfr, to-chk=0/1)\n")
+        log_fh.flush()
+    except OSError:
+        pass
+
+
 async def _run_task(task: dict, settings: Settings) -> None:
     """Execute one queued task, stream output to deterministic task log file,
     and finalize the DB row."""
-    global _current_proc, _current_task_id
+    global _current_proc, _current_task_id, _current_kernel_task_id, _kernel_cancel_flag
 
     task_id = task["id"]
     log_path = db.get_task_log_path(task_id, settings.data_dir)
@@ -196,19 +298,60 @@ async def _run_task(task: dict, settings: Settings) -> None:
         return
 
     excludes = task.get("excludes", [])
+    use_rsync = task.get("use_rsync", False)
+
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        log_fh = open(log_path, "wb")
+    except OSError as e:
+        db.mark_finished(task_id, "failed", None, f"Failed to open log file: {e}")
+        return
+
+    # Determine if we can use kernel copy
+    if not use_rsync and not excludes:
+        _current_kernel_task_id = task_id
+        _kernel_cancel_flag = False
+        try:
+            await asyncio.to_thread(_sync_kernel_copy_worker, task["source"], task["destination"], log_fh)
+            code = 0
+        except InterruptedError:
+            db.mark_finished(task_id, "interrupted", None, "Transfer cancelled by user")
+            return
+        except Exception as e:
+            try:
+                log_fh.write(f"Error: {e}\n".encode("utf-8"))
+            except OSError:
+                pass
+            code = 1
+        finally:
+            log_fh.close()
+            _current_kernel_task_id = None
+            _kernel_cancel_flag = False
+
+        latest = db.get_task(task_id)
+        if latest is None or latest["status"] != "running":
+            return
+
+        if code == 0:
+            if task["operation"] == "move":
+                try:
+                    if src_path.is_dir() and not src_path.is_symlink():
+                        shutil.rmtree(src_path, ignore_errors=True)
+                    elif src_path.exists() or src_path.is_symlink():
+                        src_path.unlink(missing_ok=True)
+                except Exception:
+                    pass
+            db.mark_finished(task_id, "succeeded", code, None)
+        else:
+            db.mark_finished(task_id, "failed", code, "Kernel copy failed")
+        return
+
     argv = build_rsync_argv(
         task["source"],
         task["destination"],
         excludes=excludes,
         operation=task["operation"],
     )
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-
-    try:
-        log_fh = open(log_path, "wb")
-    except OSError as e:
-        db.mark_finished(task_id, "failed", None, f"Failed to open log file: {e}")
-        return
 
     try:
         proc = await asyncio.create_subprocess_exec(
@@ -318,9 +461,14 @@ def reconcile_on_startup(settings: Settings) -> None:
 async def shutdown_runner() -> None:
     """Graceful shutdown: terminate active rsync child, wait for termination,
     mark task as interrupted, and exit."""
-    global _current_proc, _current_task_id
+    global _current_proc, _current_task_id, _current_kernel_task_id, _kernel_cancel_flag
     proc = _current_proc
     task_id = _current_task_id
+    
+    if _current_kernel_task_id is not None:
+        _kernel_cancel_flag = True
+        task_id = _current_kernel_task_id
+        
     if proc is not None and proc.returncode is None:
         proc.terminate()
         try:
@@ -331,11 +479,12 @@ async def shutdown_runner() -> None:
                 await proc.wait()
             except ProcessLookupError:
                 pass
-        if task_id:
-            db.mark_finished(
-                task_id,
-                "interrupted",
-                None,
-                "Server shut down during transfer",
-            )
+    
+    if task_id:
+        db.mark_finished(
+            task_id,
+            "interrupted",
+            None,
+            "Server shut down during transfer",
+        )
 

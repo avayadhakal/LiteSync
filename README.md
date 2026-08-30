@@ -2,7 +2,7 @@
 
 Ultra-lightweight single/dual-pane file transfer web app for a Raspberry Pi. Browse a
 source and destination directory (with a single-pane layout for simpler management, or side by side), select files/folders, and hand
-the transfer to `rsync` running in the background so it survives
+the transfer to a dual-engine backend (`rsync` or native `os.copy_file_range` kernel copies) running in the background so it survives
 closing the browser. Also supports direct, streamed browser-to-filesystem file uploads
 with real-time byte-level progress.
 
@@ -58,7 +58,11 @@ sudo bash uninstall.sh --keep-data # Uninstalls but preserves data/ and config.t
 
 - Only directories listed under `allowed_roots` in `config.toml` can be
   browsed or used as a transfer source/destination.
-- Transfers run in the background as asynchronous subprocesses and survive browser disconnects.
+- Dual-Backend Transfer Engine:
+  - Users can explicitly toggle the transfer method in the UI between the ultra-fast zero-copy **Kernel engine** (`os.copy_file_range`) and the standard **rsync engine**.
+  - Rsync remains enabled by default for high-reliability, interrupt-safe resumability, and is automatically forced for transfers containing folder exclusions.
+  - Same-filesystem moves instantly execute atomic `os.rename()` bypassing both backends entirely.
+- Transfers run in the background as asynchronous subprocesses (or thread-pools) and survive browser disconnects.
 - Browser file uploads stream straight to destination disks in chunks with collision guards and real-time progress (`max_upload_size_mb` configurable in `config.toml`, default 5 GB).
   - *Note:* Large uploads are temporarily spooled to a disk-backed directory (`data/tmp`) before being atomically moved to their destination to prevent RAM exhaustion. Ensure the drive hosting `data/tmp` has sufficient free space for your maximum upload size.
 - Configuration is loaded via Python's built-in `tomllib` from `config.toml` (or the path set in `LITESYNC_CONFIG`).

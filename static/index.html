@@ -111,22 +111,40 @@
               <button class="icon-btn" id="transfer-picker-mkdir" data-pane-action="mkdir" data-pane="pickerDest" title="New Folder">📁+</button>
             </div>
         </div>
-        <div class="pane-body" id="transfer-picker-body" style="height: 200px; border: 1px solid var(--border); border-top: none; overflow-y: auto;"></div>
+        <div class="pane-body" id="transfer-picker-body" style="height: 200px; border: 1px solid var(--border); border-top: none; overflow-y: auto; padding-bottom: 8px;"></div>
       </div>
 
-      <div class="modal-field" id="transfer-op-field" style="margin-top: 14px;">
-        <label class="modal-label" style="margin-bottom: 8px;">Operation</label>
-        <div class="modal-radio-group">
-          <label class="modal-radio">
-            <input type="radio" name="transfer-op" value="copy" checked />
-            <span>Copy</span>
-          </label>
-          <label class="modal-radio">
-            <input type="radio" name="transfer-op" value="move" />
-            <span>Move</span>
-          </label>
+      <div class="modal-field" id="transfer-options-field" style="margin-top: 14px; margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;">
+          
+          <div style="flex: 1;">
+            <label class="modal-label" style="margin-bottom: 8px;">Operation</label>
+            <div class="modal-radio-group" style="margin-top: 0;">
+              <label class="modal-radio">
+                <input type="radio" name="transfer-op" value="copy" checked />
+                <span>Copy</span>
+              </label>
+              <label class="modal-radio">
+                <input type="radio" name="transfer-op" value="move" />
+                <span>Move</span>
+              </label>
+            </div>
+          </div>
+          
+          <div id="transfer-rsync-wrapper" style="text-align: left; min-height: 44px; white-space: nowrap;">
+            <label class="modal-label" style="margin-bottom: 8px; visibility: hidden;">Engine</label>
+            <label id="transfer-rsync-label" style="display: flex; align-items: flex-start; justify-content: flex-start; gap: 8px; font-size: 13px; cursor: pointer; color: var(--text);">
+              <input type="checkbox" id="transfer-rsync-toggle" checked style="margin: 0;" />
+              <div style="display: flex; flex-direction: column;">
+                <span style="position: relative; top: -3px;">Enable rsync engine</span>
+                <span id="transfer-rsync-hint" class="modal-hint" style="margin-top: 4px;">Resumes on restart.</span>
+              </div>
+            </label>
+          </div>
+
         </div>
       </div>
+
       <div class="actions">
         <button id="confirm-cancel">Cancel</button>
         <button id="confirm-ok" class="primary">Transfer</button>

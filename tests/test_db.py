@@ -45,6 +45,7 @@ class TestDatabaseSchemaAndTasks(unittest.TestCase):
                 "exit_code": "INTEGER",
                 "error_message": "TEXT",
                 "excludes": "TEXT",
+            "use_rsync": "INTEGER",
             }
             self.assertEqual(task_cols, expected_task_cols)
 

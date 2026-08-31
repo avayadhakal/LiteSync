@@ -104,10 +104,15 @@ export function renderActiveTransfers() {
     if (pauseBtn) {
       pauseBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
+        pauseBtn.disabled = true;
+        pauseBtn.textContent = 'Pausing...';
         try {
           await api(`/api/tasks/${task.task_id}/pause`, { method: 'POST' });
-          loadHistory();
+          task.status = 'paused';
+          renderActiveTransfers();
         } catch (err) {
+          pauseBtn.disabled = false;
+          pauseBtn.textContent = 'Pause';
           toastError(`Failed to pause task: ${err.message}`);
         }
       });
@@ -117,10 +122,29 @@ export function renderActiveTransfers() {
     if (resumeBtn) {
       resumeBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
+        resumeBtn.disabled = true;
+        resumeBtn.textContent = 'Resuming...';
         try {
           await api(`/api/tasks/${task.task_id}/resume`, { method: 'POST' });
-          loadHistory();
+          
+          // The backend puts it in 'queued' state briefly. Poll until it runs.
+          let currentStatus = 'queued';
+          while (currentStatus === 'queued') {
+            await new Promise(r => setTimeout(r, 500));
+            const fresh = await api(`/api/tasks/${task.task_id}`);
+            currentStatus = fresh.status;
+          }
+          
+          if (currentStatus === 'running') {
+            task.status = 'running';
+            renderActiveTransfers();
+          } else {
+            resumeBtn.disabled = false;
+            resumeBtn.textContent = 'Resume';
+          }
         } catch (err) {
+          resumeBtn.disabled = false;
+          resumeBtn.textContent = 'Resume';
           toastError(`Failed to resume task: ${err.message}`);
         }
       });

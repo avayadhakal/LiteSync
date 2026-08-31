@@ -51,7 +51,18 @@ export function startUploads(pane, destPath, files, resolvedConflictChoice = nul
   const header = document.createElement('div');
   header.className = 'upload-card-header';
   const folderName = normalizePath(destPath).split('/').pop() || destPath;
-  header.innerHTML = `<span>Uploading ${files.length} file${files.length === 1 ? '' : 's'} → ${escapeHtml(folderName)}</span>`;
+  header.innerHTML = `
+    <span>Uploading ${files.length} file${files.length === 1 ? '' : 's'} → ${escapeHtml(folderName)}</span>
+    <button class="upload-close-btn" title="Close" style="background:none;border:none;color:inherit;cursor:pointer;font-size:16px;">&times;</button>
+  `;
+  const closeBtn = header.querySelector('.upload-close-btn');
+  closeBtn.addEventListener('click', () => {
+    card.classList.add('toast-out');
+    setTimeout(() => card.remove(), 220);
+  });
+  header.style.display = 'flex';
+  header.style.justifyContent = 'space-between';
+  header.style.alignItems = 'center';
   card.appendChild(header);
 
   const rowsContainer = document.createElement('div');
@@ -126,8 +137,10 @@ export function startUploads(pane, destPath, files, resolvedConflictChoice = nul
   const checkAllFinished = () => {
     const remaining = inFlight.filter((u) => u.status === 'uploading');
     if (remaining.length === 0) {
-      card.classList.add('toast-out');
-      setTimeout(() => card.remove(), 220);
+      if (document.body.contains(card)) {
+        card.classList.add('toast-out');
+        setTimeout(() => card.remove(), 220);
+      }
     }
   };
 
@@ -166,22 +179,32 @@ export function startUploads(pane, destPath, files, resolvedConflictChoice = nul
         toastError(`Upload failed for ${item.file.name}: ${errMsg}`);
       }
 
-      if (state[pane] && state[pane].path === destPath) {
-        await loadPane(pane, destPath);
+      try {
+        if (state[pane] && state[pane].path === destPath) {
+          await loadPane(pane, destPath);
+        }
+        await loadActivity();
+      } catch (err) {
+        console.error('Failed to reload panes after upload:', err);
+      } finally {
+        if (item.rowEl) item.rowEl.remove();
+        checkAllFinished();
       }
-      await loadActivity();
-
-      if (item.rowEl) item.rowEl.remove();
-      checkAllFinished();
     };
 
     xhr.onerror = async () => {
       if (item.status === 'aborted') return;
       item.status = 'failed';
       toastError(`Upload failed for ${item.file.name}: Network error`);
-      await loadActivity();
-      if (item.rowEl) item.rowEl.remove();
-      checkAllFinished();
+
+      try {
+        await loadActivity();
+      } catch (err) {
+        console.error('Failed to reload activity after error:', err);
+      } finally {
+        if (item.rowEl) item.rowEl.remove();
+        checkAllFinished();
+      }
     };
 
     xhr.onabort = async () => {

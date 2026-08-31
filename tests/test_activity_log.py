@@ -13,8 +13,9 @@ from fastapi import HTTPException
 
 from app.config import Settings, User
 from app.routes_browse import DeleteRequest, MkdirRequest, RenameRequest, create_folder, delete_entry, rename_entry
-from app.tasks import db, runner
-from app.tasks.routes import (
+from app.transfers import db, scheduler
+from app.transfers import engine_rsync, engine_kernel
+from app.transfers.routes import (
     TransferRequest,
     cancel_task,
     clear_activity,
@@ -111,7 +112,7 @@ class TestActivityLogIntegration(unittest.TestCase):
         file1 = self.source_dir / "queued_file.txt"
         file1.write_text("data")
 
-        with patch("app.tasks.routes.get_settings", return_value=self.settings):
+        with patch("app.transfers.routes.get_settings", return_value=self.settings):
             req = TransferRequest(
                 sources=[str(file1)],
                 destination=str(self.dest_dir),
@@ -132,7 +133,7 @@ class TestActivityLogIntegration(unittest.TestCase):
         file1 = self.source_dir / "report.pdf"
         file1.write_text("pdf data")
 
-        task_id = runner.queue_task(
+        task_id = scheduler.queue_task(
             settings=self.settings,
             source=str(file1),
             destination=str(self.dest_dir),
@@ -141,7 +142,7 @@ class TestActivityLogIntegration(unittest.TestCase):
 
         db.mark_running(task_id)
         task = db.get_task(task_id)
-        asyncio.run(runner._run_task(task, self.settings))
+        asyncio.run(scheduler._run_task(task, self.settings))
 
         # Check task completion
         finished = db.get_task(task_id)
@@ -163,7 +164,7 @@ class TestActivityLogIntegration(unittest.TestCase):
         file1 = self.source_dir / "movie.mkv"
         file1.write_text("movie data")
 
-        task_id = runner.queue_task(
+        task_id = scheduler.queue_task(
             settings=self.settings,
             source=str(file1),
             destination=str(self.dest_dir),
@@ -172,7 +173,7 @@ class TestActivityLogIntegration(unittest.TestCase):
 
         db.mark_running(task_id)
         task = db.get_task(task_id)
-        asyncio.run(runner._run_task(task, self.settings))
+        asyncio.run(scheduler._run_task(task, self.settings))
 
         finished = db.get_task(task_id)
         self.assertEqual(finished["status"], "succeeded")
@@ -195,7 +196,7 @@ class TestActivityLogIntegration(unittest.TestCase):
         dest_collision = self.dest_dir / "broken_file.mkv"
         dest_collision.write_text("dest content")
 
-        task_id = runner.queue_task(
+        task_id = scheduler.queue_task(
             settings=self.settings,
             source=str(source_file),
             destination=str(self.dest_dir),
@@ -204,7 +205,7 @@ class TestActivityLogIntegration(unittest.TestCase):
 
         db.mark_running(task_id)
         task = db.get_task(task_id)
-        asyncio.run(runner._run_task(task, self.settings))
+        asyncio.run(scheduler._run_task(task, self.settings))
 
         finished = db.get_task(task_id)
         self.assertEqual(finished["status"], "failed")
@@ -220,14 +221,14 @@ class TestActivityLogIntegration(unittest.TestCase):
         self.assertIn("already exists", msg["summary"])
 
     def test_interrupted_cancelled_transfer_creates_activity(self):
-        task_id = runner.queue_task(
+        task_id = scheduler.queue_task(
             settings=self.settings,
             source=str(self.source_dir / "large_backup.tar"),
             destination=str(self.dest_dir),
             operation="copy",
         )
 
-        with patch("app.tasks.routes.get_settings", return_value=self.settings):
+        with patch("app.transfers.routes.get_settings", return_value=self.settings):
             res = asyncio.run(cancel_task(task_id, _user="test_user"))
             self.assertEqual(res, {"success": True})
 
@@ -263,7 +264,7 @@ class TestActivityLogIntegration(unittest.TestCase):
         self.assertEqual(len(db.list_activity()), 0)
 
         # Run startup reconciliation
-        runner.reconcile_on_startup(self.settings)
+        scheduler.reconcile_on_startup(self.settings)
 
         # Task must be interrupted
         task = db.get_task(task_id)
@@ -293,7 +294,7 @@ class TestActivityLogIntegration(unittest.TestCase):
         f2.write_text("b")
         f3.write_text("c")
 
-        with patch("app.tasks.routes.get_settings", return_value=self.settings):
+        with patch("app.transfers.routes.get_settings", return_value=self.settings):
             req = TransferRequest(
                 sources=[str(f1), str(f2), str(f3)],
                 destination=str(self.dest_dir),
@@ -309,7 +310,7 @@ class TestActivityLogIntegration(unittest.TestCase):
             # Task 1 succeeds
             db.mark_running(task_ids[0])
             t1 = db.get_task(task_ids[0])
-            asyncio.run(runner._run_task(t1, self.settings))
+            asyncio.run(scheduler._run_task(t1, self.settings))
 
             act1 = db.list_activity()
             self.assertEqual(len(act1), 1)
@@ -342,7 +343,7 @@ class TestActivityLogIntegration(unittest.TestCase):
         f1 = self.source_dir / "cleanup_test.txt"
         f1.write_text("cleanup")
 
-        task_id = runner.queue_task(
+        task_id = scheduler.queue_task(
             settings=self.settings,
             source=str(f1),
             destination=str(self.dest_dir),
@@ -351,13 +352,13 @@ class TestActivityLogIntegration(unittest.TestCase):
 
         db.mark_running(task_id)
         task = db.get_task(task_id)
-        asyncio.run(runner._run_task(task, self.settings))
+        asyncio.run(scheduler._run_task(task, self.settings))
 
         # Confirm activity exists
         self.assertEqual(len(db.list_activity()), 1)
 
         # Delete single task via API
-        with patch("app.tasks.routes.get_settings", return_value=self.settings):
+        with patch("app.transfers.routes.get_settings", return_value=self.settings):
             asyncio.run(delete_task(task_id, _user="test_user"))
             self.assertIsNone(db.get_task(task_id))
 

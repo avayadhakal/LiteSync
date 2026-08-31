@@ -6,9 +6,10 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.tasks import db
-from app.tasks.runner import _run_task
-from app.fsops import compute_next_available_name
+from app.transfers import db
+from app.transfers.scheduler import _run_task
+from app.transfers import engine_rsync, engine_kernel
+from app.transfers.conflict import compute_next_available_name
 
 @pytest.fixture(autouse=True)
 def override_auth():

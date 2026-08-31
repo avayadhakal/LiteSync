@@ -12,9 +12,9 @@ from app.auth import get_current_user
 from app.auth import router as auth_router
 from app.config import get_settings
 from app.routes_browse import router as browse_router
-from app.tasks import db
-from app.tasks.routes import router as tasks_router
-from app.tasks.runner import reconcile_on_startup, run_scheduler, shutdown_runner
+from app.transfers import db
+from app.transfers.routes import router as tasks_router
+from app.transfers.scheduler import reconcile_on_startup, run_scheduler, shutdown_runner
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 

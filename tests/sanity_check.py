@@ -1,8 +1,9 @@
 import asyncio
 from pathlib import Path
-from app.tasks.runner import _run_task, build_rsync_argv
+from app.transfers.scheduler import _run_task
+from app.transfers.engine_rsync import build_rsync_argv
 from app.config import Settings
-from app.tasks import db
+from app.transfers import db
 import tempfile
 import shutil
 import os

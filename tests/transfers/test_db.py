@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from app.tasks import db
+from app.transfers import db
 
 
 class TestDatabaseSchemaAndTasks(unittest.TestCase):

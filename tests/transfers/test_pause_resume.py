@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.auth import get_current_user
 from app.config import Settings, get_settings
-from app.tasks import db, runner
+from app.transfers import db, scheduler, engine_rsync, engine_kernel
 
 
 class TestPauseResume(unittest.TestCase):
@@ -38,9 +38,9 @@ class TestPauseResume(unittest.TestCase):
 
     def tearDown(self):
         app.dependency_overrides = {}
-        runner._paused_procs.clear()
-        runner._current_proc = None
-        runner._current_task_id = None
+        engine_rsync._paused_procs.clear()
+        engine_rsync._current_proc = None
+        scheduler._current_task_id = None
         db._db_path = None
         for root in self.settings.allowed_roots:
             try:
@@ -79,8 +79,8 @@ class TestPauseResume(unittest.TestCase):
         task_id = "test_pause_task"
         db.insert_task(id=task_id, source="/tmp", destination="/tmp", status="running", use_rsync=True)
         
-        runner._current_task_id = task_id
-        runner._current_proc = mock_proc
+        scheduler._current_task_id = task_id
+        engine_rsync._current_proc = mock_proc
         
         resp = self.client.post(f"/api/tasks/{task_id}/pause")
         self.assertEqual(resp.status_code, 200)
@@ -89,8 +89,8 @@ class TestPauseResume(unittest.TestCase):
         self.assertEqual(task["status"], "paused")
         mock_proc.send_signal.assert_called_with(signal.SIGSTOP)
         
-        self.assertIn(task_id, runner._paused_procs)
-        self.assertIsNone(runner._current_task_id)
+        self.assertIn(task_id, engine_rsync._paused_procs)
+        self.assertIsNone(scheduler._current_task_id)
 
     def test_pause_rejected_kernel_copy(self):
         # Test 2
@@ -108,7 +108,7 @@ class TestPauseResume(unittest.TestCase):
         self.assertEqual(resp.status_code, 400)
         self.assertIn("not currently running", resp.json()["detail"])
 
-    @patch("app.tasks.runner.build_rsync_argv")
+    @patch("app.transfers.engine_rsync.build_rsync_argv")
     @patch("asyncio.create_subprocess_exec")
     def test_queue_progression_while_paused(self, mock_exec, mock_build_argv):
         # Test 4 & 13 (finally block race condition)
@@ -129,26 +129,26 @@ class TestPauseResume(unittest.TestCase):
         db.insert_task(id=task1_id, source="/tmp/a", destination="/tmp/b", status="running", use_rsync=True)
         db.insert_task(id=task2_id, source="/tmp/c", destination="/tmp/d", status="queued", use_rsync=True)
         
-        runner._current_task_id = task1_id
-        runner._current_proc = mock_proc_1
+        scheduler._current_task_id = task1_id
+        engine_rsync._current_proc = mock_proc_1
         
         # We manually pause Task 1
-        runner.pause_task_runner(task1_id)
+        scheduler.pause_task_runner(task1_id)
         db.mark_paused(task1_id)
         
-        self.assertEqual(runner._current_task_id, None)
-        self.assertIn(task1_id, runner._paused_procs)
+        self.assertEqual(scheduler._current_task_id, None)
+        self.assertIn(task1_id, engine_rsync._paused_procs)
         
         # Start Task 2
-        runner._current_task_id = task2_id
-        runner._current_proc = mock_proc_2
+        scheduler._current_task_id = task2_id
+        engine_rsync._current_proc = mock_proc_2
         
         # Task 1 finally block simulates race condition
-        if runner._current_task_id == task1_id:
-            runner._current_proc = None
-            runner._current_task_id = None
+        if scheduler._current_task_id == task1_id:
+            engine_rsync._current_proc = None
+            scheduler._current_task_id = None
             
-        self.assertEqual(runner._current_task_id, task2_id) # Was NOT stomped!
+        self.assertEqual(scheduler._current_task_id, task2_id) # Was NOT stomped!
 
     @patch("asyncio.create_subprocess_exec")
     def test_resume_success_and_pid_reconnect(self, mock_exec):
@@ -158,7 +158,7 @@ class TestPauseResume(unittest.TestCase):
         
         mock_proc = MagicMock()
         mock_proc.returncode = None
-        runner._paused_procs[task_id] = mock_proc
+        engine_rsync._paused_procs[task_id] = mock_proc
         
         # Resume via API
         resp = self.client.post(f"/api/tasks/{task_id}/resume")
@@ -178,7 +178,7 @@ class TestPauseResume(unittest.TestCase):
                 return 0
             mock_proc.wait = mock_wait
             
-            await runner._run_task(nxt, self.settings)
+            await scheduler._run_task(nxt, self.settings)
             
         asyncio.run(run_resumed())
         
@@ -195,7 +195,7 @@ class TestPauseResume(unittest.TestCase):
         db.insert_task(id="task1", source="/tmp", destination="/tmp", status="paused", use_rsync=True)
         db.insert_task(id="task2", source="/tmp", destination="/tmp", status="running", use_rsync=True)
         
-        runner.reconcile_on_startup(self.settings)
+        scheduler.reconcile_on_startup(self.settings)
         
         self.assertEqual(db.get_task("task1")["status"], "interrupted")
         self.assertEqual(db.get_task("task2")["status"], "interrupted")
@@ -214,11 +214,11 @@ class TestPauseResume(unittest.TestCase):
             mock_proc.returncode = -9
             
         mock_proc.wait = mock_wait
-        runner._paused_procs[task_id] = mock_proc
+        engine_rsync._paused_procs[task_id] = mock_proc
         
         async def run_shutdown():
             start = time.time()
-            await runner.shutdown_runner()
+            await scheduler.shutdown_runner()
             duration = time.time() - start
             self.assertLess(duration, 2.0)
             
@@ -236,7 +236,7 @@ class TestPauseResume(unittest.TestCase):
         
         mock_proc = MagicMock()
         mock_proc.returncode = None
-        runner._paused_procs[task_id] = mock_proc
+        engine_rsync._paused_procs[task_id] = mock_proc
         
         resp = self.client.post(f"/api/tasks/{task_id}/cancel")
         self.assertEqual(resp.status_code, 200)
@@ -244,7 +244,7 @@ class TestPauseResume(unittest.TestCase):
         task = db.get_task(task_id)
         self.assertEqual(task["status"], "interrupted")
         mock_proc.kill.assert_called_once()
-        self.assertNotIn(task_id, runner._paused_procs)
+        self.assertNotIn(task_id, engine_rsync._paused_procs)
 
     def test_activity_log_terminal_events(self):
         # Test 12
@@ -277,7 +277,7 @@ class TestPauseResume(unittest.TestCase):
         
         mock_proc = MagicMock()
         mock_proc.returncode = None
-        runner._paused_procs[task_id] = mock_proc
+        engine_rsync._paused_procs[task_id] = mock_proc
         
         # Resume via API
         resp = self.client.post(f"/api/tasks/{task_id}/resume")
@@ -291,7 +291,7 @@ class TestPauseResume(unittest.TestCase):
                 return 0
             mock_proc.wait = mock_wait
             
-            await runner._run_task(nxt, self.settings)
+            await scheduler._run_task(nxt, self.settings)
             
         asyncio.run(run_resumed())
         
@@ -308,25 +308,25 @@ class TestPauseResume(unittest.TestCase):
         mock_proc = MagicMock()
         mock_proc.returncode = None
         
-        runner._current_task_id = task_id
-        runner._current_proc = mock_proc
+        scheduler._current_task_id = task_id
+        engine_rsync._current_proc = mock_proc
         
         # Simulate original token
         original_token = object()
-        runner._current_run_token = original_token
+        engine_rsync._current_run_token = original_token
         
         # Step 1: User pauses
-        runner.pause_task_runner(task_id)
+        scheduler.pause_task_runner(task_id)
         db.mark_paused(task_id)
         
         # Step 2: User rapidly resumes (before old 5s loop wakes up)
         db.mark_queued(task_id)
         
         # New loop picks it up and claims it
-        runner._current_task_id = task_id
-        runner._current_proc = mock_proc
+        scheduler._current_task_id = task_id
+        engine_rsync._current_proc = mock_proc
         new_token = object()
-        runner._current_run_token = new_token
+        engine_rsync._current_run_token = new_token
         
         # Step 3: Old loop wakes up from its 5-second timeout and evaluates the catch block
         # We simulate the catch block logic that caused the bug
@@ -338,21 +338,21 @@ class TestPauseResume(unittest.TestCase):
         
         # But our new token logic intercepts it:
         stale_loop_token = original_token
-        current_global_token = runner._current_run_token
+        current_global_token = engine_rsync._current_run_token
         
         # Assert that the tokens don't match, which triggers the clean exit
         self.assertIsNot(stale_loop_token, current_global_token)
         
         # Simulate the old finally block executing
         if stale_loop_token is current_global_token:
-            runner._current_proc = None
-            runner._current_task_id = None
-            runner._current_run_token = None
+            engine_rsync._current_proc = None
+            scheduler._current_task_id = None
+            engine_rsync._current_run_token = None
             
         # Assert that the globals were NOT cleared by the stale loop
-        self.assertEqual(runner._current_task_id, task_id)
-        self.assertEqual(runner._current_proc, mock_proc)
-        self.assertIsNotNone(runner._current_run_token)
+        self.assertEqual(scheduler._current_task_id, task_id)
+        self.assertEqual(engine_rsync._current_proc, mock_proc)
+        self.assertIsNotNone(engine_rsync._current_run_token)
         
         # Assert the process wasn't killed
         mock_proc.kill.assert_not_called()
@@ -367,9 +367,9 @@ class TestPauseResume(unittest.TestCase):
         
         # Simulate the token matching so we actually evaluate the status checks
         original_token = object()
-        runner._current_run_token = original_token
-        runner._current_task_id = task_id
-        runner._current_proc = mock_proc
+        engine_rsync._current_run_token = original_token
+        scheduler._current_task_id = task_id
+        engine_rsync._current_proc = mock_proc
         
         # Manually change the DB status out of band to "failed"
         db.mark_finished(task_id, "failed", 1, "Simulated out of band failure")

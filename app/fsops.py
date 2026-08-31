@@ -60,34 +60,3 @@ def list_directory(path: Path, allowed_roots: list[Path]) -> list[dict]:
     return entries
 
 
-def compute_next_available_name(target_path: Path) -> Path:
-    """Compute the next available name by checking existence and incrementing."""
-    if not target_path.exists():
-        return target_path
-
-    parent = target_path.parent
-    name = target_path.name
-
-    try:
-        is_dir = target_path.is_dir()
-    except OSError:
-        is_dir = False
-
-    if is_dir:
-        stem = name
-        suffix = ""
-    else:
-        # Avoid treating dotfiles like ".bashrc" as having stem "" and suffix ".bashrc"
-        if name.startswith(".") and name.count(".") == 1:
-            stem = name
-            suffix = ""
-        else:
-            stem = target_path.stem
-            suffix = target_path.suffix
-
-    i = 1
-    while True:
-        new_path = parent / f"{stem}_{i}{suffix}"
-        if not new_path.exists():
-            return new_path
-        i += 1

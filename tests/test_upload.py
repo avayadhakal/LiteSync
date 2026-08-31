@@ -16,7 +16,7 @@ from starlette.requests import ClientDisconnect, Request
 
 from app.config import Settings, User
 from app.routes_browse import upload_files, validate_upload_filename
-from app.tasks import db
+from app.transfers import db
 
 
 def make_mock_request(form_data: dict[str, any] | None = None, exc_on_form: Exception | None = None) -> Request:

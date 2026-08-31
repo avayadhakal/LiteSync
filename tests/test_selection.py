@@ -10,8 +10,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi import HTTPException
 
 from app.config import Settings, User
-from app.tasks import db, runner
-from app.tasks.routes import TransferRequest, TransferSourceItem, create_transfer
+from app.transfers import db, scheduler
+from app.transfers import engine_rsync, engine_kernel
+from app.transfers.routes import TransferRequest, TransferSourceItem, create_transfer
 
 
 class SelectionModelHelper:
@@ -317,7 +318,7 @@ class TestSelectionModel(unittest.TestCase):
             destination=str(self.dest_dir),
             operation="copy",
         )
-        with patch("app.tasks.routes.get_settings", return_value=self.settings):
+        with patch("app.transfers.routes.get_settings", return_value=self.settings):
             with self.assertRaises(HTTPException) as ctx:
                 asyncio.run(create_transfer(req, user="test_user"))
             self.assertEqual(ctx.exception.status_code, 400)
@@ -330,7 +331,7 @@ class TestSelectionModel(unittest.TestCase):
             destination=str(self.dest_dir),
             operation="copy",
         )
-        with patch("app.tasks.routes.get_settings", return_value=self.settings):
+        with patch("app.transfers.routes.get_settings", return_value=self.settings):
             with self.assertRaises(HTTPException) as ctx:
                 asyncio.run(create_transfer(req, user="test_user"))
             self.assertEqual(ctx.exception.status_code, 400)
@@ -338,7 +339,7 @@ class TestSelectionModel(unittest.TestCase):
 
     def test_rsync_argv_receives_separate_argv_entries(self):
         """Rsync invocation receives exclude patterns as separate argv list entries, never shell-joined."""
-        argv = runner.build_rsync_argv(
+        argv = engine_rsync.build_rsync_argv(
             source=str(self.source_dir),
             target_path=str(self.dest_dir),
             excludes=["2026/movie.mkv", "cache/temp"],
@@ -354,7 +355,7 @@ class TestSelectionModel(unittest.TestCase):
 
     def test_rsync_argv_move_with_excludes_includes_remove_source_files(self):
         """When moving with excludes, rsync argv includes --remove-source-files."""
-        argv = runner.build_rsync_argv(
+        argv = engine_rsync.build_rsync_argv(
             source=str(self.source_dir),
             target_path=str(self.dest_dir),
             excludes=["exclude.txt"],
@@ -369,7 +370,7 @@ class TestSelectionModel(unittest.TestCase):
         (sub / "keep.txt").write_text("keep")
         (sub / "exclude.txt").write_text("exclude")
 
-        task_id = runner.queue_task(
+        task_id = scheduler.queue_task(
             settings=self.settings,
             source=str(sub),
             destination=str(self.dest_dir),
@@ -381,7 +382,7 @@ class TestSelectionModel(unittest.TestCase):
         task = db.get_task(task_id)
         self.assertEqual(task["excludes"], ["exclude.txt"])
 
-        asyncio.run(runner._run_task(task, self.settings))
+        asyncio.run(scheduler._run_task(task, self.settings))
 
         # Check destination
         target_dir = self.dest_dir / "my_dir"
@@ -408,7 +409,7 @@ class TestSelectionModel(unittest.TestCase):
         (sub / "untransferred.txt").write_text("file 2")
         (sub / "excluded.txt").write_text("file 3")
 
-        task_id = runner.queue_task(
+        task_id = scheduler.queue_task(
             settings=self.settings,
             source=str(sub),
             destination=str(self.dest_dir),
@@ -431,7 +432,7 @@ class TestSelectionModel(unittest.TestCase):
         mock_proc.wait = AsyncMock(return_value=23)
 
         with patch("asyncio.create_subprocess_exec", return_value=mock_proc):
-            asyncio.run(runner._run_task(task, self.settings))
+            asyncio.run(scheduler._run_task(task, self.settings))
 
         # Assert already-transferred file is gone from source
         self.assertFalse((sub / "transferred.txt").exists())

@@ -20,8 +20,9 @@ from starlette.types import Send
 
 from app.auth import get_current_user, read_session_cookie, verify_password
 from app.config import get_download_signing_key, get_settings
-from app.fsops import list_directory, resolve_safe_path, compute_next_available_name
-from app.tasks import db
+from app.fsops import list_directory, resolve_safe_path
+from app.transfers.conflict import compute_next_available_name
+from app.transfers import db
 
 router = APIRouter(prefix="/api")
 

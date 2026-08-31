@@ -1,5 +1,5 @@
 import pytest
-from tests.test_conflict_resolution import temp_roots, override_auth, test_client
+from tests.transfers.test_conflict_resolution import temp_roots, override_auth, test_client
 from starlette.requests import ClientDisconnect
 from unittest.mock import patch
 

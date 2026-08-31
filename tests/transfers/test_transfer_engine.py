@@ -7,7 +7,8 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.config import Settings, User
-from app.tasks import db, runner
+from app.transfers import db, scheduler
+from app.transfers import engine_rsync, engine_kernel
 
 
 class TestTransferEngine(unittest.TestCase):
@@ -46,7 +47,7 @@ class TestTransferEngine(unittest.TestCase):
         source_file = self.source_dir / "kcopy_test.txt"
         source_file.write_text("kernel copy content")
 
-        task_id = runner.queue_task(
+        task_id = scheduler.queue_task(
             settings=self.settings,
             source=str(source_file),
             destination=str(self.dest_dir),
@@ -57,7 +58,7 @@ class TestTransferEngine(unittest.TestCase):
         db.mark_running(task_id)
         task = db.get_task(task_id)
 
-        asyncio.run(runner._run_task(task, self.settings))
+        asyncio.run(scheduler._run_task(task, self.settings))
 
         self.assertTrue((self.dest_dir / "kcopy_test.txt").exists())
         mock_exec.assert_not_called()
@@ -69,7 +70,7 @@ class TestTransferEngine(unittest.TestCase):
         source_file = self.source_dir / "rsync_test.txt"
         source_file.write_text("rsync content")
 
-        task_id = runner.queue_task(
+        task_id = scheduler.queue_task(
             settings=self.settings,
             source=str(source_file),
             destination=str(self.dest_dir),
@@ -85,7 +86,7 @@ class TestTransferEngine(unittest.TestCase):
         mock_proc.wait = AsyncMock(return_value=0)
         mock_exec.return_value = mock_proc
 
-        asyncio.run(runner._run_task(task, self.settings))
+        asyncio.run(scheduler._run_task(task, self.settings))
 
         mock_exec.assert_called_once()
 
@@ -95,7 +96,7 @@ class TestTransferEngine(unittest.TestCase):
         source_file = self.source_dir / "atomic_ignore_rsync.txt"
         source_file.write_text("content")
 
-        task_id = runner.queue_task(
+        task_id = scheduler.queue_task(
             settings=self.settings,
             source=str(source_file),
             destination=str(self.dest_dir),
@@ -108,7 +109,7 @@ class TestTransferEngine(unittest.TestCase):
 
         # It should ignore use_rsync=True and use os.rename because it's same fs
         with patch("os.rename") as mock_rename:
-            asyncio.run(runner._run_task(task, self.settings))
+            asyncio.run(scheduler._run_task(task, self.settings))
             mock_rename.assert_called_once()
             
     # 4. move, different filesystem, toggle OFF -> uses kernel copy + delete-source-only-after-success, rsync never spawned.
@@ -117,7 +118,7 @@ class TestTransferEngine(unittest.TestCase):
         source_file = self.source_dir / "kmove_test.txt"
         source_file.write_text("kernel move content")
 
-        task_id = runner.queue_task(
+        task_id = scheduler.queue_task(
             settings=self.settings,
             source=str(source_file),
             destination=str(self.dest_dir),
@@ -128,8 +129,8 @@ class TestTransferEngine(unittest.TestCase):
         db.mark_running(task_id)
         task = db.get_task(task_id)
 
-        with patch("app.tasks.runner._can_atomic_rename", return_value=False):
-            asyncio.run(runner._run_task(task, self.settings))
+        with patch("app.transfers.scheduler._can_atomic_rename", return_value=False):
+            asyncio.run(scheduler._run_task(task, self.settings))
 
         mock_exec.assert_not_called()
         self.assertTrue((self.dest_dir / "kmove_test.txt").exists())
@@ -148,7 +149,7 @@ class TestTransferEngine(unittest.TestCase):
         source_dir.mkdir()
         (source_dir / "file.txt").write_text("file")
 
-        task_id = runner.queue_task(
+        task_id = scheduler.queue_task(
             settings=self.settings,
             source=str(source_dir),
             destination=str(self.dest_dir),
@@ -159,7 +160,7 @@ class TestTransferEngine(unittest.TestCase):
         db.mark_running(task_id)
         task = db.get_task(task_id)
         
-        asyncio.run(runner._run_task(task, self.settings))
+        asyncio.run(scheduler._run_task(task, self.settings))
         
         self.assertTrue((self.dest_dir / "kdir" / "file.txt").exists())
 
@@ -168,7 +169,7 @@ class TestTransferEngine(unittest.TestCase):
         source_file = self.source_dir / "kfail_test.txt"
         source_file.write_text("kfail content")
 
-        task_id = runner.queue_task(
+        task_id = scheduler.queue_task(
             settings=self.settings,
             source=str(source_file),
             destination=str(self.dest_dir),
@@ -180,9 +181,9 @@ class TestTransferEngine(unittest.TestCase):
         task = db.get_task(task_id)
 
         # Mock shutil.copytree or copy_file_range to fail
-        with patch("app.tasks.runner._can_atomic_rename", return_value=False):
-            with patch("app.tasks.runner._sync_kernel_copy_worker", side_effect=Exception("Copy failed")):
-                asyncio.run(runner._run_task(task, self.settings))
+        with patch("app.transfers.scheduler._can_atomic_rename", return_value=False):
+            with patch("app.transfers.engine_kernel._sync_kernel_copy_worker", side_effect=Exception("Copy failed")):
+                asyncio.run(scheduler._run_task(task, self.settings))
 
         self.assertTrue(source_file.exists()) # Not deleted!
         self.assertEqual(db.get_task(task_id)["status"], "failed")
@@ -192,7 +193,7 @@ class TestTransferEngine(unittest.TestCase):
         source_file = self.source_dir / "kfallback.txt"
         source_file.write_text("fallback content")
 
-        task_id = runner.queue_task(
+        task_id = scheduler.queue_task(
             settings=self.settings,
             source=str(source_file),
             destination=str(self.dest_dir),
@@ -203,7 +204,7 @@ class TestTransferEngine(unittest.TestCase):
         task = db.get_task(task_id)
         
         with patch("os.copy_file_range", side_effect=OSError("EXDEV")):
-            asyncio.run(runner._run_task(task, self.settings))
+            asyncio.run(scheduler._run_task(task, self.settings))
             
         self.assertTrue((self.dest_dir / "kfallback.txt").exists())
         self.assertEqual((self.dest_dir / "kfallback.txt").read_text(), "fallback content")
@@ -243,7 +244,7 @@ class TestTransferEngine(unittest.TestCase):
         content = b"X" * (5 * 1024 * 1024)
         large_file.write_bytes(content)
 
-        task_id = runner.queue_task(
+        task_id = scheduler.queue_task(
             settings=self.settings,
             source=str(large_file),
             destination=str(self.dest_dir),
@@ -258,7 +259,7 @@ class TestTransferEngine(unittest.TestCase):
         # Run task
         db.mark_running(task_id)
         task = db.get_task(task_id)
-        asyncio.run(runner._run_task(task, self.settings))
+        asyncio.run(scheduler._run_task(task, self.settings))
 
         # Destination file must exist with identical content
         target_file = self.dest_dir / "large_file.bin"
@@ -290,7 +291,7 @@ class TestTransferEngine(unittest.TestCase):
         nested_dir.mkdir(parents=True, exist_ok=True)
         (nested_dir / "file2.txt").write_text("hello file 2")
 
-        task_id = runner.queue_task(
+        task_id = scheduler.queue_task(
             settings=self.settings,
             source=str(sub_dir),
             destination=str(self.dest_dir),
@@ -300,7 +301,7 @@ class TestTransferEngine(unittest.TestCase):
 
         db.mark_running(task_id)
         task = db.get_task(task_id)
-        asyncio.run(runner._run_task(task, self.settings))
+        asyncio.run(scheduler._run_task(task, self.settings))
 
         target_dir = self.dest_dir / "my_folder"
         self.assertTrue(target_dir.exists())
@@ -318,7 +319,7 @@ class TestTransferEngine(unittest.TestCase):
         source_file = self.source_dir / "cross_fs.txt"
         source_file.write_text("cross filesystem content")
 
-        task_id = runner.queue_task(
+        task_id = scheduler.queue_task(
             settings=self.settings,
             source=str(source_file),
             destination=str(self.dest_dir),
@@ -329,8 +330,8 @@ class TestTransferEngine(unittest.TestCase):
         db.mark_running(task_id)
         task = db.get_task(task_id)
 
-        with patch("app.tasks.runner._can_atomic_rename", return_value=False):
-            asyncio.run(runner._run_task(task, self.settings))
+        with patch("app.transfers.scheduler._can_atomic_rename", return_value=False):
+            asyncio.run(scheduler._run_task(task, self.settings))
 
         target_file = self.dest_dir / "cross_fs.txt"
         self.assertTrue(target_file.exists())
@@ -346,7 +347,7 @@ class TestTransferEngine(unittest.TestCase):
         sub_dir.mkdir(parents=True, exist_ok=True)
         (sub_dir / "data.txt").write_text("directory rsync data")
 
-        task_id = runner.queue_task(
+        task_id = scheduler.queue_task(
             settings=self.settings,
             source=str(sub_dir),
             destination=str(self.dest_dir),
@@ -357,8 +358,8 @@ class TestTransferEngine(unittest.TestCase):
         db.mark_running(task_id)
         task = db.get_task(task_id)
 
-        with patch("app.tasks.runner._can_atomic_rename", return_value=False):
-            asyncio.run(runner._run_task(task, self.settings))
+        with patch("app.transfers.scheduler._can_atomic_rename", return_value=False):
+            asyncio.run(scheduler._run_task(task, self.settings))
 
         target_dir = self.dest_dir / "cross_dir"
         self.assertTrue(target_dir.exists())
@@ -372,7 +373,7 @@ class TestTransferEngine(unittest.TestCase):
         source_file = self.source_dir / "preserve_me.txt"
         source_file.write_text("do not delete if rsync fails")
 
-        task_id = runner.queue_task(
+        task_id = scheduler.queue_task(
             settings=self.settings,
             source=str(source_file),
             destination=str(self.dest_dir),
@@ -388,9 +389,9 @@ class TestTransferEngine(unittest.TestCase):
         mock_proc.returncode = 23
         mock_proc.wait = AsyncMock(return_value=23)
 
-        with patch("app.tasks.runner._can_atomic_rename", return_value=False), \
+        with patch("app.transfers.scheduler._can_atomic_rename", return_value=False), \
              patch("asyncio.create_subprocess_exec", return_value=mock_proc):
-            asyncio.run(runner._run_task(task, self.settings))
+            asyncio.run(scheduler._run_task(task, self.settings))
 
         # Source file MUST be preserved!
         self.assertTrue(source_file.exists())
@@ -407,7 +408,7 @@ class TestTransferEngine(unittest.TestCase):
         target_file = self.dest_dir / "conflict.txt"
         target_file.write_text("pre-existing destination content")
 
-        task_id = runner.queue_task(
+        task_id = scheduler.queue_task(
             settings=self.settings,
             source=str(source_file),
             destination=str(self.dest_dir),
@@ -419,7 +420,7 @@ class TestTransferEngine(unittest.TestCase):
         task = db.get_task(task_id)
 
         # Attempt to run task
-        asyncio.run(runner._run_task(task, self.settings))
+        asyncio.run(scheduler._run_task(task, self.settings))
 
         # Verify overwrite guard blocked the move
         self.assertTrue(target_file.exists())
@@ -435,7 +436,7 @@ class TestTransferEngine(unittest.TestCase):
         source_file = self.source_dir / "copy_file.txt"
         source_file.write_text("copy source content")
 
-        task_id = runner.queue_task(
+        task_id = scheduler.queue_task(
             settings=self.settings,
             source=str(source_file),
             destination=str(self.dest_dir),
@@ -445,7 +446,7 @@ class TestTransferEngine(unittest.TestCase):
         db.mark_running(task_id)
         task = db.get_task(task_id)
 
-        asyncio.run(runner._run_task(task, self.settings))
+        asyncio.run(scheduler._run_task(task, self.settings))
 
         target_file = self.dest_dir / "copy_file.txt"
         self.assertTrue(target_file.exists())
@@ -461,7 +462,7 @@ class TestTransferEngine(unittest.TestCase):
         source_file = self.source_dir / "queued_file.txt"
         source_file.write_text("queued file content")
 
-        task_id = runner.queue_task(
+        task_id = scheduler.queue_task(
             settings=self.settings,
             source=str(source_file),
             destination=str(self.dest_dir),
@@ -487,17 +488,17 @@ class TestTransferEngine(unittest.TestCase):
         mock_proc.returncode = None
         mock_proc.terminate = MagicMock()
 
-        runner._current_proc = mock_proc
-        runner._current_task_id = "test_cancel_task"
+        engine_rsync._current_proc = mock_proc
+        scheduler._current_task_id = "test_cancel_task"
 
         try:
             # Terminate task
-            res = runner.terminate_task("test_cancel_task")
+            res = scheduler.terminate_task("test_cancel_task")
             self.assertTrue(res)
             mock_proc.terminate.assert_called_once()
         finally:
-            runner._current_proc = None
-            runner._current_task_id = None
+            engine_rsync._current_proc = None
+            scheduler._current_task_id = None
 
     def test_startup_reconciliation(self):
         # Task 1: was running when server crashed
@@ -517,7 +518,7 @@ class TestTransferEngine(unittest.TestCase):
             status="queued",
         )
 
-        runner.reconcile_on_startup(self.settings)
+        scheduler.reconcile_on_startup(self.settings)
 
         t1 = db.get_task("stale_running_task")
         self.assertEqual(t1["status"], "interrupted")
@@ -540,10 +541,10 @@ class TestTransferEngine(unittest.TestCase):
         mock_proc.terminate = MagicMock()
         mock_proc.wait = AsyncMock(return_value=-15)
 
-        runner._current_proc = mock_proc
-        runner._current_task_id = "shutdown_task"
+        engine_rsync._current_proc = mock_proc
+        scheduler._current_task_id = "shutdown_task"
 
-        asyncio.run(runner.shutdown_runner())
+        asyncio.run(scheduler.shutdown_runner())
 
         mock_proc.terminate.assert_called_once()
         t = db.get_task("shutdown_task")
@@ -571,10 +572,10 @@ class TestTransferEngine(unittest.TestCase):
         self.assertNotIn("delete_source", task)
 
     def test_api_create_transfer_copy_and_move(self):
-        from app.tasks.routes import TransferRequest, create_transfer
+        from app.transfers.routes import TransferRequest, create_transfer
         (self.source_dir / "test_api_file.txt").write_text("api file content")
 
-        with patch("app.tasks.routes.get_settings", return_value=self.settings):
+        with patch("app.transfers.routes.get_settings", return_value=self.settings):
             # Test Copy
             req_copy = TransferRequest(
                 sources=[str(self.source_dir / "test_api_file.txt")],
@@ -600,7 +601,7 @@ class TestTransferEngine(unittest.TestCase):
             self.assertNotIn("delete_source", t_move)
 
     def test_api_create_transfer_invalid_operation(self):
-        from app.tasks.routes import TransferRequest, create_transfer
+        from app.transfers.routes import TransferRequest, create_transfer
         from fastapi import HTTPException
 
         (self.source_dir / "file.txt").write_text("content")
@@ -609,29 +610,29 @@ class TestTransferEngine(unittest.TestCase):
             destination=str(self.dest_dir),
             operation="invalid_op",
         )
-        with patch("app.tasks.routes.get_settings", return_value=self.settings):
+        with patch("app.transfers.routes.get_settings", return_value=self.settings):
             with self.assertRaises(HTTPException) as ctx:
                 asyncio.run(create_transfer(req_invalid, user="test_user"))
             self.assertEqual(ctx.exception.status_code, 400)
             self.assertIn("Invalid operation", ctx.exception.detail)
 
     def test_api_cancel_task(self):
-        from app.tasks.routes import cancel_task
-        task_id = runner.queue_task(
+        from app.transfers.routes import cancel_task
+        task_id = scheduler.queue_task(
             settings=self.settings,
             source=str(self.source_dir / "x.txt"),
             destination=str(self.dest_dir),
             operation="copy",
         )
 
-        with patch("app.tasks.routes.get_settings", return_value=self.settings):
+        with patch("app.transfers.routes.get_settings", return_value=self.settings):
             res = asyncio.run(cancel_task(task_id, _user="test_user"))
             self.assertEqual(res, {"success": True})
             t = db.get_task(task_id)
             self.assertEqual(t["status"], "interrupted")
 
     def test_api_stream_task_missing_log(self):
-        from app.tasks.routes import stream_task
+        from app.transfers.routes import stream_task
 
         # Insert a finished task that has no log file on disk
         task_id = "missing_log_stream_task"
@@ -644,7 +645,7 @@ class TestTransferEngine(unittest.TestCase):
             exit_code=0,
         )
 
-        with patch("app.tasks.routes.get_settings", return_value=self.settings):
+        with patch("app.transfers.routes.get_settings", return_value=self.settings):
             response = asyncio.run(stream_task(task_id, _user="test_user"))
             self.assertEqual(response.media_type, "text/event-stream")
 

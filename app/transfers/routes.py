@@ -14,8 +14,8 @@ from pydantic import BaseModel
 from app.auth import get_current_user
 from app.config import get_settings
 from app.fsops import resolve_safe_path
-from app.tasks import db
-from app.tasks.runner import queue_task, terminate_task, wake_scheduler, pause_task_runner, terminate_paused_task
+from app.transfers import db
+from app.transfers.scheduler import queue_task, terminate_task, wake_scheduler, pause_task_runner, terminate_paused_task
 
 router = APIRouter(prefix="/api")
 

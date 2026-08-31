@@ -7,91 +7,33 @@ import uuid
 from pathlib import Path
 
 from app.config import Settings
-from app.tasks import db
-from app.fsops import compute_next_available_name
+from app.transfers import db
+from app.transfers.conflict import resolve_conflict, ConflictSkipped
+from app.transfers import engine_rsync
+from app.transfers import engine_kernel
 
 # --- In-process scheduler state (event-loop owned) ---------------------------
 # At most ONE transfer is ever running; everything else waits as 'queued' rows
 # in SQLite. Transfers are managed in-process, so closing the browser / dropping
 # the SSE stream never interrupts them.
-_current_proc: asyncio.subprocess.Process | None = None
 _current_task_id: str | None = None
-_current_run_token: object | None = None
-_current_kernel_task_id: str | None = None
-_kernel_cancel_flag: bool = False
 _wake = asyncio.Event()
-_paused_procs: dict[str, asyncio.subprocess.Process] = {}
 
 def pause_task_runner(task_id: str) -> bool:
-    global _current_proc, _current_task_id, _current_run_token
-    if _current_task_id == task_id and _current_proc is not None and _current_proc.returncode is None:
-        import signal
-        try:
-            _current_proc.send_signal(signal.SIGSTOP)
-        except ProcessLookupError:
-            return False
-        _paused_procs[task_id] = _current_proc
-        _current_proc = None
-        _current_task_id = None
-        _current_run_token = None
-        wake_scheduler()
-        return True
+    global _current_task_id
+    if _current_task_id == task_id:
+        if engine_rsync.pause_proc(task_id):
+            _current_task_id = None
+            wake_scheduler()
+            return True
     return False
 
 def terminate_paused_task(task_id: str) -> bool:
-    if task_id in _paused_procs:
-        proc = _paused_procs.pop(task_id)
-        if proc.returncode is None:
-            try:
-                proc.kill()
-            except ProcessLookupError:
-                pass
-        return True
-    return False
+    return engine_rsync.terminate_paused_task(task_id)
 
 
 
-def build_rsync_argv(
-    source: str,
-    target_path: str,
-    excludes: list[str] | None = None,
-    operation: str = "copy",
-    drop_ignore_existing: bool = False,
-) -> list[str]:
-    """Construct rsync arguments without shell wrapping.
-    Optionally drops --ignore-existing to allow overwriting."""
-    argv = [
-        "rsync",
-        "-avh",
-        "--progress",
-        "--partial",
-        "--inplace",
-    ]
-    if not drop_ignore_existing:
-        argv.append("--ignore-existing")
 
-    if operation == "move" and excludes:
-        argv.append("--remove-source-files")
-
-    src_p = Path(source)
-    is_dir = src_p.is_dir()
-
-    if excludes:
-        for exc in excludes:
-            exc_clean = exc.strip()
-            if exc_clean:
-                # Anchored exclude relative to the transferred source directory
-                # Passed as separate argv list entries, never string-interpolated or shell-joined
-                if is_dir:
-                    argv.append(f"--exclude=/{exc_clean}")
-                else:
-                    argv.append(f"--exclude=/{exc_clean}")
-
-    if is_dir:
-        argv.extend([f"{source}/", target_path])
-    else:
-        argv.extend([source, target_path])
-    return argv
 
 
 def queue_task(
@@ -124,14 +66,11 @@ def wake_scheduler() -> None:
 
 
 def terminate_task(task_id: str) -> bool:
-    """Send SIGTERM to the active rsync child of the given running task, or flag the kernel copy to stop."""
-    global _current_proc, _current_task_id, _current_kernel_task_id, _kernel_cancel_flag
-    proc = _current_proc
-    if _current_task_id == task_id and proc is not None and proc.returncode is None:
-        proc.terminate()
-        return True
-    if _current_kernel_task_id == task_id:
-        _kernel_cancel_flag = True
+    global _current_task_id
+    if _current_task_id == task_id:
+        if engine_rsync.terminate_current_proc():
+            return True
+    if engine_kernel.cancel_kernel_task(task_id):
         return True
     return False
 
@@ -209,113 +148,10 @@ def _try_atomic_move(task: dict, log_path: Path) -> bool:
 
 
 
-def _sync_kernel_copy_worker(src_str: str, target_path_str: str, log_fh, overwrite: bool = False) -> None:
-    """Synchronous worker to perform kernel copy (falling back to chunked read/write)."""
-    global _kernel_cancel_flag
-    src_p = Path(src_str)
-    target_path = Path(target_path_str)
-
-    def copy_func(src_file, dst_file):
-        if _kernel_cancel_flag:
-            raise InterruptedError("Transfer cancelled by user")
-        
-        src_path = Path(src_file)
-        dst_path = Path(dst_file)
-        
-        # Guard against overwrite
-        if dst_path.exists():
-            if not overwrite:
-                return
-            else:
-                try:
-                    dst_path.unlink()
-                except OSError:
-                    pass
-            
-        try:
-            # Attempt kernel copy
-            if hasattr(os, 'copy_file_range'):
-                src_fd = os.open(src_path, os.O_RDONLY)
-                try:
-                    # preserve mode if possible
-                    mode = src_path.stat().st_mode
-                    dst_fd = os.open(dst_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
-                    try:
-                        src_size = src_path.stat().st_size
-                        copied = 0
-                        last_pct = -1
-                        while copied < src_size:
-                            if _kernel_cancel_flag:
-                                raise InterruptedError("Transfer cancelled by user")
-                            # Max 32MB per syscall to ensure we can stream progress
-                            n = os.copy_file_range(src_fd, dst_fd, min(src_size - copied, 32 * 1024 * 1024), offset_src=copied, offset_dst=copied)
-                            if n == 0:
-                                break
-                            copied += n
-                            
-                            if src_size > 0:
-                                pct = int((copied / src_size) * 100)
-                                if pct != last_pct:
-                                    last_pct = pct
-                                    try:
-                                        log_fh.write(f" {pct}%\n".encode("utf-8"))
-                                        log_fh.flush()
-                                    except OSError:
-                                        pass
-                        return
-                    finally:
-                        os.close(dst_fd)
-                finally:
-                    os.close(src_fd)
-        except OSError:
-            pass
-
-        # Fallback to chunked read/write
-        chunk_size = 1024 * 1024
-        try:
-            src_size = src_path.stat().st_size
-        except OSError:
-            src_size = 0
-        copied = 0
-        last_pct = -1
-        with open(src_path, "rb") as in_f:
-            with open(dst_path, "wb") as out_f:
-                while True:
-                    if _kernel_cancel_flag:
-                        raise InterruptedError("Transfer cancelled by user")
-                    chunk = in_f.read(chunk_size)
-                    if not chunk:
-                        break
-                    out_f.write(chunk)
-                    copied += len(chunk)
-                    
-                    if src_size > 0:
-                        pct = int((copied / src_size) * 100)
-                        if pct != last_pct:
-                            last_pct = pct
-                            try:
-                                log_fh.write(f" {pct}%\n".encode("utf-8"))
-                                log_fh.flush()
-                            except OSError:
-                                pass
-
-    if src_p.is_dir():
-        shutil.copytree(src_p, target_path, copy_function=copy_func, dirs_exist_ok=True)
-    else:
-        copy_func(src_p, target_path)
-        
-    try:
-        log_fh.write(f"{src_p.name}\n".encode("utf-8"))
-        log_fh.write(b"            100%    0.00kB/s    0:00:00 (xfr, to-chk=0/1)\n")
-        log_fh.flush()
-    except OSError:
-        pass
-
-
 async def _run_task(task: dict, settings: Settings) -> None:
     """Execute one queued task, stream output to deterministic task log file,
     and finalize the DB row."""
-    global _current_proc, _current_task_id, _current_run_token, _current_kernel_task_id, _kernel_cancel_flag
+    global _current_task_id
     
     my_run_token = object()
 
@@ -329,18 +165,13 @@ async def _run_task(task: dict, settings: Settings) -> None:
         return
 
     # Check for resume
-    if task_id in _paused_procs:
-        proc = _paused_procs.pop(task_id)
-        import signal
-        try:
-            proc.send_signal(signal.SIGCONT)
-        except ProcessLookupError:
+    if engine_rsync.has_paused_task(task_id):
+        proc = engine_rsync.pop_paused_task(task_id)
+        if not engine_rsync.resume_proc(proc, my_run_token):
             db.mark_finished(task_id, "interrupted", None, "Process exited while paused")
             return
         
-        _current_proc = proc
         _current_task_id = task_id
-        _current_run_token = my_run_token
         
         try:
             log_fh = open(log_path, "ab")
@@ -358,29 +189,14 @@ async def _run_task(task: dict, settings: Settings) -> None:
         target_path = dst_dir / src_path.name
 
         on_conflict = task.get("on_conflict", "skip")
-        drop_ignore = False
 
-        if on_conflict == "rename":
-            target_path = compute_next_available_name(target_path)
-        elif on_conflict == "overwrite":
-            if target_path.exists() and target_path.is_file():
-                try:
-                    target_path.unlink()
-                except OSError:
-                    pass
-            drop_ignore = True
-        elif on_conflict == "skip":
-            # Overwrite guard (ONLY for skip)
-            if target_path.exists() and target_path.is_file():
-                log_path.parent.mkdir(parents=True, exist_ok=True)
-                err = f"Destination item already exists: {target_path.name}"
-                try:
-                    with open(log_path, "wb") as log_fh:
-                        log_fh.write(f"Error: {err}\n".encode("utf-8"))
-                except OSError:
-                    pass
-                db.mark_finished(task_id, "failed", 1, err)
-                return
+        try:
+            resolution = resolve_conflict(target_path, on_conflict, log_path, task_id)
+        except ConflictSkipped:
+            return
+            
+        target_path = resolution.target_path
+        drop_ignore = resolution.drop_ignore
 
         excludes = task.get("excludes", [])
         use_rsync = task.get("use_rsync", False)
@@ -394,10 +210,9 @@ async def _run_task(task: dict, settings: Settings) -> None:
 
         # Determine if we can use kernel copy
         if not use_rsync and not excludes:
-            _current_kernel_task_id = task_id
-            _kernel_cancel_flag = False
+            engine_kernel.set_kernel_task_id(task_id)
             try:
-                await asyncio.to_thread(_sync_kernel_copy_worker, task["source"], str(target_path), log_fh, drop_ignore)
+                await asyncio.to_thread(engine_kernel._sync_kernel_copy_worker, task["source"], str(target_path), log_fh, drop_ignore)
                 code = 0
             except InterruptedError:
                 db.mark_finished(task_id, "interrupted", None, "Transfer cancelled by user")
@@ -410,8 +225,7 @@ async def _run_task(task: dict, settings: Settings) -> None:
                 code = 1
             finally:
                 log_fh.close()
-                _current_kernel_task_id = None
-                _kernel_cancel_flag = False
+                engine_kernel.set_kernel_task_id(None)
 
             latest = db.get_task(task_id)
             if latest is None or latest["status"] != "running":
@@ -431,7 +245,7 @@ async def _run_task(task: dict, settings: Settings) -> None:
                 db.mark_finished(task_id, "failed", code, "Kernel copy failed")
             return
 
-        argv = build_rsync_argv(
+        argv = engine_rsync.build_rsync_argv(
             task["source"],
             str(target_path),
             excludes=excludes,
@@ -450,10 +264,8 @@ async def _run_task(task: dict, settings: Settings) -> None:
             db.mark_finished(task_id, "failed", None, f"Failed to start rsync: {e}")
             return
 
-        _current_proc = proc
+        engine_rsync.set_current_proc(proc, my_run_token)
         _current_task_id = task_id
-        _current_run_token = my_run_token
-
     try:
         while True:
             try:
@@ -464,7 +276,7 @@ async def _run_task(task: dict, settings: Settings) -> None:
                     break
                 
                 # Check if this run loop was detached (e.g. paused)
-                if _current_run_token is not my_run_token:
+                if not engine_rsync.is_current_run_token(my_run_token):
                     break
                     
                 latest = db.get_task(task_id)
@@ -479,10 +291,10 @@ async def _run_task(task: dict, settings: Settings) -> None:
                     break
     finally:
         log_fh.close()
-        if _current_run_token is my_run_token:
-            _current_proc = None
+        if engine_rsync.is_current_run_token(my_run_token):
+            engine_rsync.set_current_proc(None, None)
             _current_task_id = None
-            _current_run_token = None
+
 
     # Finalize only if nobody (e.g. cancel route or shutdown) already finalized it
     latest = db.get_task(task_id)
@@ -559,15 +371,15 @@ def reconcile_on_startup(settings: Settings) -> None:
 async def shutdown_runner() -> None:
     """Graceful shutdown: terminate active rsync child, wait for termination,
     mark task as interrupted, and exit."""
-    global _current_proc, _current_task_id, _current_kernel_task_id, _kernel_cancel_flag
-    proc = _current_proc
+    global _current_task_id
+    proc = engine_rsync.get_current_proc()
     task_id = _current_task_id
     
-    if _current_kernel_task_id is not None:
-        _kernel_cancel_flag = True
-        task_id = _current_kernel_task_id
+    if engine_kernel._current_kernel_task_id is not None:
+        engine_kernel.cancel_kernel_task(engine_kernel._current_kernel_task_id)
+        task_id = engine_kernel._current_kernel_task_id
         
-    for p_id, p in list(_paused_procs.items()):
+    for p_id, p in list(engine_rsync.get_all_paused_procs().items()):
         if p.returncode is None:
             try:
                 p.kill()
@@ -599,4 +411,3 @@ async def shutdown_runner() -> None:
             None,
             "Server shut down during transfer",
         )
-

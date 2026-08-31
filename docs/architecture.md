@@ -1,4 +1,4 @@
-# LiteSync — Architecture & Implementation Plan
+# LiteSync — Architecture
 
 ## 1. System Context & Core Principles
 Minimal-overhead Raspberry Pi web app for dual-pane local directory browsing and background `rsync` transfers.
@@ -18,29 +18,59 @@ Minimal-overhead Raspberry Pi web app for dual-pane local directory browsing and
 │   ├── config.py             # Loads config.toml -> Settings object via tomllib (max_upload_size_mb)
 │   ├── auth.py               # bcrypt password hashing, signed cookies, login/lockout logic
 │   ├── fsops.py              # resolve_safe_path(), list_directory() — path validation
-│   ├── browse/
+│   ├── browse/               # Browser and upload subsystem
+│   │   ├── __init__.py
+│   │   ├── download.py       # /api/download endpoints
 │   │   ├── routes.py         # /api/roots, /api/browse, /api/mkdir | rename | delete
-│   │   ├── download.py       # /api/download
-│   │   └── upload.py         # /api/upload
-│   └── tasks/
+│   │   └── upload.py         # /api/upload direct-to-disk logic
+│   └── transfers/            # Background transfer engine
 │       ├── __init__.py
-│       ├── db.py             # sqlite3 wrapper (init, CRUD, next_queued_task, activity log)
-│       ├── runner.py         # rsync argv, asyncio subprocess scheduler, SIGTERM, fast-path move
-│       └── routes.py         # POST /api/transfer, GET /api/tasks, SSE stream generator, /api/activity
-├── static/
+│       ├── conflict.py       # Conflict resolution strategies
+│       ├── db.py             # SQLite wrapper (init, CRUD, next_queued_task, activity log)
+│       ├── engine_kernel.py  # os.copy_file_range backend implementation
+│       ├── engine_rsync.py   # rsync subprocess wrapper
+│       ├── routes.py         # /api/transfer, /api/tasks, /api/activity endpoints
+│       └── scheduler.py      # Asyncio FIFO task queue and process lifecycle
+├── static/                   # Vanilla HTML/JS/CSS frontend
 │   ├── login.html
 │   ├── index.html            # Main SPA shell
-│   ├── css/app.css           # Vanilla CSS (custom properties, responsive flex, modals, popovers)
-│   └── js/app.js             # Dual-pane logic, SSE Map, Toast/Activity system, Modal handlers
+│   ├── favicon.ico
+│   ├── css/app.css           # Vanilla CSS (custom properties, flex layout)
+│   └── js/
+│       ├── api.js            # Fetch wrapper and HTTP utilities
+│       ├── app.js            # Application entrypoint and event binding
+│       ├── activity.js       # Activity log UI and polling
+│       ├── panes.js          # Dual-pane UI state management
+│       ├── selection.js      # Hierarchical selection logic
+│       ├── state.js          # Shared frontend application state
+│       ├── tasks-ui.js       # Transfer progress and SSE listeners
+│       ├── uploads.js        # Multipart streaming upload client
+│       ├── utils.js          # Formatting and helper utilities
+│       └── modals/           # Modal dialog controllers
+│           ├── item-details.js
+│           ├── mkdir-rename-delete.js
+│           └── transfer.js
 ├── data/                     # Gitignored runtime data
 │   ├── litesync.db           # SQLite database (tasks + activity tables)
-│   └── tasks/<task_id>.log   # Deterministic flat task logs
+│   ├── tasks/                # Deterministic flat task logs
+│   └── tmp/                  # Spooled large file uploads
+├── docs/                     # Documentation and project assets
+│   ├── architecture.md       # Architecture and design doc (this file)
+│   ├── logo.svg
+│   └── screenshots/          # README assets
+├── tests/                    # Pytest and Node.js test suites
+│   ├── browse/               # API endpoint tests for browser subsystem
+│   ├── transfers/            # Core transfer engine and DB logic tests
+│   └── ...                   # Miscellaneous JS/PY test files
 ├── config.example.toml
 ├── config.toml               # Gitignored (chmod 600)
 ├── install.sh                # Automated installer & deployment helper
 ├── uninstall.sh              # Automated service and file uninstaller
 ├── requirements.txt
 ├── litesync.service          # systemd unit (NoNewPrivileges=true, ProtectSystem=strict)
+├── CHANGELOG.md              # Version history and notable changes
+├── CONTRIBUTING.md           # Developer guidelines and setup
+├── LICENSE                   # MIT License
 └── README.md
 ```
 
@@ -61,7 +91,7 @@ CREATE TABLE tasks (
   exit_code     INTEGER,
   error_message TEXT,
   excludes      TEXT DEFAULT '[]',
-  use_rsync     INTEGER DEFAULT 1,
+  use_rsync     INTEGER DEFAULT 0,
   on_conflict   TEXT DEFAULT 'skip'        -- 'skip' | 'overwrite' | 'rename'
 );
 CREATE INDEX idx_tasks_status ON tasks(status);
@@ -112,11 +142,11 @@ CREATE INDEX idx_activity_created ON activity(created_at DESC);
 
 1. **FIFO Scheduler:** `queue_task` inserts DB row → `wake_scheduler()` triggers the worker pipeline. Runs one concurrent task.
 2. **Dual-Backend Transfer:**
-   - **Kernel Copy:** If `use_rsync` is false (and no exclusions are selected), executes a fast, zero-copy native kernel transfer via `os.copy_file_range` running synchronously in an `asyncio.to_thread` pool. Falls back gracefully to chunked `read()`/`write()` if cross-device boundaries prevent syscall copies.
-   - **Rsync:** If `use_rsync` is true (the default) or if exclusions exist, spawns an `rsync` subprocess (`asyncio.create_subprocess_exec`) for resumable transfers.
+   - **Kernel Copy:** If `use_rsync` is false (the default, and no exclusions are selected), executes a fast, zero-copy native kernel transfer via `os.copy_file_range` running synchronously in an `asyncio.to_thread` pool. Falls back gracefully to chunked `read()`/`write()` if cross-device boundaries prevent syscall copies.
+   - **Rsync:** If `use_rsync` is true or if exclusions exist, spawns an `rsync` subprocess (`asyncio.create_subprocess_exec`) for resumable transfers.
 3. **Direct Logging:** Process `stdout`/`stderr` or dynamic kernel percentages are piped directly into `data/tasks/<task_id>.log` to maintain real-time animated frontend progress bars for both backends.
 4. **Conflict Resolution:** Safely implements `skip`, `overwrite`, or `rename` fallback via pre-flight checks and `fsops.compute_next_available_name` computed precisely at execution run-time (not at job submission time).
-5. **Same-Filesystem Fast Path:** If `os.stat(src).st_dev == dest.st_dev` AND `operation == "move"` without excludes, `runner.py` bypasses both backends and executes an instant atomic `os.rename()`. Writes instant `100%` summary to log, marks `succeeded`.
+5. **Same-Filesystem Fast Path:** If `os.stat(src).st_dev == dest.st_dev` AND `operation == "move"` without excludes, `scheduler.py` bypasses both backends and executes an instant atomic `os.rename()`. Writes instant `100%` summary to log, marks `succeeded`.
 6. **Lifecycle & Pruning:** On move with exclusions, rsync runs with `--remove-source-files`, followed by bottom-up empty directory pruning.
 7. **Cancellation & Startup Reconciliation:** Active transfers can be forcefully cancelled via an injected threading flag (kernel) or `SIGTERM` (rsync). Stale `running` or `paused` tasks are automatically marked `interrupted` if the server is restarted mid-transfer.
 8. **Pause & Resume Architecture:** Active `rsync` transfers can be instantly paused via the UI. This triggers a `SIGSTOP` signal to the `rsync` subprocess, freezing it efficiently at the OS level while preserving all progress, state, and open file descriptors.
@@ -136,7 +166,7 @@ CREATE INDEX idx_activity_created ON activity(created_at DESC);
 
 * **Modals:** Reusable styling (`.modal-backdrop`, `.modal`). Dedicated popups for Mkdir, Rename, Delete, Item Details, and Confirmations.
 * **Toasts (`.toast-stack`):** Top-right fixed position. Auto-dismiss (4s) or click-to-dismiss. Slide-in animations.
-* **Activity Log (SQLite):** Persistent across browsers and reloads. Color-coded by severity. Replaces the legacy localStorage model.
+* **Activity Log (SQLite):** Persistent across browsers and reloads. Color-coded by severity.
 
 ### Uploads & Active Transfers UI
 

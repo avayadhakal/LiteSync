@@ -206,7 +206,9 @@ export async function openConfirmModal() {
     el('transfer-picker-container').classList.add('hidden');
     el('transfer-options-field').classList.remove('hidden');
     el('transfer-change-dest-btn').classList.add('hidden');
-    el('confirm-dest').textContent = state.dest.path || '(select a destination)';
+    const confirmDest = el('confirm-dest');
+    confirmDest.textContent = state.dest.path || '(select a destination)';
+    confirmDest.title = state.dest.path || '';
     el('confirm-ok').disabled = state.dest.path === null;
   }
 
@@ -425,7 +427,9 @@ export async function onTaskFinished(status, task) {
 export   function confirmStyled(title, message, okLabel = 'Confirm', isDanger = false) {
   return new Promise((resolve) => {
     const modal = el('action-confirm-modal');
-    el('action-confirm-title').textContent = title;
+    const titleEl = el('action-confirm-title');
+    titleEl.textContent = title;
+    titleEl.title = title;
     el('action-confirm-message').textContent = message || '';
     const okBtn = el('action-confirm-ok');
     okBtn.textContent = okLabel;

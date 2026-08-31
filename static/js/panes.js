@@ -47,7 +47,12 @@ export function renderPane(which) {
   const sel = paneSelection(which);
   const pathElId = which === 'pickerDest' ? 'transfer-picker-path' : `${which}-path`;
   const bodyElId = which === 'pickerDest' ? 'transfer-picker-body' : `${which}-body`;
-  el(pathElId).textContent = pane.path === null ? '(select a root)' : pane.path;
+  const pathEl = el(pathElId);
+  pathEl.textContent = pane.path === null ? '(select a root)' : pane.path;
+  pathEl.title = pane.path === null ? '' : pane.path;
+  requestAnimationFrame(() => {
+    pathEl.scrollLeft = pathEl.scrollWidth;
+  });
   const body = el(bodyElId);
   if (!body) return;
   const prevScrollTop = body.scrollTop;

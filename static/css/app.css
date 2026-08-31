@@ -197,9 +197,13 @@ input[type="text"], input[type="password"] {
   color: var(--text);
   font-family: ui-monospace, monospace;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis; /* Keeps long paths from pushing UI out of bounds */
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   opacity: 0.6;
+}
+.pane-path::-webkit-scrollbar {
+  display: none;
 }
 
 /* Mobile: stacked layout — label + actions on row 1, full-width path below */
@@ -228,6 +232,21 @@ input[type="text"], input[type="password"] {
     grid-column: 1 / span 2; /* Span both columns on the bottom row */
     grid-row: 2;
     font-size: 0.9em; /* Slightly smaller on mobile */
+  }
+
+  #transfer-picker-container .pane-header {
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto;
+  }
+
+  #transfer-picker-container .pane-path {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  #transfer-picker-container .pane-actions {
+    grid-column: 2;
+    grid-row: 1;
   }
 }
 
@@ -534,7 +553,15 @@ tr.task-row:hover { background: rgba(255, 255, 255, 0.05); }
   width: 420px;
   max-width: 90vw;
 }
-.modal h2 { margin-top: 0; font-size: 15px; }
+.modal h2 {
+  margin-top: 0;
+  font-size: 15px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
 .modal ul { max-height: 140px; overflow-y: auto; font-size: 13px; color: var(--text-dim); }
 .modal-radio-group {
   display: flex;

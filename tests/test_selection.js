@@ -1,20 +1,8 @@
 const assert = require('assert');
-const fs = require('fs');
-const path = require('path');
 
-// Extract the SelectionState and helper functions from static/js/app.js to ensure tests exercise the exact production implementation
-const appJsContent = fs.readFileSync(path.join(__dirname, '../static/js/app.js'), 'utf8');
-const scriptContext = `
-${appJsContent.replace(/^[\s\S]*?class SelectionState/, 'class SelectionState').replace(/\/\/ --- Toast notifications[\s\S]*$/, '')}
-module.exports = { SelectionState, normalizePath };
-`;
-
-// Evaluate in local scope
-const exportsObj = {};
-const moduleObj = { exports: exportsObj };
-const runFn = new Function('module', 'exports', scriptContext);
-runFn(moduleObj, exportsObj);
-const { SelectionState, normalizePath } = moduleObj.exports;
+(async () => {
+  const { SelectionState } = await import('../static/js/selection.js');
+  const { normalizePath } = await import('../static/js/utils.js');
 
 console.log('Running LiteSync Selection Model JavaScript Test Suite...');
 
@@ -224,3 +212,5 @@ console.log('Running LiteSync Selection Model JavaScript Test Suite...');
 })();
 
 console.log('\nAll JavaScript selection model unit tests passed successfully!');
+
+})();

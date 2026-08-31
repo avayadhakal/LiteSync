@@ -40,6 +40,10 @@ async def index_page(_user: str = Depends(get_current_user)):
     return FileResponse(STATIC_DIR / "index.html")
 
 
+@app.get("/favicon.ico")
+async def favicon():
+    return FileResponse(STATIC_DIR / "favicon.ico")
+
 @app.get("/")
 async def root(_user: str = Depends(get_current_user)):
     return FileResponse(STATIC_DIR / "index.html")

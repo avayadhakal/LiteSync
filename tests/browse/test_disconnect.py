@@ -13,7 +13,7 @@ def test_upload_overwrite_mid_stream_disconnect(temp_roots, test_client):
     async def mock_read(self, size=-1):
         raise ClientDisconnect()
 
-    with patch("app.routes_browse.UploadFile.read", new=mock_read):
+    with patch("app.browse.upload.UploadFile.read", new=mock_read):
         response = test_client.post(
             "/api/upload",
             data={"path": str(dest), "on_conflict": "overwrite"},

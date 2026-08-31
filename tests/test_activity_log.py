@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi import HTTPException
 
 from app.config import Settings, User
-from app.routes_browse import DeleteRequest, MkdirRequest, RenameRequest, create_folder, delete_entry, rename_entry
+from app.browse.routes import DeleteRequest, MkdirRequest, RenameRequest, create_folder, delete_entry, rename_entry
 from app.transfers import db, scheduler
 from app.transfers import engine_rsync, engine_kernel
 from app.transfers.routes import (
@@ -55,7 +55,7 @@ class TestActivityLogIntegration(unittest.TestCase):
         self.temp_dir.cleanup()
 
     def test_mkdir_creates_activity(self):
-        with patch("app.routes_browse.get_settings", return_value=self.settings):
+        with patch("app.browse.routes.get_settings", return_value=self.settings):
             req = MkdirRequest(path=str(self.dest_dir), name="NewFolder2026")
             res = asyncio.run(create_folder(req, _user="test_user"))
             self.assertTrue(res["success"])
@@ -74,7 +74,7 @@ class TestActivityLogIntegration(unittest.TestCase):
         target_file = self.dest_dir / "old_name.mkv"
         target_file.write_text("content")
 
-        with patch("app.routes_browse.get_settings", return_value=self.settings):
+        with patch("app.browse.routes.get_settings", return_value=self.settings):
             req = RenameRequest(path=str(target_file), new_name="new_name.mkv")
             res = asyncio.run(rename_entry(req, _user="test_user"))
             self.assertTrue(res["success"])
@@ -94,7 +94,7 @@ class TestActivityLogIntegration(unittest.TestCase):
         target_file = self.dest_dir / "temp_file.log"
         target_file.write_text("log content")
 
-        with patch("app.routes_browse.get_settings", return_value=self.settings):
+        with patch("app.browse.routes.get_settings", return_value=self.settings):
             req = DeleteRequest(path=str(target_file))
             res = asyncio.run(delete_entry(req, _user="test_user"))
             self.assertTrue(res["success"])

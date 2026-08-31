@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from app.auth import get_current_user
 from app.auth import router as auth_router
 from app.config import get_settings
-from app.routes_browse import router as browse_router
+from app.browse import router as browse_router
 from app.transfers import db
 from app.transfers.routes import router as tasks_router
 from app.transfers.scheduler import reconcile_on_startup, run_scheduler, shutdown_runner

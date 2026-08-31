@@ -15,7 +15,7 @@ from starlette.datastructures import FormData, Headers
 from starlette.requests import ClientDisconnect, Request
 
 from app.config import Settings, User
-from app.routes_browse import upload_files, validate_upload_filename
+from app.browse.upload import upload_files, validate_upload_filename
 from app.transfers import db
 
 
@@ -138,7 +138,7 @@ class TestFileUploadIntegration(unittest.TestCase):
             "files": upload_file,
         })
 
-        with patch("app.routes_browse.get_settings", return_value=self.settings):
+        with patch("app.browse.upload.get_settings", return_value=self.settings):
             res = asyncio.run(upload_files(req, _user="test_user"))
             self.assertTrue(res["success"])
             self.assertEqual(len(res["files"]), 1)
@@ -198,7 +198,7 @@ class TestFileUploadIntegration(unittest.TestCase):
         # Measure RSS before and after
         rss_before = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
 
-        with patch("app.routes_browse.get_settings", return_value=self.settings), \
+        with patch("app.browse.upload.get_settings", return_value=self.settings), \
              patch("builtins.open", side_effect=tracking_open):
             res = asyncio.run(upload_files(req, _user="test_user"))
             self.assertTrue(res["success"])
@@ -224,7 +224,7 @@ class TestFileUploadIntegration(unittest.TestCase):
             "files": upload_file,
         })
 
-        with patch("app.routes_browse.get_settings", return_value=self.settings):
+        with patch("app.browse.upload.get_settings", return_value=self.settings):
             with self.assertRaises(HTTPException) as ctx:
                 asyncio.run(upload_files(req, _user="test_user"))
             self.assertEqual(ctx.exception.status_code, 403)
@@ -244,7 +244,7 @@ class TestFileUploadIntegration(unittest.TestCase):
             "files": upload_file,
         })
 
-        with patch("app.routes_browse.get_settings", return_value=self.settings):
+        with patch("app.browse.upload.get_settings", return_value=self.settings):
             with self.assertRaises(HTTPException) as ctx:
                 asyncio.run(upload_files(req, _user="test_user"))
             self.assertEqual(ctx.exception.status_code, 400)
@@ -274,7 +274,7 @@ class TestFileUploadIntegration(unittest.TestCase):
             "files": upload_file,
         })
 
-        with patch("app.routes_browse.get_settings", return_value=self.settings):
+        with patch("app.browse.upload.get_settings", return_value=self.settings):
             with self.assertRaises(HTTPException) as ctx:
                 asyncio.run(upload_files(req, _user="test_user"))
             self.assertEqual(ctx.exception.status_code, 400)
@@ -299,7 +299,7 @@ class TestFileUploadIntegration(unittest.TestCase):
         """Client disconnect during form resolution: silent abandonment, no activity log, no temp file."""
         req = make_mock_request(exc_on_form=ClientDisconnect())
 
-        with patch("app.routes_browse.get_settings", return_value=self.settings):
+        with patch("app.browse.upload.get_settings", return_value=self.settings):
             res = asyncio.run(upload_files(req, _user="test_user"))
             self.assertEqual(res.status_code, 499)
 
@@ -326,7 +326,7 @@ class TestFileUploadIntegration(unittest.TestCase):
             "files": uf,
         })
 
-        with patch("app.routes_browse.get_settings", return_value=self.settings):
+        with patch("app.browse.upload.get_settings", return_value=self.settings):
             res = asyncio.run(upload_files(req, _user="test_user"))
             self.assertEqual(res.status_code, 499)
 
@@ -362,7 +362,7 @@ class TestFileUploadIntegration(unittest.TestCase):
             "files": upload_file,
         })
 
-        with patch("app.routes_browse.get_settings", return_value=settings_small_limit):
+        with patch("app.browse.upload.get_settings", return_value=settings_small_limit):
             with self.assertRaises(HTTPException) as ctx:
                 asyncio.run(upload_files(req, _user="test_user"))
             self.assertEqual(ctx.exception.status_code, 413)
@@ -412,7 +412,7 @@ class TestFileUploadIntegration(unittest.TestCase):
             "files": upload_file,
         })
 
-        with patch("app.routes_browse.get_settings", return_value=settings_small_limit):
+        with patch("app.browse.upload.get_settings", return_value=settings_small_limit):
             with self.assertRaises(HTTPException) as ctx:
                 asyncio.run(upload_files(req, _user="test_user"))
             self.assertEqual(ctx.exception.status_code, 413)
@@ -444,7 +444,7 @@ class TestFileUploadIntegration(unittest.TestCase):
             "files": upload_file,
         })
 
-        with patch("app.routes_browse.get_settings", return_value=self.settings):
+        with patch("app.browse.upload.get_settings", return_value=self.settings):
             res = asyncio.run(upload_files(req, _user="test_user"))
             self.assertTrue(res["success"])
 
@@ -464,7 +464,7 @@ class TestFileUploadIntegration(unittest.TestCase):
             "files": [f1, f2, f3],
         })
 
-        with patch("app.routes_browse.get_settings", return_value=self.settings):
+        with patch("app.browse.upload.get_settings", return_value=self.settings):
             res = asyncio.run(upload_files(req, _user="test_user"))
             self.assertTrue(res["success"])
             self.assertEqual(len(res["files"]), 3)

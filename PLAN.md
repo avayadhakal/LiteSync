@@ -18,7 +18,10 @@ Minimal-overhead Raspberry Pi web app for dual-pane local directory browsing and
 │   ├── config.py             # Loads config.toml -> Settings object via tomllib (max_upload_size_mb)
 │   ├── auth.py               # bcrypt password hashing, signed cookies, login/lockout logic
 │   ├── fsops.py              # resolve_safe_path(), list_directory() — path validation
-│   ├── routes_browse.py      # /api/roots, /api/browse, /api/mkdir | rename | delete, /api/download, /api/upload
+│   ├── browse/
+│   │   ├── routes.py         # /api/roots, /api/browse, /api/mkdir | rename | delete
+│   │   ├── download.py       # /api/download
+│   │   └── upload.py         # /api/upload
 │   └── tasks/
 │       ├── __init__.py
 │       ├── db.py             # sqlite3 wrapper (init, CRUD, next_queued_task, activity log)

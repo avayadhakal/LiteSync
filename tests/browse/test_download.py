@@ -11,7 +11,7 @@ from urllib.parse import parse_qs, quote, urlparse
 from app.auth import create_session_cookie
 from app.config import Settings, User, get_download_signing_key, load_settings
 from app.main import app
-from app.routes_browse import compute_download_signature, verify_download_signature
+from app.browse.download import compute_download_signature, verify_download_signature
 
 
 async def make_request(

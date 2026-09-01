@@ -195,11 +195,7 @@ export async function openConfirmModal() {
     
     let targetPath = localStorage.getItem('litesync-last-destination');
     if (!targetPath) targetPath = null;
-    try {
-      await loadPane('pickerDest', targetPath, false, false);
-    } catch (e) {
-      await loadPane('pickerDest', null);
-    }
+    await loadPane('pickerDest', targetPath, false, false);
     el('confirm-ok').disabled = state.pickerDest.path === null;
   } else {
     el('transfer-static-dest-view').classList.remove('hidden');

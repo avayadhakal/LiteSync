@@ -27,10 +27,21 @@ export async function loadPane(which, path, forceRefresh = false, fallbackToPare
         // a listing of a path that no longer exists.
         const parent = normalizePath(fetchPath).replace(/\/[^/]+$/, '') || '/';
         if (parent !== normalizePath(fetchPath)) {
-          await loadPane(which, parent, true, true);
-          return;
+          try {
+            await loadPane(which, parent, true, true);
+            return;
+          } catch (e) {
+            // Let it fall through if the parent also doesn't exist
+          }
         }
       }
+      
+      if (which === 'pickerDest') {
+        localStorage.removeItem('litesync-last-destination');
+        await loadPane(which, null, false, false);
+        return;
+      }
+      
       throw err;
     }
   }

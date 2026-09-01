@@ -21,3 +21,4 @@ All notable changes to this project will be documented in this file.
 - **Mobile UX:** Streamlined vertical padding and element alignment within the mobile transfer dialog.
 - **Modals:** Improved text visibility and wrapping for long file paths and filenames in transfer and cancellation dialogs, including native hover tooltips.
 - **Transfer Picker:** Simplified the destination browser UI by dynamically hiding non-essential metadata (dates, sizes), eliminating truncation and maximizing real estate for long folder names.
+- **Destination Picker Fallback & Stability:** Automatically fallback to root and clear stale stored destinations on 404 errors when opening the destination picker; improved missing parent directory handling to prevent unhandled promise rejections.

@@ -38,7 +38,6 @@
   <div class="panes">
     <section class="pane" id="source-pane">
       <div class="pane-header">
-        <input type="checkbox" class="pane-master-cb" id="source-master-cb" data-pane="source" title="Select All" />
         <span class="pane-label">Source</span>
         <span class="pane-path" id="source-path"></span>
         <div class="pane-actions">
@@ -48,12 +47,19 @@
           <button class="icon-btn danger" data-pane-action="delete" data-pane="source" title="Delete">🗑️</button>
         </div>
       </div>
+      <div class="pane-column-header">
+        <input type="checkbox" class="pane-master-cb" id="source-master-cb" data-pane="source" title="Select All" aria-label="Select All" />
+        <span class="col-icon-spacer" aria-hidden="true"></span>
+        <button class="col-name sortable" data-sort="name" data-pane="source">Name <span class="sort-icon"></span></button>
+        <button class="col-mtime sortable" data-sort="mtime" data-pane="source">Modified <span class="sort-icon"></span></button>
+        <button class="col-size sortable" data-sort="size" data-pane="source">Size <span class="sort-icon"></span></button>
+        <button class="icon-btn btn-copy-path invisible-spacer" disabled style="visibility: hidden;" tabindex="-1" aria-hidden="true">📋</button>
+      </div>
       <div class="pane-body" id="source-body"></div>
     </section>
     <div id="vertical-splitter" class="splitter-v"></div>
     <section class="pane" id="dest-pane">
       <div class="pane-header">
-        <input type="checkbox" class="pane-master-cb" id="dest-master-cb" data-pane="dest" title="Select All" />
         <span class="pane-label">Destination</span>
         <span class="pane-path" id="dest-path"></span>
         <div class="pane-actions">
@@ -62,6 +68,14 @@
           <button class="icon-btn" data-pane-action="rename" data-pane="dest" title="Rename">✏️</button>
           <button class="icon-btn danger" data-pane-action="delete" data-pane="dest" title="Delete">🗑️</button>
         </div>
+      </div>
+      <div class="pane-column-header">
+        <input type="checkbox" class="pane-master-cb" id="dest-master-cb" data-pane="dest" title="Select All" aria-label="Select All" />
+        <span class="col-icon-spacer" aria-hidden="true"></span>
+        <button class="col-name sortable" data-sort="name" data-pane="dest">Name <span class="sort-icon"></span></button>
+        <button class="col-mtime sortable" data-sort="mtime" data-pane="dest">Modified <span class="sort-icon"></span></button>
+        <button class="col-size sortable" data-sort="size" data-pane="dest">Size <span class="sort-icon"></span></button>
+        <button class="icon-btn btn-copy-path invisible-spacer" disabled style="visibility: hidden;" tabindex="-1" aria-hidden="true">📋</button>
       </div>
       <div class="pane-body" id="dest-body"></div>
     </section>

@@ -1,9 +1,9 @@
 import { api, copyDownloadLink, attachLongPress } from './api.js';
-import { el, formatSize, escapeHtml } from './utils.js';
+import { el, formatSize, formatMtime, escapeHtml, normalizePath } from './utils.js';
 import { state } from './state.js';
 import { openItemDetailsModal } from './modals/item-details.js';
 
-export async function loadPane(which, path, forceRefresh = false) {
+export async function loadPane(which, path, forceRefresh = false, fallbackToParent = true) {
   const pane = state[which];
   if (path === null) {
     pane.path = null;
@@ -21,13 +21,15 @@ export async function loadPane(which, path, forceRefresh = false) {
       pane.entries = data.entries;
       pane.parent = data.parent;
     } catch (err) {
-      // The current directory itself may have just been moved/deleted by a
-      // completed transfer: fall back to its parent so the pane never shows
-      // a listing of a path that no longer exists.
-      const parent = normalizePath(fetchPath).replace(/\/[^/]+$/, '') || '/';
-      if (parent !== normalizePath(fetchPath)) {
-        await loadPane(which, parent, true);
-        return;
+      if (fallbackToParent) {
+        // The current directory itself may have just been moved/deleted by a
+        // completed transfer: fall back to its parent so the pane never shows
+        // a listing of a path that no longer exists.
+        const parent = normalizePath(fetchPath).replace(/\/[^/]+$/, '') || '/';
+        if (parent !== normalizePath(fetchPath)) {
+          await loadPane(which, parent, true, true);
+          return;
+        }
       }
       throw err;
     }
@@ -40,6 +42,28 @@ export async function loadPane(which, path, forceRefresh = false) {
   if (typeof updateTransferMethodUI === 'function' && el('confirm-modal') && !el('confirm-modal').classList.contains('hidden')) {
     updateTransferMethodUI();
   }
+}
+
+export function sortPaneEntries(which) {
+  const pane = state[which];
+  const sortState = state.sort[which];
+  if (!pane.entries || !sortState) return;
+
+  pane.entries.sort((a, b) => {
+    if (a.is_dir !== b.is_dir) {
+      return a.is_dir ? -1 : 1; // Folders always on top
+    }
+    
+    let cmp = 0;
+    if (sortState.col === 'name') {
+      cmp = a.name.localeCompare(b.name);
+    } else if (sortState.col === 'mtime') {
+      cmp = (a.mtime || 0) - (b.mtime || 0);
+    } else if (sortState.col === 'size') {
+      cmp = (a.size || 0) - (b.size || 0);
+    }
+    return sortState.dir === 'asc' ? cmp : -cmp;
+  });
 }
 
 export function renderPane(which) {
@@ -57,6 +81,22 @@ export function renderPane(which) {
   if (!body) return;
   const prevScrollTop = body.scrollTop;
   body.innerHTML = '';
+
+  sortPaneEntries(which);
+
+  // Update sort icons
+  const sortState = state.sort[which];
+  if (sortState) {
+    document.querySelectorAll(`.pane-column-header button[data-pane="${which}"]`).forEach(btn => {
+      const icon = btn.querySelector('.sort-icon');
+      if (!icon) return;
+      if (btn.getAttribute('data-sort') === sortState.col) {
+        icon.textContent = sortState.dir === 'asc' ? '▲' : '▼';
+      } else {
+        icon.textContent = '';
+      }
+    });
+  }
 
   if (which === 'pickerDest') {
     const okBtn = el('confirm-ok');
@@ -141,12 +181,19 @@ export function renderPane(which) {
     name.title = entry.name;
     row.appendChild(name);
 
-    if (!entry.is_dir) {
-      const size = document.createElement('span');
-      size.className = 'size';
-      size.textContent = formatSize(entry.size);
-      row.appendChild(size);
+    const mtime = document.createElement('span');
+    mtime.className = 'mtime';
+    mtime.textContent = formatMtime(entry.mtime);
+    row.appendChild(mtime);
 
+    const size = document.createElement('span');
+    size.className = 'size';
+    if (!entry.is_dir) {
+      size.textContent = formatSize(entry.size);
+    }
+    row.appendChild(size);
+
+    if (!entry.is_dir) {
       const copyBtn = document.createElement('button');
       copyBtn.className = 'icon-btn btn-copy-path';
       copyBtn.innerHTML = '📋';
@@ -164,6 +211,11 @@ export function renderPane(which) {
         }
       });
       row.appendChild(copyBtn);
+    } else {
+      const copyBtnSpacer = document.createElement('span');
+      copyBtnSpacer.className = 'icon-btn btn-copy-path invisible-spacer';
+      copyBtnSpacer.style.visibility = 'hidden';
+      row.appendChild(copyBtnSpacer);
     }
 
     row.title = entry.path;

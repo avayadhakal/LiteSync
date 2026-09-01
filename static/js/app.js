@@ -196,7 +196,7 @@ export async function openConfirmModal() {
     let targetPath = localStorage.getItem('litesync-last-destination');
     if (!targetPath) targetPath = null;
     try {
-      await loadPane('pickerDest', targetPath);
+      await loadPane('pickerDest', targetPath, false, false);
     } catch (e) {
       await loadPane('pickerDest', null);
     }
@@ -629,6 +629,21 @@ async function init() {
       if (typeof updateTransferMethodUI === 'function' && el('confirm-modal') && !el('confirm-modal').classList.contains('hidden')) {
         updateTransferMethodUI();
       }
+    });
+  });
+
+  document.querySelectorAll('.pane-column-header button.sortable').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const pane = e.currentTarget.getAttribute('data-pane');
+      const col = e.currentTarget.getAttribute('data-sort');
+      const sortState = state.sort[pane];
+      if (sortState.col === col) {
+        sortState.dir = sortState.dir === 'asc' ? 'desc' : 'asc';
+      } else {
+        sortState.col = col;
+        sortState.dir = 'asc';
+      }
+      renderPane(pane);
     });
   });
 

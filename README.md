@@ -49,6 +49,7 @@
 * **Direct-to-Disk Streamed Uploads:** Browser uploads are streamed to disk to prevent large files from exhausting system RAM.
 * **Smart Conflict Resolution:** Pre-flight modal resolution explicitly handles name collisions with `Skip`, `Keep Both` (sequential append like `_1`, `_2`), or `Replace`.
 * **Contextual Exclusion Rules:** Exclude subfolders visually, with automatic `rsync` fallback enforcement.
+* **Interactive File Sorting:** Native in-memory array sorting for Name, Modified, and Size columns, completely preserving selection states during pivots.
 * **Same-Filesystem Moves:** Moves on the same filesystem use atomic `os.rename()` instead of invoking either transfer engine.
 * **Real-Time Progress:** Transfers and uploads expose progress information through the web interface.
 * **Persistent Task History:** Transfer task state and activity information are stored in SQLite so task history survives application restarts.

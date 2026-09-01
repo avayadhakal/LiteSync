@@ -186,3 +186,6 @@ CREATE INDEX idx_activity_created ON activity(created_at DESC);
   * Copies a signed download URL directly to the clipboard.
 * **Hierarchical Selection Cascading & Pruning (`SelectionModel`):**
   * Recursive selection model supports arbitrary sub-item exclusions and re-inclusions without filesystem walks.
+* **File Sorting & Layout Engine:**
+  * Uses a 2-tier header structure (`.pane-column-header`) matching the underlying flex dimensions of `.entry` rows. Invisible structural spacers ensure pixel-perfect column alignment across directories (which lack size/copy metrics) and files.
+  * In-memory `Array.prototype.sort()` logic re-evaluates the array instantly on column header clicks (`name`, `mtime`, `size`), preserving existing selections since `SelectionState` binds to absolute path identities rather than array indices.

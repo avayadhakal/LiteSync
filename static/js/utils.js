@@ -9,6 +9,13 @@ export function formatSize(bytes) {
   return `${v.toFixed(1)} ${units[i]}`;
 }
 
+export function formatMtime(unixSeconds) {
+  if (!unixSeconds) return '';
+  const d = new Date(unixSeconds * 1000);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export function escapeHtml(s) {
   return String(s)
     .replace(/&/g, '&amp;')

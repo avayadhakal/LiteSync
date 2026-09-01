@@ -14,5 +14,10 @@ export const state = {
   singlePane: (typeof localStorage !== 'undefined' ? localStorage.getItem('litesync-dual-pane') : null) !== 'true',
   pickerDest: { path: null, entries: [] },
   pickerDestSelection: new SelectionState(), // Selection object for modal picker, just to keep renderPane happy
+  sort: {
+    source: { col: 'name', dir: 'asc' },
+    dest: { col: 'name', dir: 'asc' },
+    pickerDest: { col: 'name', dir: 'asc' }
+  }
 };
 

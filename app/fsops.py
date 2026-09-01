@@ -25,6 +25,8 @@ def resolve_safe_path(requested: str, allowed_roots: list[Path]) -> Path:
 
 
 def list_directory(path: Path, allowed_roots: list[Path]) -> list[dict]:
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Path does not exist")
     if not path.is_dir():
         raise HTTPException(status_code=400, detail="Not a directory")
 

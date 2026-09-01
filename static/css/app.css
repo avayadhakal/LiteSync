@@ -168,9 +168,73 @@ input[type="text"], input[type="password"] {
   white-space: nowrap;
 }
 
-.pane-header .pane-master-cb {
+.pane-column-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 16px;
+  min-height: 38px;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  font-weight: 600;
   flex: none;
-  margin-left: 0 !important; /* Force override user-agent margins for pixel-perfect alignment */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.pane-column-header .col-icon-spacer {
+  width: 24px;
+  flex: none;
+}
+
+.pane-column-header .col-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pane-column-header button.sortable {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.pane-column-header button.sortable:hover {
+  color: var(--text);
+}
+.pane-column-header .col-size {
+  justify-content: flex-end;
+}
+
+.entry .mtime, .pane-column-header .col-mtime {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-dim);
+}
+.entry .size, .pane-column-header .col-size {
+  width: 70px;
+  flex: none;
+  text-align: right;
+}
+
+@media (max-width: 1024px) {
+  .entry .mtime,
+  .pane-column-header .col-mtime {
+    display: none !important;
+  }
 }
 
 .pane-header .pane-label {
@@ -275,6 +339,14 @@ input[type="text"], input[type="password"] {
 }
 .entry .size { color: var(--text-dim); font-size: 12px; opacity: 0.6; }
 
+@media (max-width: 768px) {
+  .entry .size,
+  .pane-column-header .col-size {
+    display: none !important;
+  }
+}
+
+
 .btn-copy-path {
   opacity: 0.6;
   font-size: 15px;
@@ -297,7 +369,7 @@ input[type="text"], input[type="password"] {
    Custom-rendered so the indeterminate state shows a white dash inside the standard
    blue-accented box instead of the browser's jarring yellow warning style. */
 .entry input[type="checkbox"],
-.pane-header .pane-master-cb {
+.pane-column-header .pane-master-cb {
   appearance: none;
   -webkit-appearance: none;
   width: 23px;
@@ -312,17 +384,17 @@ input[type="text"], input[type="password"] {
   transition: background 0.12s, border-color 0.12s;
 }
 .entry input[type="checkbox"]:hover,
-.pane-header .pane-master-cb:hover { border-color: var(--accent); }
+.pane-column-header .pane-master-cb:hover { border-color: var(--accent); }
 .entry input[type="checkbox"]:checked,
-.pane-header .pane-master-cb:checked,
+.pane-column-header .pane-master-cb:checked,
 .entry input[type="checkbox"]:indeterminate,
-.pane-header .pane-master-cb:indeterminate {
+.pane-column-header .pane-master-cb:indeterminate {
   background: var(--accent);
   border-color: var(--accent);
 }
 /* White dash for the partially-selected (indeterminate) state. */
 .entry input[type="checkbox"]:indeterminate::after,
-.pane-header .pane-master-cb:indeterminate::after {
+.pane-column-header .pane-master-cb:indeterminate::after {
   content: "";
   position: absolute;
   left: 4px;
@@ -335,7 +407,7 @@ input[type="text"], input[type="password"] {
 }
 /* White check mark for the fully-selected state. */
 .entry input[type="checkbox"]:checked::after,
-.pane-header .pane-master-cb:checked::after {
+.pane-column-header .pane-master-cb:checked::after {
   content: "";
   position: absolute;
   left: 7px;

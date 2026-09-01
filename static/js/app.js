@@ -609,6 +609,29 @@ async function init() {
     });
   });
 
+  document.querySelectorAll('.pane-master-cb').forEach(cb => {
+    cb.addEventListener('click', (e) => {
+      const pane = e.target.getAttribute('data-pane');
+      const sel = paneSelection(pane);
+      const isChecked = e.target.checked;
+      const paneState = state[pane];
+      
+      if (!paneState || !paneState.entries) return;
+
+      if (isChecked) {
+        paneState.entries.forEach(entry => sel.select(entry.path));
+      } else {
+        paneState.entries.forEach(entry => sel.unselect(entry.path));
+      }
+      
+      renderPane(pane);
+      updateSelectionUI();
+      if (typeof updateTransferMethodUI === 'function' && el('confirm-modal') && !el('confirm-modal').classList.contains('hidden')) {
+        updateTransferMethodUI();
+      }
+    });
+  });
+
   const fileInput = el('upload-file-input');
   if (fileInput) {
     fileInput.addEventListener('change', () => {

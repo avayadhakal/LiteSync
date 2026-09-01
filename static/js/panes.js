@@ -63,6 +63,39 @@ export function renderPane(which) {
     if (okBtn) okBtn.disabled = pane.path === null;
   }
 
+  const masterCb = el(`${which}-master-cb`);
+  if (masterCb && pane.entries) {
+    const total = pane.entries.length;
+    let selectedCount = 0;
+    let indeterminateCount = 0;
+
+    for (const entry of pane.entries) {
+      if (sel.isPathSelected(entry.path)) {
+        selectedCount++;
+      } else if (sel.isPathIndeterminate(entry.path)) {
+        indeterminateCount++;
+      }
+    }
+
+    if (total === 0) {
+      masterCb.checked = false;
+      masterCb.indeterminate = false;
+      masterCb.disabled = true;
+    } else {
+      masterCb.disabled = false;
+      if (selectedCount === total) {
+        masterCb.checked = true;
+        masterCb.indeterminate = false;
+      } else if (selectedCount > 0 || indeterminateCount > 0) {
+        masterCb.checked = false;
+        masterCb.indeterminate = true;
+      } else {
+        masterCb.checked = false;
+        masterCb.indeterminate = false;
+      }
+    }
+  }
+
   if (pane.path !== null) {
     const up = document.createElement('div');
     up.className = 'entry parent';

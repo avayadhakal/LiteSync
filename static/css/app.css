@@ -450,7 +450,7 @@ input[type="text"], input[type="password"] {
 }
 .entry.dir .name::before { content: "📁 "; }
 .entry:not(.dir) .name::before { content: "📄 "; }
-.entry.parent .name::before { content: "⬆️ "; }
+.entry.parent .name::before { content: "⬅️ "; }
 
 /* Isolate and align the back navigation row */
 .entry.parent {

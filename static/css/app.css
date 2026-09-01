@@ -306,6 +306,19 @@ input[type="text"], input[type="password"] {
   }
 }
 
+/* Simplify transfer destination picker by hiding all non-name metadata */
+#transfer-picker-body .mtime,
+#transfer-picker-body .size,
+#transfer-picker-body .btn-copy-path,
+#transfer-picker-body input[type="checkbox"] {
+  display: none !important;
+}
+
+/* Because checkboxes are hidden, reset the artificial indentation on the parent navigation row */
+#transfer-picker-body .entry.parent {
+  padding-left: 16px !important;
+}
+
 .pane-body { flex: 1; overflow-y: auto; }
 
 .entry {

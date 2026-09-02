@@ -16,6 +16,7 @@ All notable changes to this project will be documented in this file.
 - **Interactive File Sorting:** Implemented 2-tier column headers supporting instant ascending/descending sorts for Name, Modified, and Size with dynamic responsive layouts.
 
 ### Fixed
+- **Transfer Queue UI Transitions:** Resolved an issue where queued operations failed to dynamically render active controls upon state shifts.
 - **UI & State:** Resolved action button visibility loss when toggling pause/resume on active transfers.
 - **Uploads:** Automated cleanup of completed upload toast notifications.
 - **Mobile UX:** Streamlined vertical padding and element alignment within the mobile transfer dialog.

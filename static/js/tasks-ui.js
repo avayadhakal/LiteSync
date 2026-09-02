@@ -26,6 +26,145 @@ export function pruneCompletedSelection(task) {
   return changed;
 }
 
+function renderCardControlsHtml(task) {
+  const isRunning = task.status === 'running';
+  const isPaused = task.status === 'paused';
+  const isQueued = task.status === 'queued';
+  const streamData = activeStreams.get(task.task_id);
+  const currentPct = streamData ? streamData.pct : 0;
+
+  let statusBadge = '';
+  if (isQueued) {
+    statusBadge = `<span id="status-badge-${task.task_id}" class="badge-status-queued" style="color: #94a3b8; font-size: 12px; font-weight: 600; margin-right: 6px;">Queued</span>`;
+  } else if (isPaused) {
+    statusBadge = `<span id="status-badge-${task.task_id}" class="badge-status-paused" style="color: #f59e0b; font-size: 12px; font-weight: 600; margin-right: 6px;">Paused</span>`;
+  } else {
+    statusBadge = `<span id="status-badge-${task.task_id}" class="badge-status-running hidden"></span>`;
+  }
+
+  let actionBtns = '';
+  if (isRunning && task.use_rsync) {
+    actionBtns += `<button class="btn-sm btn-secondary pause-btn" data-id="${task.task_id}" style="margin-right: 8px;">Pause</button>`;
+  } else if (isPaused) {
+    actionBtns += `<button class="btn-sm btn-primary resume-btn" data-id="${task.task_id}" style="margin-right: 8px;">Resume</button>`;
+  }
+  actionBtns += `<button class="btn-sm btn-danger cancel-btn" data-id="${task.task_id}">Cancel</button>`;
+
+  return `
+    <div id="progress-text-${task.task_id}" style="color: #94a3b8; font-size: 13px; font-weight: 600; margin-right: 12px; display: flex; align-items: center;">
+      ${statusBadge}
+      <span id="progress-pct-${task.task_id}">${currentPct}%</span>
+    </div>
+    <div id="card-actions-${task.task_id}" style="display: flex; align-items: center;">
+      ${actionBtns}
+    </div>
+  `;
+}
+
+function bindCardEventListeners(task, card) {
+  const pauseBtn = card.querySelector('.pause-btn');
+  if (pauseBtn) {
+    pauseBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      pauseBtn.disabled = true;
+      pauseBtn.textContent = 'Pausing...';
+      try {
+        await api(`/api/tasks/${task.task_id}/pause`, { method: 'POST' });
+        task.status = 'paused';
+        updateCardControlsInPlace(task);
+        await loadHistory();
+      } catch (err) {
+        pauseBtn.disabled = false;
+        pauseBtn.textContent = 'Pause';
+        toastError(`Failed to pause task: ${err.message}`);
+      }
+    });
+  }
+
+  const resumeBtn = card.querySelector('.resume-btn');
+  if (resumeBtn) {
+    resumeBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      resumeBtn.disabled = true;
+      resumeBtn.textContent = 'Resuming...';
+      try {
+        await api(`/api/tasks/${task.task_id}/resume`, { method: 'POST' });
+
+        // The backend puts it in 'queued' state briefly. Poll until it runs.
+        let currentStatus = 'queued';
+        while (currentStatus === 'queued') {
+          await new Promise((r) => setTimeout(r, 500));
+          const fresh = await api(`/api/tasks/${task.task_id}`);
+          currentStatus = fresh.status;
+        }
+
+        if (currentStatus === 'running') {
+          task.status = 'running';
+          updateCardControlsInPlace(task);
+          await loadHistory();
+        } else {
+          resumeBtn.disabled = false;
+          resumeBtn.textContent = 'Resume';
+        }
+      } catch (err) {
+        resumeBtn.disabled = false;
+        resumeBtn.textContent = 'Resume';
+        toastError(`Failed to resume task: ${err.message}`);
+      }
+    });
+  }
+
+  const cancelBtn = card.querySelector('.cancel-btn');
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const title = getPrimaryTitle(task.source || task.sources);
+      const ok = await confirmStyled(
+        `Cancel transfer: ${title}?`,
+        'The active transfer will be stopped.',
+        'Cancel Transfer',
+        true
+      );
+      if (!ok) return;
+      if (activeStreams.has(task.task_id)) {
+        activeStreams.get(task.task_id).source.close();
+        activeStreams.delete(task.task_id);
+      }
+      try {
+        await api(`/api/tasks/${task.task_id}/cancel`, { method: 'POST' });
+        await onTaskFinished('interrupted', task);
+      } catch (err) {
+        toastError(`Failed to cancel task: ${err.message}`);
+      }
+    });
+  }
+}
+
+export function updateCardControlsInPlace(task) {
+  const card = el(`card-${task.task_id}`);
+  if (!card) return;
+
+  const topControls = el(`top-controls-${task.task_id}`);
+  if (topControls) {
+    topControls.innerHTML = renderCardControlsHtml(task);
+    bindCardEventListeners(task, card);
+  }
+
+  const detailEl = el(`progress-detail-${task.task_id}`);
+  if (detailEl) {
+    const streamData = activeStreams.get(task.task_id);
+    if (task.status === 'paused') {
+      detailEl.textContent = 'Paused';
+    } else if (task.status === 'queued') {
+      detailEl.textContent = 'Queued...';
+    } else if (streamData && streamData.currentFile) {
+      detailEl.textContent = `Copying: ${streamData.currentFile}`;
+    } else {
+      detailEl.textContent = 'Starting transfer...';
+    }
+  }
+}
+
 export function renderActiveTransfers() {
   if (state.historyTab !== 'active') return;
   const activeContainer = el('active-transfers-container');
@@ -80,13 +219,8 @@ export function renderActiveTransfers() {
     card.innerHTML = `
       <div class="card-top" style="display: flex; justify-content: space-between; align-items: center;">
         <span class="card-title" title="${escapeHtml(primaryTitle)}">${escapeHtml(primaryTitle)}</span>
-        <div style="display: flex; align-items: center;">
-          <div id="progress-text-${task.task_id}" style="color: #94a3b8; font-size: 13px; font-weight: 600; margin-right: 12px;">
-            ${currentPct}%
-          </div>
-          ${task.status === 'running' && task.use_rsync ? `<button class="btn-sm btn-secondary pause-btn" data-id="${task.task_id}" style="margin-right: 8px;">Pause</button>` : ''}
-          ${task.status === 'paused' ? `<button class="btn-sm btn-primary resume-btn" data-id="${task.task_id}" style="margin-right: 8px;">Resume</button>` : ''}
-          <button class="btn-sm btn-danger cancel-btn" data-id="${task.task_id}">Cancel</button>
+        <div id="top-controls-${task.task_id}" style="display: flex; align-items: center;">
+          ${renderCardControlsHtml(task)}
         </div>
       </div>
       <div class="card-path truncate" title="${escapeHtml(sourceText)} ➔ ${escapeHtml(task.destination)}">
@@ -100,80 +234,7 @@ export function renderActiveTransfers() {
       </div>
     `;
 
-    const pauseBtn = card.querySelector('.pause-btn');
-    if (pauseBtn) {
-      pauseBtn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        pauseBtn.disabled = true;
-        pauseBtn.textContent = 'Pausing...';
-        try {
-          await api(`/api/tasks/${task.task_id}/pause`, { method: 'POST' });
-          task.status = 'paused';
-          renderActiveTransfers();
-        } catch (err) {
-          pauseBtn.disabled = false;
-          pauseBtn.textContent = 'Pause';
-          toastError(`Failed to pause task: ${err.message}`);
-        }
-      });
-    }
-
-    const resumeBtn = card.querySelector('.resume-btn');
-    if (resumeBtn) {
-      resumeBtn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        resumeBtn.disabled = true;
-        resumeBtn.textContent = 'Resuming...';
-        try {
-          await api(`/api/tasks/${task.task_id}/resume`, { method: 'POST' });
-          
-          // The backend puts it in 'queued' state briefly. Poll until it runs.
-          let currentStatus = 'queued';
-          while (currentStatus === 'queued') {
-            await new Promise(r => setTimeout(r, 500));
-            const fresh = await api(`/api/tasks/${task.task_id}`);
-            currentStatus = fresh.status;
-          }
-          
-          if (currentStatus === 'running') {
-            task.status = 'running';
-            renderActiveTransfers();
-          } else {
-            resumeBtn.disabled = false;
-            resumeBtn.textContent = 'Resume';
-          }
-        } catch (err) {
-          resumeBtn.disabled = false;
-          resumeBtn.textContent = 'Resume';
-          toastError(`Failed to resume task: ${err.message}`);
-        }
-      });
-    }
-
-    const cancelBtn = card.querySelector('.cancel-btn');
-    if (cancelBtn) {
-      cancelBtn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        const title = getPrimaryTitle(task.source || task.sources);
-        const ok = await confirmStyled(
-          `Cancel transfer: ${title}?`,
-          'The active transfer will be stopped.',
-          'Cancel Transfer',
-          true
-        );
-        if (!ok) return;
-        if (activeStreams.has(task.task_id)) {
-          activeStreams.get(task.task_id).source.close();
-          activeStreams.delete(task.task_id);
-        }
-        try {
-          await api(`/api/tasks/${task.task_id}/cancel`, { method: 'POST' });
-          await onTaskFinished('interrupted', task);
-        } catch (err) {
-          toastError(`Failed to cancel task: ${err.message}`);
-        }
-      });
-    }
+    bindCardEventListeners(task, card);
 
     activeContainer.appendChild(card);
 
@@ -201,7 +262,7 @@ export function attachTaskStream(task) {
     if (!trimmed) return;
 
     const fillEl = el(`progress-fill-${taskId}`);
-    const textEl = el(`progress-text-${taskId}`);
+    const pctEl = el(`progress-pct-${taskId}`);
     const detailEl = el(`progress-detail-${taskId}`);
 
     // Check if line contains rsync progress percentage
@@ -212,7 +273,7 @@ export function attachTaskStream(task) {
       if (!isNaN(pct)) {
         streamData.pct = pct;
         if (fillEl) fillEl.style.width = `${pct}%`;
-        if (textEl) textEl.textContent = `${pct}%`;
+        if (pctEl) pctEl.textContent = `${pct}%`;
         if (detailEl) {
           detailEl.textContent = streamData.currentFile
             ? `Copying: ${streamData.currentFile}`
@@ -240,19 +301,24 @@ export function attachTaskStream(task) {
   };
 
   source.addEventListener('status', (e) => {
-    source.close();
-    activeStreams.delete(taskId);
-
     let status = null;
     try {
       status = JSON.parse(e.data).status;
     } catch (_err) {
-      // Malformed payload: still treat the stream as finished below.
+      // Malformed payload
     }
 
-    // Task reached a terminal state ('succeeded' | 'failed' | 'interrupted'):
-    // prune stale selections, auto-remove the card, refresh both panes.
-    onTaskFinished(status, task).catch((err) => console.error('Post-task refresh failed:', err));
+    if (TERMINAL_STATUSES.has(status)) {
+      source.close();
+      activeStreams.delete(taskId);
+      // Task reached a terminal state ('succeeded' | 'failed' | 'interrupted'):
+      // prune stale selections, auto-remove the card, refresh both panes.
+      onTaskFinished(status, task).catch((err) => console.error('Post-task refresh failed:', err));
+    } else if (status) {
+      // Non-terminal transition: queued -> running or running -> paused / queued
+      task.status = status;
+      updateCardControlsInPlace(task);
+    }
   });
 
   source.onerror = () => {

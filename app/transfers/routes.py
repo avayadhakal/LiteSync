@@ -135,6 +135,7 @@ async def stream_task(task_id: str, _user: str = Depends(get_current_user)):
 
     async def generator():
         offset = 0
+        last_status = None
         while True:
             if log_path.exists():
                 try:
@@ -153,8 +154,14 @@ async def stream_task(task_id: str, _user: str = Depends(get_current_user)):
             current = db.get_task(task_id)
             if current is None:
                 break
+            if current["status"] != last_status:
+                last_status = current["status"]
+                # Only announce active transitions if we actually observed a change,
+                # or if the task has reached a terminal state.
+                if last_status is not None:
+                    yield f"event: status\ndata: {json.dumps({'status': current['status']})}\n\n"
+
             if current["status"] not in ("queued", "running", "paused"):
-                yield f"event: status\ndata: {json.dumps({'status': current['status']})}\n\n"
                 break
 
             await asyncio.sleep(0.5)

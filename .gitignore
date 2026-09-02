@@ -1,5 +1,4 @@
 config.toml
-config.yaml
 data/
 .venv/
 __pycache__/

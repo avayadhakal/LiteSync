@@ -390,5 +390,37 @@ class TestPauseResume(unittest.TestCase):
         self.assertTrue(broke_loop, "The catch-all did not trigger for 'failed' status!")
         mock_proc.kill.assert_not_called()
 
+    def test_sse_status_event_on_non_terminal_transition(self):
+        # Test that stream_task emits event: status on non-terminal transitions (e.g. queued -> running)
+        task_id = "test_sse_status_flow"
+        db.insert_task(id=task_id, source="/tmp/s", destination="/tmp/d", status="queued", use_rsync=True)
+
+        from app.transfers.routes import stream_task
+
+        async def run_stream_test():
+            response = await stream_task(task_id, _user="admin")
+            body_iter = response.body_iterator
+
+            # Initially task is queued; next generator iteration will see status change when updated
+            db.mark_running(task_id)
+            
+            # Read first chunk
+            first_event = await anext(body_iter)
+            self.assertIn("event: status", first_event)
+            self.assertIn('"status": "running"', first_event)
+
+            # Mark succeeded (terminal)
+            db.mark_finished(task_id, "succeeded", 0)
+
+            second_event = await anext(body_iter)
+            self.assertIn("event: status", second_event)
+            self.assertIn('"status": "succeeded"', second_event)
+
+            # Generator should now be exhausted
+            with self.assertRaises(StopAsyncIteration):
+                await anext(body_iter)
+
+        asyncio.run(run_stream_test())
+
 if __name__ == '__main__':
     unittest.main()

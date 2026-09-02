@@ -4,8 +4,9 @@
 
 # Directories the app is allowed to browse and transfer between.
 # Every browse/transfer path must resolve inside one of these.
+# Examples below are illustrative; configure paths matching your drives/mounts:
 allowed_roots = [
-    "/home/pi/share",
+    "/mnt/storage",
     "/mnt/usb",
 ]
 
@@ -42,5 +43,5 @@ port = 8000
 # Configure one or more users.
 # Generate a hash with: python -m app.auth hash "yourpassword"
 [[users]]
-username = "pi"
+username = "admin"
 password_hash = "$2b$12$REPLACE_ME_WITH_A_REAL_BCRYPT_HASH"

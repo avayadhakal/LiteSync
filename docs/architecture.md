@@ -1,7 +1,7 @@
 # LiteSync — Architecture
 
 ## 1. System Context & Core Principles
-Minimal-overhead Raspberry Pi web app for dual-pane local directory browsing and background `rsync` transfers.
+Minimal-overhead Linux web app for dual-pane local directory browsing and background `rsync` / zero-copy kernel transfers (supporting `x86_64`, `arm64`, Raspberry Pi, NAS, and homelab environments).
 * **Stack**: Python + FastAPI (async, SSE-friendly) on `uvicorn` (`--workers 1`). Vanilla HTML/JS/CSS frontend.
 * **Auth**: Built-in lightweight auth (TOML hashed passwords, signed session cookies).
 * **Security**: Filesystem constrained to admin-configured "allowed roots". `fsops.resolve_safe_path()` strictly validates all paths against traversal/symlink escapes.
@@ -133,7 +133,7 @@ CREATE INDEX idx_activity_created ON activity(created_at DESC);
 ### Browser Upload Subsystem (Streamed Multipart)
 
 1. **Direct-to-Disk Streaming:** Bypasses the tasks table, background scheduler, and SSE stream.
-2. **Memory Boundedness:** FastAPI/Starlette SpooledTemporaryFile rolls to disk past 1MB. By default on many systems (like Raspberry Pi), `/tmp` is a RAM-backed `tmpfs`, which would cause large uploads to exhaust memory. LiteSync intercepts this by forcefully configuring `tempfile.tempdir` and the systemd `TMPDIR` environment variable to spool these temporary files to a disk-backed location (`data/tmp`), from which they are safely streamed in 1MB chunks to `dest_dir/.litesync-upload-<hex>.tmp`.
+2. **Memory Boundedness:** FastAPI/Starlette SpooledTemporaryFile rolls to disk past 1MB. By default on many Linux systems (including Raspberry Pi OS), `/tmp` is a RAM-backed `tmpfs`, which would cause large uploads to exhaust memory. LiteSync intercepts this by forcefully configuring `tempfile.tempdir` and the systemd `TMPDIR` environment variable to spool these temporary files to a disk-backed location (`data/tmp`), from which they are safely streamed in 1MB chunks to `dest_dir/.litesync-upload-<hex>.tmp`.
 3. **Collision Safety:** Validates bare filename, writes to temp file, and enforces `on_conflict` policy (`skip`, `overwrite`, `rename`) natively during the atomic `os.rename()` resolution via `fsops.compute_next_available_name`.
 4. **Client Disconnect Handling:** Catches `ClientDisconnect`, immediately unlinks temporary files, and returns HTTP 499 with zero Activity Log entries (silent abandonment).
 5. **Activity Log:** Success records `[⬆] UPLOADED <name> → <dest_dir>`; genuine failures record `[✗] UPLOAD FAILED <name> → <dest_dir> (<error>)`.

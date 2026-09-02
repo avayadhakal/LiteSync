@@ -22,7 +22,7 @@ To set up a local development environment, we recommend using the provided insta
    uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1 --reload
    ```
 
-For a comprehensive installation (e.g., on a Raspberry Pi), you can refer to the `install.sh` script which manages system services and user setups.
+For a comprehensive installation (e.g. on Linux servers or Raspberry Pi), you can refer to the `install.sh` script which manages system services and user setups.
 
 ## Running the Test Suite
 
@@ -38,13 +38,12 @@ Ensure you have Node.js installed, then run the tests directly:
 ```bash
 node tests/test_selection.js
 node tests/test_layout.js
-node tests/test_conflict_frontend.js
 node tests/test_filename_visibility.js
 ```
 
 ## Architectural Philosophy
 
-LiteSync is designed as a minimal-overhead web app for local directory browsing and background file transfers, particularly optimized for devices like the Raspberry Pi.
+LiteSync is designed as a minimal-overhead web app for local directory browsing and background file transfers across Linux platforms, homelabs, NAS servers, and single-board computers like the Raspberry Pi.
 - **Python + FastAPI:** The backend uses FastAPI running on Uvicorn (with a single worker for state consistency).
 - **Vanilla Frontend:** The UI is a Single-Page Application (SPA) built with pure HTML, CSS, and JS. No heavy frontend frameworks or build steps are required.
 - **Dual Transfer Engine:** We support both a resilient `rsync` background worker and a fast native `os.copy_file_range` kernel-copy fallback.

@@ -5,7 +5,7 @@
   <p>
     <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.11+-3776AB.svg?style=flat-square&logo=python&logoColor=white" alt="Python Version"></a>
     <a href="https://fastapi.tiangolo.com/"><img src="https://img.shields.io/badge/FastAPI-005571?style=flat-square&logo=fastapi" alt="FastAPI"></a>
-    <a href="#"><img src="https://img.shields.io/badge/platform-Raspberry%20Pi%20%7C%20Linux-C51A4A.svg?style=flat-square&logo=raspberry-pi&logoColor=white" alt="Platform"></a>
+    <a href="#"><img src="https://img.shields.io/badge/platform-Linux%20%7C%20arm64%20%7C%20x86__64-FCC624.svg?style=flat-square&logo=linux&logoColor=black" alt="Platform"></a>
     <a href="#"><img src="https://img.shields.io/badge/engine-rsync%20%2B%20kernel%20copy-blue.svg?style=flat-square" alt="Engine"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square" alt="License"></a>
   </p>
@@ -19,7 +19,7 @@
   <!-- Title & Subtitle -->
 
   <h1>LiteSync</h1>
-  <p><b>Ultra-lightweight single/dual-pane file transfer web app for Raspberry Pi.</b></p>
+  <p><b>Ultra-lightweight single/dual-pane file transfer web app for Linux.</b></p>
   <p><i>Browse directories, manage transfers with a dual-engine backend (<code>rsync</code> or zero-copy <code>os.copy_file_range</code>), and stream uploads straight to disk.</i></p>
 
   <br />
@@ -53,7 +53,7 @@
 * **Same-Filesystem Moves:** Moves on the same filesystem use atomic `os.rename()` instead of invoking either transfer engine.
 * **Real-Time Progress:** Transfers and uploads expose progress information through the web interface.
 * **Persistent Task History:** Transfer task state and activity information are stored in SQLite so task history survives application restarts.
-* **Hardened Raspberry Pi Service:** The included installer creates a dedicated system user and configures LiteSync to run as a managed `systemd` service.
+* **Hardened Systemd Service:** The included installer creates a dedicated system user and configures LiteSync to run as a managed, sandboxed `systemd` service.
 
 ---
 
@@ -63,8 +63,9 @@
 * `rsync` installed on the host
 * `python3-venv`
 * Linux filesystem with support for `os.copy_file_range` for the Kernel transfer engine
+* Supported architectures: `x86_64` / `amd64`, `aarch64` / `arm64` (e.g. Raspberry Pi 4/5), and standard Linux environments.
 
-LiteSync is designed primarily for Raspberry Pi and Linux systems.
+LiteSync is designed for lightweight Linux servers, single-board computers (such as Raspberry Pi), home labs, and NAS systems.
 
 ---
 
@@ -121,9 +122,9 @@ http://<host>:8000/
 
 ---
 
-## Raspberry Pi Installation
+## Linux / Raspberry Pi Installation
 
-The recommended Raspberry Pi installation uses the release archive and does **not** require Git, `git pull`, or a Git checkout.
+The recommended automated installation works on Debian/Ubuntu-based Linux distributions across `x86_64` and `arm64` architectures (including Raspberry Pi 4/5). It uses the release archive and does **not** require Git, `git pull`, or a Git checkout.
 
 Download the LiteSync release archive:
 
@@ -141,13 +142,14 @@ sudo bash install.sh
 
 The installer will:
 
-1. Stage LiteSync under `/opt/litesync`.
-2. Create the dedicated `litesync` system user.
-3. Create and manage the Python virtual environment.
-4. Install the required Python dependencies.
-5. Configure the LiteSync `systemd` service.
-6. Apply the service's security restrictions.
-7. Start LiteSync automatically.
+1. Detect system architecture (`x86_64`, `aarch64`/`arm64`).
+2. Stage LiteSync under `/opt/litesync`.
+3. Create the dedicated `litesync` system user.
+4. Create and manage the Python virtual environment.
+5. Install the required Python dependencies.
+6. Configure the hardened LiteSync `systemd` service.
+7. Apply the service's security restrictions and allowed root mount permissions.
+8. Start LiteSync automatically.
 
 After installation, LiteSync is managed by `systemd`.
 
@@ -190,7 +192,7 @@ sudo systemctl enable litesync
 Then visit:
 
 ```text
-http://<raspberry-pi-ip>:8000/
+http://<host-or-pi-ip>:8000/
 ```
 
 ### Updating LiteSync

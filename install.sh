@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 #
-# install.sh — LiteSync Raspberry Pi installation & deployment helper
+# install.sh — LiteSync Linux installation & deployment helper
 #
 # Stages LiteSync from this git repository into /opt/litesync, creates the
 # dedicated `litesync` system user, manages the virtual environment, generates
 # a hardened systemd unit, and restarts the service.
+# Supports both arm64 (aarch64) and x86_64 (amd64) Linux systems.
 #
-# Usage (on the Pi, from the cloned repo):
+# Usage (from the cloned repo or extracted release archive):
 #     git clone <your-repo-url> LiteSync && cd LiteSync
 #     sudo bash install.sh
 #
@@ -61,8 +62,24 @@ if systemctl is-active --quiet "${SERVICE_NAME}" 2>/dev/null; then
 fi
 
 # ---------------------------------------------------------------------------
-# 2. System dependencies
+# 2. Architecture & system dependencies
 # ---------------------------------------------------------------------------
+ARCH="$(uname -m)"
+case "${ARCH}" in
+    x86_64|amd64)
+        log "Detected architecture: ${ARCH} (64-bit x86)"
+        ;;
+    aarch64|arm64)
+        log "Detected architecture: ${ARCH} (64-bit ARM)"
+        ;;
+    armv7l|armv6l)
+        log "Detected architecture: ${ARCH} (32-bit ARM)"
+        ;;
+    *)
+        log "Detected architecture: ${ARCH} (standard Linux)"
+        ;;
+esac
+
 log "Checking system dependencies (rsync, python3-venv)..."
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
@@ -234,7 +251,7 @@ if systemctl is-active --quiet "${SERVICE_NAME}"; then
     log "Service is UP. Status:"
     systemctl status "${SERVICE_NAME}" --no-pager -l | head -n 12 || true
     echo
-    log "Open the app at: http://<pi-ip>:${PORT}"
+    log "Open the app at: http://<host-ip>:${PORT}"
     log "Follow logs with: journalctl -u ${SERVICE_NAME} -f"
 else
     warn "Service is NOT active. Inspect with:"

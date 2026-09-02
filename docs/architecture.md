@@ -116,8 +116,8 @@ CREATE INDEX idx_activity_created ON activity(created_at DESC);
 | POST | `/api/logout` | Clears user session cookie. |
 | GET | `/api/whoami`, `/api/roots` | Session context & configured root validation. |
 | GET | `/api/browse?path=<abs>` | Returns `{path, parent, entries}`. Filters out-of-root symlinks. |
-| GET | `/api/download/link?path=<abs>` | Generates signed HMAC download URL. |
-| GET/HEAD | `/api/download?path=<abs>` | Single streaming & download endpoint supporting HTTP Range requests. |
+| GET | `/api/download/link?path=<abs>&disposition=<attachment\|inline>` | Generates signed HMAC download URL with optional inline disposition. |
+| GET/HEAD | `/api/download?path=<abs>&expires=<ts>&signature=<hmac>&disposition=<attachment\|inline>` | Streaming & download endpoint supporting HTTP Range requests, safe MIME allowlist, and nosniff protection. |
 | POST | `/api/mkdir` | `{path, name}` → `Path.mkdir()`. Rejects slashes/collisions. |
 | POST | `/api/rename` | `{path, new_name}` → `Path.rename()`. Refuses renaming roots. |
 | POST | `/api/delete` | `{path}` → `shutil.rmtree()` / `unlink()`. Refuses deleting roots. |
@@ -125,6 +125,8 @@ CREATE INDEX idx_activity_created ON activity(created_at DESC);
 | POST | `/api/transfer` | `{sources: [{path, excludes}], destination, operation, use_rsync, on_conflict}` → Queues 1 task **per source**. |
 | GET | `/api/tasks`, `/{id}` | Task history pagination and detail retrieval. |
 | GET | `/api/tasks/{id}/stream` | SSE: yields live log tail, closes with `status` event. |
+| POST | `/api/tasks/{id}/pause` | Pauses active running `rsync` transfer via `SIGSTOP`. |
+| POST | `/api/tasks/{id}/resume` | Resumes paused `rsync` transfer via `SIGCONT`. |
 | POST | `/api/tasks/{id}/cancel` | Cancels active transfer or unqueues pending task. |
 | DELETE | `/api/tasks/{id}`, `/tasks` | Deletes task history records and log files. |
 | GET | `/api/activity` | Retrieves authoritative activity log entries newest first. |
@@ -178,11 +180,17 @@ CREATE INDEX idx_activity_created ON activity(created_at DESC);
 
 ### File Browser UX & Inspection
 
-* **Full Path Tooltips (Desktop Hover + Mobile Long-Press):**
-  * Standard HTML `title` attributes attached to each `.entry` row provide native hover tooltips on desktop for truncated paths.
-  * On touch devices, a ~500ms long-press listener displays the `item-details-modal` bottom sheet with full path and Copy URL controls.
+* **Unified File-Action Dialog (Desktop Double-Click + Mobile Double-Tap):**
+  * Double-clicking (desktop) or double-tapping (touch screen) on any file row opens the unified **Item Details** modal (`openItemDetailsModal`), displaying file metadata (Name, Full Path, Size) along with contextual actions: **Open**, **Copy Link**, and **Close**.
+  * Directory rows strictly navigate on click / double-click / double-tap and never trigger the file-action modal.
+  * The previous touch long-press handler (`attachLongPress`) has been completely removed in favor of native double-tap detection (`DOUBLE_TAP_DELAY_MS = 300ms`) with touch movement thresholding (`MOVE_THRESHOLD_PX = 10px`) to prevent misfires during scrolling and suppress unwanted mobile viewport zoom.
+* **Safe Inline File Viewing & XSS Defense:**
+  * Clicking **Open** in the Item Details dialog requests a signed link with `disposition=inline` (`/api/download/link?disposition=inline`) and launches it in a secure new browsing context (`_blank` with `noopener,noreferrer`).
+  * The backend (`app/browse/download.py`) enforces strict validation: only explicitly allowed media types (`image/jpeg`, `image/png`, `image/gif`, `image/webp`, `application/pdf`, `video/*`, `audio/*`, `text/plain`) render inline.
+  * Executable/markup types (`.html`, `.htm`, `.svg`, `.xml`, `.xhtml` and corresponding MIME types) are forcefully converted to `text/plain; charset=utf-8` to eliminate stored Cross-Site Scripting (XSS) execution vectors.
+  * All inline responses unconditionally send `X-Content-Type-Options: nosniff` to prevent browsers from MIME-sniffing plain text or images into executable JavaScript/HTML.
 * **Copy Download Link to Clipboard (`.btn-copy-path`):**
-  * Subtle icon button (`📋`) rendered on file rows (`!entry.is_dir`).
+  * Subtle icon button (`📋`) rendered directly on file rows (`!entry.is_dir`) and accessible inside the Item Details modal.
   * Copies a signed download URL directly to the clipboard.
 * **Hierarchical Selection Cascading & Pruning (`SelectionModel`):**
   * Recursive selection model supports arbitrary sub-item exclusions and re-inclusions without filesystem walks.

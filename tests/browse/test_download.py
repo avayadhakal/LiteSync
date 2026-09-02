@@ -412,6 +412,218 @@ password_hash = "$2b$12$e8uq..."
         self.assertEqual(status, 403)
         self.assertIn(b"invalid download signature", body.lower())
 
+    def test_inline_pdf(self):
+        """Test opening a PDF with disposition=inline serves inline Content-Disposition and application/pdf."""
+        pdf_file = self.root_dir / "document.pdf"
+        pdf_file.write_bytes(b"%PDF-1.5 sample pdf content")
+
+        status, headers, body = asyncio.run(
+            make_request(
+                "GET",
+                "/api/download",
+                query_string=f"path={quote(str(pdf_file))}&disposition=inline",
+                headers=[("Cookie", f"litesync_session={self.session_cookie}")],
+            )
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(body, b"%PDF-1.5 sample pdf content")
+        self.assertTrue(headers.get("content-disposition", "").startswith("inline;"))
+        self.assertIn("application/pdf", headers.get("content-type", ""))
+        self.assertEqual(headers.get("x-content-type-options"), "nosniff")
+
+    def test_inline_images(self):
+        """Test opening images (jpg, png, gif, webp) with disposition=inline serves inline and correct Content-Type."""
+        for name, mime in [
+            ("test.jpg", "image/jpeg"),
+            ("test.png", "image/png"),
+            ("test.gif", "image/gif"),
+            ("test.webp", "image/webp"),
+        ]:
+            img_file = self.root_dir / name
+            img_file.write_bytes(b"fake_image_bytes")
+            status, headers, _ = asyncio.run(
+                make_request(
+                    "GET",
+                    "/api/download",
+                    query_string=f"path={quote(str(img_file))}&disposition=inline",
+                    headers=[("Cookie", f"litesync_session={self.session_cookie}")],
+                )
+            )
+            self.assertEqual(status, 200)
+            self.assertTrue(headers.get("content-disposition", "").startswith("inline;"))
+            self.assertIn(mime, headers.get("content-type", ""))
+            self.assertEqual(headers.get("x-content-type-options"), "nosniff")
+
+    def test_inline_video_range(self):
+        """Test opening a video file with disposition=inline supports Range requests and serves inline."""
+        expires, sig = self._generate_signed_params(self.test_file)
+        qs = f"path={quote(str(self.test_file))}&expires={expires}&signature={sig}&disposition=inline"
+
+        status, headers, body = asyncio.run(
+            make_request("GET", "/api/download", query_string=qs, headers=[("Range", "bytes=0-99")])
+        )
+        self.assertEqual(status, 206)
+        self.assertTrue(headers.get("content-disposition", "").startswith("inline;"))
+        self.assertIn("video/mp4", headers.get("content-type", ""))
+        self.assertEqual(headers.get("content-range"), "bytes 0-99/1000")
+        self.assertEqual(headers.get("content-length"), "100")
+        self.assertEqual(headers.get("x-content-type-options"), "nosniff")
+        self.assertEqual(body, self.test_content[0:100])
+
+    def test_inline_text(self):
+        """Test opening a .txt file with disposition=inline serves inline text/plain."""
+        txt_file = self.root_dir / "notes.txt"
+        txt_file.write_text("Hello LiteSync text")
+
+        status, headers, body = asyncio.run(
+            make_request(
+                "GET",
+                "/api/download",
+                query_string=f"path={quote(str(txt_file))}&disposition=inline",
+                headers=[("Cookie", f"litesync_session={self.session_cookie}")],
+            )
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(body, b"Hello LiteSync text")
+        self.assertTrue(headers.get("content-disposition", "").startswith("inline;"))
+        self.assertIn("text/plain", headers.get("content-type", ""))
+        self.assertEqual(headers.get("x-content-type-options"), "nosniff")
+
+    def test_inline_html_safe_text_fallback(self):
+        """Test opening an .html file with disposition=inline forces Content-Type to text/plain and never text/html."""
+        html_file = self.root_dir / "page.html"
+        html_file.write_text("<html><script>alert('xss')</script><body>Hello</body></html>")
+
+        status, headers, body = asyncio.run(
+            make_request(
+                "GET",
+                "/api/download",
+                query_string=f"path={quote(str(html_file))}&disposition=inline",
+                headers=[("Cookie", f"litesync_session={self.session_cookie}")],
+            )
+        )
+        self.assertEqual(status, 200)
+        self.assertTrue(headers.get("content-disposition", "").startswith("inline;"))
+        self.assertIn("text/plain", headers.get("content-type", ""))
+        self.assertNotIn("text/html", headers.get("content-type", ""))
+        self.assertEqual(headers.get("x-content-type-options"), "nosniff")
+        self.assertEqual(body, b"<html><script>alert('xss')</script><body>Hello</body></html>")
+
+    def test_inline_svg_safe_text_fallback(self):
+        """Test opening an .svg file with disposition=inline forces Content-Type to text/plain and never image/svg+xml."""
+        svg_file = self.root_dir / "vector.svg"
+        svg_file.write_text('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>')
+
+        status, headers, body = asyncio.run(
+            make_request(
+                "GET",
+                "/api/download",
+                query_string=f"path={quote(str(svg_file))}&disposition=inline",
+                headers=[("Cookie", f"litesync_session={self.session_cookie}")],
+            )
+        )
+        self.assertEqual(status, 200)
+        self.assertTrue(headers.get("content-disposition", "").startswith("inline;"))
+        self.assertIn("text/plain", headers.get("content-type", ""))
+        self.assertNotIn("image/svg+xml", headers.get("content-type", ""))
+        self.assertEqual(headers.get("x-content-type-options"), "nosniff")
+
+    def test_direct_api_disposition_inline_enforces_safety(self):
+        """Test direct API call with ?disposition=inline on .html file cannot bypass server-side safe fallback."""
+        html_file = self.root_dir / "secret.html"
+        html_file.write_text("<h1>Secret</h1>")
+
+        expires, sig = self._generate_signed_params(html_file)
+        qs = f"path={quote(str(html_file))}&expires={expires}&signature={sig}&disposition=inline"
+
+        status, headers, _ = asyncio.run(make_request("GET", "/api/download", query_string=qs))
+        self.assertEqual(status, 200)
+        self.assertTrue(headers.get("content-disposition", "").startswith("inline;"))
+        self.assertIn("text/plain", headers.get("content-type", ""))
+        self.assertNotIn("text/html", headers.get("content-type", ""))
+        self.assertEqual(headers.get("x-content-type-options"), "nosniff")
+
+    def test_mismatched_content_spoofed_safe_extension(self):
+        """Test mismatched content (e.g. fake.jpg containing script) served with nosniff and image/jpeg."""
+        fake_jpg = self.root_dir / "fake.jpg"
+        fake_jpg.write_text("<script>alert('xss')</script>")
+
+        status, headers, body = asyncio.run(
+            make_request(
+                "GET",
+                "/api/download",
+                query_string=f"path={quote(str(fake_jpg))}&disposition=inline",
+                headers=[("Cookie", f"litesync_session={self.session_cookie}")],
+            )
+        )
+        self.assertEqual(status, 200)
+        self.assertTrue(headers.get("content-disposition", "").startswith("inline;"))
+        self.assertIn("image/jpeg", headers.get("content-type", ""))
+        self.assertEqual(headers.get("x-content-type-options"), "nosniff")
+        self.assertEqual(body, b"<script>alert('xss')</script>")
+
+    def test_unallowlisted_extension_forces_attachment(self):
+        """Test unallowlisted file types (e.g. .sh, .exe, .bin) are forced to attachment even if inline is requested."""
+        sh_file = self.root_dir / "script.sh"
+        sh_file.write_text("#!/bin/bash\necho hello")
+
+        status, headers, _ = asyncio.run(
+            make_request(
+                "GET",
+                "/api/download",
+                query_string=f"path={quote(str(sh_file))}&disposition=inline",
+                headers=[("Cookie", f"litesync_session={self.session_cookie}")],
+            )
+        )
+        self.assertEqual(status, 200)
+        self.assertTrue(headers.get("content-disposition", "").startswith("attachment;"))
+
+    def test_copy_download_link_produces_attachment_link(self):
+        """Test GET /api/download/link without disposition parameter produces attachment link."""
+        status, _, body = asyncio.run(
+            make_request(
+                "GET",
+                "/api/download/link",
+                query_string=f"path={quote(str(self.test_file))}",
+                headers=[("Cookie", f"litesync_session={self.session_cookie}")],
+            )
+        )
+        self.assertEqual(status, 200)
+        import json
+        data = json.loads(body.decode("utf-8"))
+        self.assertNotIn("disposition=inline", data["url"])
+
+        # Fetching that URL produces Content-Disposition: attachment
+        parsed = urlparse(data["url"])
+        dl_status, dl_headers, _ = asyncio.run(
+            make_request("GET", parsed.path, query_string=parsed.query)
+        )
+        self.assertEqual(dl_status, 200)
+        self.assertTrue(dl_headers.get("content-disposition", "").startswith("attachment;"))
+
+    def test_open_download_link_produces_inline_link(self):
+        """Test GET /api/download/link with disposition=inline produces inline link."""
+        status, _, body = asyncio.run(
+            make_request(
+                "GET",
+                "/api/download/link",
+                query_string=f"path={quote(str(self.test_file))}&disposition=inline",
+                headers=[("Cookie", f"litesync_session={self.session_cookie}")],
+            )
+        )
+        self.assertEqual(status, 200)
+        import json
+        data = json.loads(body.decode("utf-8"))
+        self.assertIn("disposition=inline", data["url"])
+
+        # Fetching that URL produces Content-Disposition: inline
+        parsed = urlparse(data["url"])
+        dl_status, dl_headers, _ = asyncio.run(
+            make_request("GET", parsed.path, query_string=parsed.query)
+        )
+        self.assertEqual(dl_status, 200)
+        self.assertTrue(dl_headers.get("content-disposition", "").startswith("inline;"))
+
 
 if __name__ == "__main__":
     unittest.main()

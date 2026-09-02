@@ -4,6 +4,7 @@ import base64
 import hashlib
 import hmac
 import time
+import mimetypes
 from pathlib import Path
 from urllib.parse import quote
 
@@ -17,6 +18,57 @@ from app.config import get_download_signing_key, get_settings
 from app.fsops import resolve_safe_path
 
 router = APIRouter(prefix="/api")
+
+# Explicit safe allowlist of MIME types safe for inline rendering
+SAFE_INLINE_EXACT_MIMES = {
+    "application/pdf",
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "image/webp",
+    "text/plain",
+}
+
+# Markup / script-capable types to safely fallback to text/plain when inline is requested
+TEXT_FALLBACK_EXTENSIONS = {
+    ".html",
+    ".htm",
+    ".svg",
+    ".xml",
+    ".xhtml",
+}
+
+TEXT_FALLBACK_MIMES = {
+    "text/html",
+    "image/svg+xml",
+    "application/xhtml+xml",
+    "application/xml",
+    "text/xml",
+}
+
+
+def is_safe_inline_mime(mime: str | None) -> bool:
+    """Check if MIME type is explicitly allowed for inline browser rendering."""
+    if not mime:
+        return False
+    mime = mime.lower().split(";")[0].strip()
+    if mime in SAFE_INLINE_EXACT_MIMES:
+        return True
+    if mime.startswith("video/") or mime.startswith("audio/"):
+        return True
+    return False
+
+
+def is_text_fallback_type(suffix: str, mime: str | None) -> bool:
+    """Check if file should be treated with safe text/plain fallback when inline is requested."""
+    if suffix.lower() in TEXT_FALLBACK_EXTENSIONS:
+        return True
+    if mime:
+        clean_mime = mime.lower().split(";")[0].strip()
+        if clean_mime in TEXT_FALLBACK_MIMES:
+            return True
+    return False
+
 
 class LiteSyncFileResponse(FileResponse):
     """FileResponse with explicit HTTP 416 rejection for multi-range requests."""
@@ -52,6 +104,7 @@ def verify_download_signature(canonical_path: str | Path, expires: int, signatur
 @router.get("/download/link")
 async def get_download_link(
     path: str,
+    disposition: str = "attachment",
     _user: str = Depends(get_current_user),
 ):
     """Generate a server-side signed URL for file download or VLC/mpv streaming.
@@ -69,6 +122,8 @@ async def get_download_link(
     signing_key = get_download_signing_key(settings)
     signature = compute_download_signature(resolved, expires, signing_key)
     download_url = f"/api/download?path={quote(str(resolved))}&expires={expires}&signature={signature}"
+    if disposition.lower() == "inline":
+        download_url += "&disposition=inline"
 
     return {
         "url": download_url,
@@ -81,6 +136,7 @@ async def get_download_link(
 async def download_file(
     path: str,
     request: Request,
+    disposition: str = "attachment",
     expires: int | None = None,
     signature: str | None = None,
     litesync_session: str | None = Cookie(default=None),
@@ -90,6 +146,7 @@ async def download_file(
 
     Accepts either a valid signed URL or an authenticated session.
     Derives filename strictly from the server-validated path.
+    Enforces safe server-side inline allowlist with text/plain fallback and nosniff protection.
     """
     settings = get_settings()
 
@@ -133,4 +190,34 @@ async def download_file(
     if not resolved.is_file():
         raise HTTPException(status_code=400, detail="Path is not a file")
 
-    return LiteSyncFileResponse(path=resolved, filename=resolved.name)
+    # Determine MIME type and safe disposition
+    guessed_type, _ = mimetypes.guess_type(resolved.name)
+    suffix = resolved.suffix
+
+    response_headers: dict[str, str] = {}
+    content_disposition_type = "attachment"
+    media_type = guessed_type
+
+    if disposition.lower() == "inline":
+        response_headers["X-Content-Type-Options"] = "nosniff"
+        if is_safe_inline_mime(guessed_type) and not is_text_fallback_type(suffix, guessed_type):
+            content_disposition_type = "inline"
+            media_type = guessed_type
+        elif is_text_fallback_type(suffix, guessed_type):
+            content_disposition_type = "inline"
+            media_type = "text/plain; charset=utf-8"
+        else:
+            # Not in safe allowlist and not text-fallback; force attachment
+            content_disposition_type = "attachment"
+            media_type = guessed_type
+    else:
+        content_disposition_type = "attachment"
+        media_type = guessed_type
+
+    return LiteSyncFileResponse(
+        path=resolved,
+        filename=resolved.name,
+        media_type=media_type,
+        content_disposition_type=content_disposition_type,
+        headers=response_headers,
+    )

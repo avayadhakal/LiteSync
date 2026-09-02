@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 ### Added
+- **Linux & Multi-Architecture Support:** Expanded installer (`install.sh`) to support both `arm64`/`aarch64` and `x86_64`/`amd64` architectures for general Linux deployments, single-board computers, NAS devices, and homelabs.
+- **Unified File-Action Dialog:** Replaced mobile long-press gestures with unified double-click (desktop) and double-tap (touch) interactions opening an Item Details dialog with file inspection, safe in-browser viewing, and link copying.
+- **Safe Inline File Viewing:** Direct in-browser viewing via signed URLs (`/api/download/link?disposition=inline`), protected by a strict server-side MIME allowlist, safe `text/plain` fallback for executable markup (HTML, SVG, XML, XHTML), and mandatory `X-Content-Type-Options: nosniff` headers to prevent stored XSS.
 - **Transfer Engine:** Robust background processing utilizing `rsync` or zero-copy `os.copy_file_range` kernel transfers.
 - **Direct Uploads:** Streamed multipart browser uploads straight to disk, circumventing memory exhaustion.
 - **Downloads:** Secure file downloads via signed URLs supporting HTTP Range requests.
@@ -14,6 +17,9 @@ All notable changes to this project will be documented in this file.
 - **Conflict Resolution:** Safely skip, keep both, or replace existing files during transfers with pre-flight resolution.
 - **Bulk Selection:** Introduced a master checkbox in the pane headers for intuitive "Select All" functionality, complete with indeterminate state handling.
 - **Interactive File Sorting:** Implemented 2-tier column headers supporting instant ascending/descending sorts for Name, Modified, and Size with dynamic responsive layouts.
+
+### Changed
+- **Internal Modularization & Refactoring:** Restructured backend and frontend codebases into dedicated subsystems (`app/transfers/`, `app/browse/`, `static/js/modals/`, ES modules) with isolated concerns and focused test coverage.
 
 ### Fixed
 - **Transfer Queue UI Transitions:** Resolved an issue where queued operations failed to dynamically render active controls upon state shifts.

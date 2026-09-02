@@ -3,7 +3,7 @@ import { api, copyDownloadLink, toastError } from '../api.js';
 
 export async function open_file_action(path) {
   try {
-    const data = await api(`/api/download/link?path=${encodeURIComponent(path)}`);
+    const data = await api(`/api/download/link?path=${encodeURIComponent(path)}&disposition=inline`);
     if (data && data.url) {
       window.open(data.url, '_blank', 'noopener,noreferrer');
     }

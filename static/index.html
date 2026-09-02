@@ -259,10 +259,13 @@
     </div>
   </div>
 
-  <!-- File/Folder details modal / bottom-sheet on mobile -->
-  <div class="modal-backdrop bottom-sheet-backdrop hidden" id="item-details-modal">
-    <div class="modal bottom-sheet">
-      <h2 id="item-details-title">Item Details</h2>
+  <!-- File/Folder details modal -->
+  <div class="modal-backdrop hidden" id="item-details-modal">
+    <div class="modal">
+      <div class="modal-header-row">
+        <h2 id="item-details-title">Item Details</h2>
+        <button id="item-details-dismiss" class="modal-close-btn" title="Close" aria-label="Close">✕</button>
+      </div>
       <div id="item-details-body" class="item-details-body">
         <div class="item-details-field">
           <label class="item-details-label">Name</label>
@@ -272,10 +275,15 @@
           <label class="item-details-label">Full Path</label>
           <div id="item-details-path" class="item-details-value path-wrap"></div>
         </div>
+        <div class="item-details-field">
+          <label class="item-details-label">Size</label>
+          <div id="item-details-size" class="item-details-value"></div>
+        </div>
       </div>
-      <div class="actions">
-        <button id="item-details-copy" class="primary hidden">Copy URL</button>
+      <div class="actions item-details-actions">
         <button id="item-details-close">Close</button>
+        <button id="item-details-copy" class="hidden">Copy Link</button>
+        <button id="item-details-open" class="primary hidden">Open</button>
       </div>
     </div>
   </div>

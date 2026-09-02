@@ -1,7 +1,18 @@
-import { api, copyDownloadLink, attachLongPress } from './api.js';
+import { api, copyDownloadLink } from './api.js';
 import { el, formatSize, formatMtime, escapeHtml, normalizePath } from './utils.js';
 import { state } from './state.js';
 import { openItemDetailsModal } from './modals/item-details.js';
+
+const rowTouchState = new WeakMap();
+const DOUBLE_TAP_DELAY_MS = 300;
+const MOVE_THRESHOLD_PX = 10;
+
+export function isActionDialogEligible(e) {
+  if (!e || !e.target) return false;
+  if (e.target.tagName === 'INPUT') return false;
+  if (e.target.closest && e.target.closest('.btn-copy-path')) return false;
+  return true;
+}
 
 export async function loadPane(which, path, forceRefresh = false, fallbackToParent = true) {
   const pane = state[which];
@@ -231,19 +242,68 @@ export function renderPane(which) {
 
     row.title = entry.path;
 
-    // Attach long-press listener strictly to filename area
-    const isLongPressed = attachLongPress(name, () => {
-      openItemDetailsModal(entry);
-    });
-
     if (entry.is_dir) {
+      // Directories strictly navigate on click / double-click without opening Item Details modal
       row.addEventListener('click', (e) => {
-        if (e.target.tagName === 'INPUT' || e.target.closest('.btn-copy-path')) return;
-        if (isLongPressed()) {
-          return;
-        }
+        if (!isActionDialogEligible(e)) return;
         loadPane(which, entry.path);
       });
+      row.addEventListener('dblclick', (e) => {
+        if (!isActionDialogEligible(e)) return;
+        e.preventDefault();
+        loadPane(which, entry.path);
+      });
+    } else {
+      // Desktop double-click for files
+      row.addEventListener('dblclick', (e) => {
+        if (!isActionDialogEligible(e)) return;
+        openItemDetailsModal(entry, which);
+      });
+
+      // Mobile touch double-tap with movement threshold (<10px) to ignore scrolls/swipes
+      row.addEventListener('touchstart', (e) => {
+        if (e.touches.length !== 1 || !isActionDialogEligible(e)) return;
+        const t = e.touches[0];
+        const s = rowTouchState.get(row) || { lastTouchEnd: 0 };
+        rowTouchState.set(row, {
+          lastTouchEnd: s.lastTouchEnd,
+          startX: t.clientX,
+          startY: t.clientY,
+          touchMoved: false,
+        });
+      }, { passive: true });
+
+      row.addEventListener('touchmove', (e) => {
+        const s = rowTouchState.get(row);
+        if (!s || e.touches.length !== 1) return;
+        const t = e.touches[0];
+        if (Math.abs(t.clientX - s.startX) > MOVE_THRESHOLD_PX ||
+            Math.abs(t.clientY - s.startY) > MOVE_THRESHOLD_PX) {
+          s.touchMoved = true;
+          s.lastTouchEnd = 0; // Invalidate double-tap sequence on movement
+        }
+      }, { passive: true });
+
+      row.addEventListener('touchend', (e) => {
+        const s = rowTouchState.get(row);
+        if (!s || s.touchMoved || !isActionDialogEligible(e)) {
+          if (s) s.lastTouchEnd = 0;
+          return;
+        }
+        const now = Date.now();
+        if (now - s.lastTouchEnd < DOUBLE_TAP_DELAY_MS) {
+          e.preventDefault(); // Suppress mobile double-tap zoom
+          s.lastTouchEnd = 0;
+          openItemDetailsModal(entry, which);
+        } else {
+          s.lastTouchEnd = now;
+        }
+      });
+
+      row.addEventListener('touchcancel', () => {
+        const s = rowTouchState.get(row);
+        if (s) s.lastTouchEnd = 0;
+      }, { passive: true });
     }
 
     body.appendChild(row);

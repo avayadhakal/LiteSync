@@ -2,8 +2,8 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 
-// Test suite for LiteSync Filename Visibility & Long-Press Interactions
-console.log('Running LiteSync Filename Visibility JavaScript Test Suite...');
+// Test suite for LiteSync Filename Visibility & File Action Dialog (Double-Click & Double-Tap)
+console.log('Running LiteSync Filename Visibility & File Action Dialog Test Suite...');
 
 // Mock Minimal DOM & Environment
 class MockClassList {
@@ -40,6 +40,7 @@ class MockElement {
     this.disabled = false;
     this.dataset = {};
     this.scrollLeft = 0;
+    this.parentElement = null;
   }
 
   addEventListener(event, callback, opts) {
@@ -55,7 +56,7 @@ class MockElement {
       h(event);
       if (event._propagationStopped) break;
     }
-    // Simple bubbling to parent if not stopped
+    // Bubbling to parent if not stopped
     if (!event._propagationStopped && this.parentElement) {
       this.parentElement.dispatchEvent(event);
     }
@@ -96,418 +97,428 @@ class MockEvent {
 }
 
 (async () => {
-// 1. Test attachLongPress fires on 500ms hold
-await (async () => {
-  let timerHandler = null;
-  const originalSetTimeout = global.setTimeout;
-  const originalClearTimeout = global.clearTimeout;
+  const rowTouchState = new WeakMap();
+  const DOUBLE_TAP_DELAY_MS = 300;
+  const MOVE_THRESHOLD_PX = 10;
 
-  global.setTimeout = (fn, ms) => {
-    timerHandler = fn;
-    return 123;
-  };
-  global.clearTimeout = (id) => {
-    timerHandler = null;
-  };
-
-  function attachLongPress(element, onLongPress) {
-    let startX = 0;
-    let startY = 0;
-    let timer = null;
-    let longPressed = false;
-    const MOVE_THRESHOLD = 10;
-
-    const cancel = () => {
-      if (timer) {
-        clearTimeout(timer);
-        timer = null;
-      }
-    };
-
-    element.addEventListener('touchstart', (e) => {
-      if (e.touches.length !== 1) return;
-      const touch = e.touches[0];
-      startX = touch.clientX;
-      startY = touch.clientY;
-      longPressed = false;
-
-      cancel();
-      timer = setTimeout(() => {
-        longPressed = true;
-        timer = null;
-        onLongPress();
-      }, 500);
-    }, { passive: true });
-
-    element.addEventListener('touchmove', (e) => {
-      if (!timer || e.touches.length !== 1) return;
-      const touch = e.touches[0];
-      const dx = Math.abs(touch.clientX - startX);
-      const dy = Math.abs(touch.clientY - startY);
-      if (dx > MOVE_THRESHOLD || dy > MOVE_THRESHOLD) {
-        cancel();
-      }
-    }, { passive: true });
-
-    const endOrCancel = () => {
-      cancel();
-    };
-
-    element.addEventListener('touchend', endOrCancel, { passive: true });
-    element.addEventListener('touchcancel', endOrCancel, { passive: true });
-
-    return () => {
-      const wasTriggered = longPressed;
-      longPressed = false;
-      return wasTriggered;
-    };
-  }
-
-  const nameEl = new MockElement('span');
-  nameEl.className = 'name';
-  let sheetOpened = false;
-
-  const isLongPressed = attachLongPress(nameEl, () => {
-    sheetOpened = true;
-  });
-
-  // Touch start
-  nameEl.dispatchEvent(new MockEvent('touchstart', {
-    touches: [{ clientX: 100, clientY: 100 }],
-  }));
-  assert.strictEqual(sheetOpened, false);
-  assert.strictEqual(timerHandler !== null, true);
-
-  // Timer fires at 500ms
-  timerHandler();
-  assert.strictEqual(sheetOpened, true);
-  assert.strictEqual(isLongPressed(), true);
-  // Subsequent check resets
-  assert.strictEqual(isLongPressed(), false);
-
-  global.setTimeout = originalSetTimeout;
-  global.clearTimeout = originalClearTimeout;
-  console.log('✓ Test 1: Long press on filename area for ~500ms triggers bottom sheet passed');
-})();
-
-// 2. Test normal tap (<500ms) preserves navigation/selection and cancels timer
-(() => {
-  let timerHandler = null;
-  global.setTimeout = (fn, ms) => {
-    timerHandler = fn;
-    return 456;
-  };
-  global.clearTimeout = () => {
-    timerHandler = null;
-  };
-
-  const nameEl = new MockElement('span');
-  let sheetOpened = false;
-  let navTriggered = false;
-
-  function attachLongPress(element, onLongPress) {
-    let startX = 0, startY = 0, timer = null, longPressed = false;
-    const cancel = () => { if (timer) { clearTimeout(timer); timer = null; } };
-    element.addEventListener('touchstart', (e) => {
-      const touch = e.touches[0];
-      startX = touch.clientX; startY = touch.clientY; longPressed = false;
-      cancel();
-      timer = setTimeout(() => { longPressed = true; timer = null; onLongPress(); }, 500);
-    });
-    element.addEventListener('touchend', cancel);
-    return () => {
-      const was = longPressed; longPressed = false; return was;
-    };
-  }
-
-  const isLongPressed = attachLongPress(nameEl, () => { sheetOpened = true; });
-
-  // Touchstart
-  nameEl.dispatchEvent(new MockEvent('touchstart', { touches: [{ clientX: 50, clientY: 50 }] }));
-  assert.strictEqual(timerHandler !== null, true);
-
-  // Touchend quickly (e.g. 100ms)
-  nameEl.dispatchEvent(new MockEvent('touchend'));
-  assert.strictEqual(timerHandler, null);
-  assert.strictEqual(sheetOpened, false);
-  assert.strictEqual(isLongPressed(), false);
-
-  // Click event fires for navigation
-  if (!isLongPressed()) {
-    navTriggered = true;
-  }
-  assert.strictEqual(navTriggered, true);
-  console.log('✓ Test 2: Normal tap preserves navigation/selection without opening bottom sheet passed');
-})();
-
-// 3. Test touch movement > 10px cancels long-press
-(() => {
-  let timerHandler = null;
-  global.setTimeout = (fn) => { timerHandler = fn; return 789; };
-  global.clearTimeout = () => { timerHandler = null; };
-
-  const nameEl = new MockElement('span');
-  let sheetOpened = false;
-
-  function attachLongPress(element, onLongPress) {
-    let startX = 0, startY = 0, timer = null, longPressed = false;
-    const cancel = () => { if (timer) { clearTimeout(timer); timer = null; } };
-    element.addEventListener('touchstart', (e) => {
-      const touch = e.touches[0];
-      startX = touch.clientX; startY = touch.clientY; longPressed = false;
-      cancel();
-      timer = setTimeout(() => { longPressed = true; timer = null; onLongPress(); }, 500);
-    });
-    element.addEventListener('touchmove', (e) => {
-      const touch = e.touches[0];
-      if (Math.abs(touch.clientX - startX) > 10 || Math.abs(touch.clientY - startY) > 10) {
-        cancel();
-      }
-    });
-    element.addEventListener('touchend', cancel);
-    return () => longPressed;
-  }
-
-  attachLongPress(nameEl, () => { sheetOpened = true; });
-
-  // Touch start at (100, 100)
-  nameEl.dispatchEvent(new MockEvent('touchstart', { touches: [{ clientX: 100, clientY: 100 }] }));
-  assert.strictEqual(timerHandler !== null, true);
-
-  // Touch move to (105, 105) (under 10px delta) -> still active
-  nameEl.dispatchEvent(new MockEvent('touchmove', { touches: [{ clientX: 105, clientY: 105 }] }));
-  assert.strictEqual(timerHandler !== null, true);
-
-  // Touch move to (120, 105) (dx = 20px > 10px) -> cancelled!
-  nameEl.dispatchEvent(new MockEvent('touchmove', { touches: [{ clientX: 120, clientY: 105 }] }));
-  assert.strictEqual(timerHandler, null);
-  assert.strictEqual(sheetOpened, false);
-  console.log('✓ Test 3: Touch movement > 10px cancels long-press timer passed');
-})();
-
-// 4. Test long-pressing selection checkbox performs toggle only and does not open sheet
-(() => {
-  const row = new MockElement('div');
-  row.className = 'entry file';
-  const cb = new MockElement('input');
-  cb.type = 'checkbox';
-  row.appendChild(cb);
-  const nameEl = new MockElement('span');
-  nameEl.className = 'name';
-  row.appendChild(nameEl);
-
-  let sheetOpened = false;
-  let cbToggled = false;
-
-  cb.addEventListener('click', (e) => {
-    e.stopPropagation();
-    cbToggled = true;
-  });
-
-  // Long press attached strictly to nameEl
-  nameEl.addEventListener('touchstart', () => { sheetOpened = true; });
-
-  // Touch on checkbox
-  const touchEvent = new MockEvent('touchstart', { touches: [{ clientX: 10, clientY: 10 }] });
-  cb.dispatchEvent(touchEvent);
-  assert.strictEqual(sheetOpened, false);
-
-  cb.dispatchEvent(new MockEvent('click'));
-  assert.strictEqual(cbToggled, true);
-  assert.strictEqual(sheetOpened, false);
-  console.log('✓ Test 4: Long-pressing checkbox does not open bottom sheet passed');
-})();
-
-// 5. Test long-pressing clipboard copy button copies only and does not open sheet
-(() => {
-  const row = new MockElement('div');
-  const copyBtn = new MockElement('button');
-  copyBtn.className = 'icon-btn btn-copy-path';
-  row.appendChild(copyBtn);
-  const nameEl = new MockElement('span');
-  nameEl.className = 'name';
-  row.appendChild(nameEl);
-
-  let sheetOpened = false;
-  let copyExecuted = false;
-
-  copyBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    copyExecuted = true;
-  });
-
-  nameEl.addEventListener('touchstart', () => { sheetOpened = true; });
-
-  // Touch on copyBtn
-  copyBtn.dispatchEvent(new MockEvent('touchstart', { touches: [{ clientX: 200, clientY: 10 }] }));
-  assert.strictEqual(sheetOpened, false);
-
-  copyBtn.dispatchEvent(new MockEvent('click'));
-  assert.strictEqual(copyExecuted, true);
-  assert.strictEqual(sheetOpened, false);
-  console.log('✓ Test 5: Long-pressing clipboard button does not open bottom sheet passed');
-})();
-
-// 6 & 7. Test bottom sheet displays for file (with Copy URL) vs directory (without Copy URL)
-(() => {
-  const modal = new MockElement('div', 'item-details-modal');
-  modal.classList.add('hidden');
-  const nameDisplay = new MockElement('div', 'item-details-name');
-  const pathDisplay = new MockElement('div', 'item-details-path');
-  const copyBtn = new MockElement('button', 'item-details-copy');
-
-  const elements = {
-    'item-details-modal': modal,
-    'item-details-name': nameDisplay,
-    'item-details-path': pathDisplay,
-    'item-details-copy': copyBtn,
-  };
-  const el = (id) => elements[id];
-
-  function openItemDetailsModal(entry) {
-    const m = el('item-details-modal');
-    el('item-details-name').textContent = entry.name;
-    el('item-details-path').textContent = entry.path;
-    const btn = el('item-details-copy');
-    if (entry.is_dir) {
-      btn.classList.add('hidden');
-    } else {
-      btn.classList.remove('hidden');
-    }
-    m.classList.remove('hidden');
-  }
-
-  // File entry
-  const fileEntry = { name: 'Dune.Part.Two.2024.mkv', path: '/media/movies/Dune.Part.Two.2024.mkv', is_dir: false };
-  openItemDetailsModal(fileEntry);
-  assert.strictEqual(modal.classList.contains('hidden'), false);
-  assert.strictEqual(nameDisplay.textContent, 'Dune.Part.Two.2024.mkv');
-  assert.strictEqual(pathDisplay.textContent, '/media/movies/Dune.Part.Two.2024.mkv');
-  assert.strictEqual(copyBtn.classList.contains('hidden'), false);
-  console.log('✓ Test 6: Bottom sheet for file shows filename, full path, and Copy URL button passed');
-
-  // Directory entry
-  const dirEntry = { name: '2024 Movies', path: '/media/movies/2024 Movies', is_dir: true };
-  openItemDetailsModal(dirEntry);
-  assert.strictEqual(modal.classList.contains('hidden'), false);
-  assert.strictEqual(nameDisplay.textContent, '2024 Movies');
-  assert.strictEqual(pathDisplay.textContent, '/media/movies/2024 Movies');
-  assert.strictEqual(copyBtn.classList.contains('hidden'), true);
-  console.log('✓ Test 7: Bottom sheet for directory shows filename, full path, and omits Copy URL button passed');
-})();
-
-// 8. Test Copy URL in bottom sheet calls API/clipboard and auto-closes sheet on success
-await (async () => {
-  const modal = new MockElement('div', 'item-details-modal');
-  modal.classList.remove('hidden');
-  const copyBtn = new MockElement('button', 'item-details-copy');
-
-  let apiCalledWith = '';
-  let copiedText = '';
-  let sheetClosed = false;
-
-  async function mockCopyDownloadLink(p) {
-    apiCalledWith = p;
-    copiedText = `http://localhost:8000/api/download/file?path=${p}&token=sig123`;
+  function isActionDialogEligible(e) {
+    if (!e || !e.target) return false;
+    if (e.target.tagName === 'INPUT') return false;
+    if (e.target.closest && e.target.closest('.btn-copy-path')) return false;
     return true;
   }
 
-  copyBtn.onclick = async (e) => {
-    e.stopPropagation();
-    const success = await mockCopyDownloadLink('/media/doc.pdf');
-    if (success) {
-      sheetClosed = true;
-      modal.classList.add('hidden');
+  function setupRowInteractions(row, entry, onOpenDialog, onNavigate) {
+    if (entry.is_dir) {
+      row.addEventListener('click', (e) => {
+        if (!isActionDialogEligible(e)) return;
+        onNavigate(entry.path);
+      });
+      row.addEventListener('dblclick', (e) => {
+        if (!isActionDialogEligible(e)) return;
+        e.preventDefault();
+        onNavigate(entry.path);
+      });
+    } else {
+      row.addEventListener('dblclick', (e) => {
+        if (!isActionDialogEligible(e)) return;
+        onOpenDialog(entry);
+      });
+
+      row.addEventListener('touchstart', (e) => {
+        if (e.touches.length !== 1 || !isActionDialogEligible(e)) return;
+        const t = e.touches[0];
+        const s = rowTouchState.get(row) || { lastTouchEnd: 0 };
+        rowTouchState.set(row, {
+          lastTouchEnd: s.lastTouchEnd,
+          startX: t.clientX,
+          startY: t.clientY,
+          touchMoved: false,
+        });
+      });
+
+      row.addEventListener('touchmove', (e) => {
+        const s = rowTouchState.get(row);
+        if (!s || e.touches.length !== 1) return;
+        const t = e.touches[0];
+        if (Math.abs(t.clientX - s.startX) > MOVE_THRESHOLD_PX ||
+            Math.abs(t.clientY - s.startY) > MOVE_THRESHOLD_PX) {
+          s.touchMoved = true;
+          s.lastTouchEnd = 0;
+        }
+      });
+
+      row.addEventListener('touchend', (e) => {
+        const s = rowTouchState.get(row);
+        if (!s || s.touchMoved || !isActionDialogEligible(e)) {
+          if (s) s.lastTouchEnd = 0;
+          return;
+        }
+        const now = Date.now();
+        if (now - s.lastTouchEnd < DOUBLE_TAP_DELAY_MS) {
+          e.preventDefault();
+          s.lastTouchEnd = 0;
+          onOpenDialog(entry);
+        } else {
+          s.lastTouchEnd = now;
+        }
+      });
+
+      row.addEventListener('touchcancel', () => {
+        const s = rowTouchState.get(row);
+        if (s) s.lastTouchEnd = 0;
+      });
     }
-  };
-
-  await copyBtn.onclick(new MockEvent('click'));
-  assert.strictEqual(apiCalledWith, '/media/doc.pdf');
-  assert.strictEqual(copiedText.includes('sig123'), true);
-  assert.strictEqual(sheetClosed, true);
-  assert.strictEqual(modal.classList.contains('hidden'), true);
-  console.log('✓ Test 8: Copy URL in bottom sheet calls download link flow and auto-closes sheet passed');
-})();
-
-// 9. Test horizontal swipe on filename container
-(() => {
-  const nameEl = new MockElement('span');
-  nameEl.className = 'name';
-  let swipeOccurred = false;
-  let navTriggered = false;
-  let longPressTriggered = false;
-
-  let startX = 0;
-  let timer = null;
-  nameEl.addEventListener('touchstart', (e) => {
-    startX = e.touches[0].clientX;
-    timer = 1;
-  });
-  nameEl.addEventListener('touchmove', (e) => {
-    const dx = e.touches[0].clientX - startX;
-    if (Math.abs(dx) > 10) {
-      timer = null; // cancelled long press
-      swipeOccurred = true;
-      nameEl.scrollLeft += 50;
-    }
-  });
-
-  nameEl.dispatchEvent(new MockEvent('touchstart', { touches: [{ clientX: 200, clientY: 50 }] }));
-  nameEl.dispatchEvent(new MockEvent('touchmove', { touches: [{ clientX: 150, clientY: 50 }] }));
-
-  assert.strictEqual(swipeOccurred, true);
-  assert.strictEqual(timer, null);
-  assert.strictEqual(longPressTriggered, false);
-  assert.strictEqual(navTriggered, false);
-  console.log('✓ Test 9: Horizontal swipe on filename scrolls container without triggering navigation or long press passed');
-})();
-
-// 10. Test Close button and backdrop tap dismiss bottom sheet with isolated events
-(() => {
-  const modal = new MockElement('div', 'item-details-modal');
-  modal.classList.remove('hidden');
-  const closeBtn = new MockElement('button', 'item-details-close');
-  modal.appendChild(closeBtn);
-
-  let sheetClosed = false;
-  function closeItemDetailsModal() {
-    sheetClosed = true;
-    modal.classList.add('hidden');
   }
 
-  // Close button click
-  closeBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    closeItemDetailsModal();
-  });
+  // 1. Desktop double-click on file row opens dialog with all 4 options
+  (() => {
+    let dialogOpenedWith = null;
+    const row = new MockElement('div');
+    row.className = 'entry file';
+    const nameEl = new MockElement('span');
+    nameEl.className = 'name';
+    nameEl.textContent = 'document.pdf';
+    row.appendChild(nameEl);
 
-  const closeEvt = new MockEvent('click');
-  closeBtn.dispatchEvent(closeEvt);
-  assert.strictEqual(sheetClosed, true);
-  assert.strictEqual(modal.classList.contains('hidden'), true);
-  assert.strictEqual(closeEvt._propagationStopped, true);
+    const fileEntry = { name: 'document.pdf', path: '/docs/document.pdf', is_dir: false };
+    setupRowInteractions(row, fileEntry, (e) => { dialogOpenedWith = e; }, () => {});
 
-  // Re-open and test backdrop tap isolation
-  modal.classList.remove('hidden');
-  sheetClosed = false;
+    // Trigger dblclick on name element
+    const dblEvt = new MockEvent('dblclick', { target: nameEl });
+    nameEl.dispatchEvent(dblEvt);
 
-  modal.addEventListener('click', (e) => {
-    if (e.target === modal) {
-      e.stopPropagation();
-      e.preventDefault();
-      closeItemDetailsModal();
+    assert.strictEqual(dialogOpenedWith !== null, true);
+    assert.strictEqual(dialogOpenedWith.path, '/docs/document.pdf');
+    console.log('✓ Test 1: Desktop double-click on file opens dialog passed');
+  })();
+
+  // 2. Desktop double-click or rapid clicking on directory row strictly navigates and NEVER opens dialog
+  (() => {
+    let dialogOpenedWith = null;
+    let navigatedPath = null;
+    const row = new MockElement('div');
+    row.className = 'entry dir';
+    const nameEl = new MockElement('span');
+    nameEl.className = 'name';
+    nameEl.textContent = 'Projects';
+    row.appendChild(nameEl);
+
+    const dirEntry = { name: 'Projects', path: '/Projects', is_dir: true };
+    setupRowInteractions(row, dirEntry, (e) => { dialogOpenedWith = e; }, (p) => { navigatedPath = p; });
+
+    const dblEvt = new MockEvent('dblclick', { target: nameEl });
+    nameEl.dispatchEvent(dblEvt);
+
+    assert.strictEqual(dialogOpenedWith, null);
+    assert.strictEqual(navigatedPath, '/Projects');
+    console.log('✓ Test 2: Double-clicking / rapid clicking on directory row strictly navigates without dialog passed');
+  })();
+
+  // 3. Mobile double-tap on row (<300ms) triggers dialog and calls preventDefault()
+  (() => {
+    let dialogOpenedWith = null;
+    const row = new MockElement('div');
+    row.className = 'entry file';
+    const nameEl = new MockElement('span');
+    nameEl.className = 'name';
+    row.appendChild(nameEl);
+
+    const entry = { name: 'photo.jpg', path: '/images/photo.jpg', is_dir: false };
+    setupRowInteractions(row, entry, (e) => { dialogOpenedWith = e; }, () => {});
+
+    // Tap 1
+    row.dispatchEvent(new MockEvent('touchstart', { touches: [{ clientX: 100, clientY: 100 }] }));
+    row.dispatchEvent(new MockEvent('touchend', { target: nameEl }));
+    assert.strictEqual(dialogOpenedWith, null);
+
+    // Tap 2 (within 100ms)
+    row.dispatchEvent(new MockEvent('touchstart', { touches: [{ clientX: 102, clientY: 101 }] }));
+    const touchEnd2 = new MockEvent('touchend', { target: nameEl });
+    row.dispatchEvent(touchEnd2);
+
+    assert.strictEqual(dialogOpenedWith !== null, true);
+    assert.strictEqual(dialogOpenedWith.path, '/images/photo.jpg');
+    assert.strictEqual(touchEnd2._defaultPrevented, true); // Suppresses native zoom
+    console.log('✓ Test 3: Mobile double-tap on row triggers dialog and suppresses zoom passed');
+  })();
+
+  // 4. Negative Test: Two taps outside threshold (e.g. 1000ms apart) do NOT trigger dialog
+  (() => {
+    let dialogOpenedWith = null;
+    const row = new MockElement('div');
+    row.className = 'entry file';
+    const nameEl = new MockElement('span');
+    nameEl.className = 'name';
+    row.appendChild(nameEl);
+
+    const entry = { name: 'track.mp3', path: '/music/track.mp3', is_dir: false };
+    setupRowInteractions(row, entry, (e) => { dialogOpenedWith = e; }, () => {});
+
+    // Tap 1 at t=0
+    row.dispatchEvent(new MockEvent('touchstart', { touches: [{ clientX: 100, clientY: 100 }] }));
+    row.dispatchEvent(new MockEvent('touchend', { target: nameEl }));
+
+    // Advance time manually by simulating lastTouchEnd 1000ms in past
+    const state = rowTouchState.get(row);
+    state.lastTouchEnd = Date.now() - 1000;
+
+    // Tap 2
+    row.dispatchEvent(new MockEvent('touchstart', { touches: [{ clientX: 100, clientY: 100 }] }));
+    const touchEnd2 = new MockEvent('touchend', { target: nameEl });
+    row.dispatchEvent(touchEnd2);
+
+    assert.strictEqual(dialogOpenedWith, null);
+    assert.strictEqual(touchEnd2._defaultPrevented, false);
+    console.log('✓ Test 4: Two taps outside threshold (>300ms) do NOT trigger dialog passed');
+  })();
+
+  // 5. Horizontal swipe gesture (>10px) cancels double-tap sequence and does not trigger dialog on tap
+  (() => {
+    let dialogOpenedWith = null;
+    let navCalled = false;
+    const row = new MockElement('div');
+    row.className = 'entry file';
+    const nameEl = new MockElement('span');
+    nameEl.className = 'name';
+    row.appendChild(nameEl);
+
+    const entry = { name: 'very-long-filename-that-overflows.mp4', path: '/very-long-filename-that-overflows.mp4', is_dir: false };
+    setupRowInteractions(row, entry, (e) => { dialogOpenedWith = e; }, () => { navCalled = true; });
+
+    // 1. Swipe horizontally: touchstart at x=200, move to x=150 (dx = 50px > 10px), touchend
+    row.dispatchEvent(new MockEvent('touchstart', { touches: [{ clientX: 200, clientY: 50 }] }));
+    row.dispatchEvent(new MockEvent('touchmove', { touches: [{ clientX: 150, clientY: 50 }] }));
+    row.dispatchEvent(new MockEvent('touchend', { target: nameEl }));
+
+    // 2. Immediately follow with a single tap within 100ms
+    row.dispatchEvent(new MockEvent('touchstart', { touches: [{ clientX: 150, clientY: 50 }] }));
+    row.dispatchEvent(new MockEvent('touchend', { target: nameEl }));
+
+    assert.strictEqual(dialogOpenedWith, null); // Must not trigger double-tap
+    console.log('✓ Test 5: Horizontal scroll swipe (>10px) rejects sequence and prevents double-tap misfire passed');
+  })();
+
+  // 6. Double-click/double-tap on checkbox or copy button does NOT trigger dialog
+  (() => {
+    let dialogOpenedWith = null;
+    const row = new MockElement('div');
+    row.className = 'entry file';
+
+    const cb = new MockElement('input');
+    cb.type = 'checkbox';
+    row.appendChild(cb);
+
+    const copyBtn = new MockElement('button');
+    copyBtn.className = 'icon-btn btn-copy-path';
+    row.appendChild(copyBtn);
+
+    const entry = { name: 'test.txt', path: '/test.txt', is_dir: false };
+    setupRowInteractions(row, entry, (e) => { dialogOpenedWith = e; }, () => {});
+
+    // Dblclick on checkbox
+    cb.dispatchEvent(new MockEvent('dblclick', { target: cb }));
+    assert.strictEqual(dialogOpenedWith, null);
+
+    // Double-tap on copy button
+    copyBtn.dispatchEvent(new MockEvent('touchstart', { target: copyBtn, touches: [{ clientX: 10, clientY: 10 }] }));
+    copyBtn.dispatchEvent(new MockEvent('touchend', { target: copyBtn }));
+    copyBtn.dispatchEvent(new MockEvent('touchstart', { target: copyBtn, touches: [{ clientX: 10, clientY: 10 }] }));
+    copyBtn.dispatchEvent(new MockEvent('touchend', { target: copyBtn }));
+    assert.strictEqual(dialogOpenedWith, null);
+
+    console.log('✓ Test 6: Double-click/tap on checkbox or copy button ignores dialog passed');
+  })();
+
+  // 7. Single click maintains directory navigation
+  (() => {
+    let navTarget = null;
+    const row = new MockElement('div');
+    row.className = 'entry dir';
+    const nameEl = new MockElement('span');
+    nameEl.className = 'name';
+    row.appendChild(nameEl);
+
+    const dirEntry = { name: 'Videos', path: '/Videos', is_dir: true };
+    setupRowInteractions(row, dirEntry, () => {}, (p) => { navTarget = p; });
+
+    nameEl.dispatchEvent(new MockEvent('click', { target: nameEl }));
+    assert.strictEqual(navTarget, '/Videos');
+    console.log('✓ Test 7: Single-click directory navigation unaffected passed');
+  })();
+
+  // 8. Dialog DOM rendering for file (shows Name, Full Path, Size, Open, Copy Link, Close, Dismiss ✕)
+  await (async () => {
+    const modal = new MockElement('div', 'item-details-modal');
+    modal.classList.add('hidden');
+    const nameEl = new MockElement('div', 'item-details-name');
+    const pathEl = new MockElement('div', 'item-details-path');
+    const sizeEl = new MockElement('div', 'item-details-size');
+    const dismissBtn = new MockElement('button', 'item-details-dismiss');
+    const openBtn = new MockElement('button', 'item-details-open');
+    const copyBtn = new MockElement('button', 'item-details-copy');
+    const closeBtn = new MockElement('button', 'item-details-close');
+
+    const dom = {
+      'item-details-modal': modal,
+      'item-details-name': nameEl,
+      'item-details-path': pathEl,
+      'item-details-size': sizeEl,
+      'item-details-dismiss': dismissBtn,
+      'item-details-open': openBtn,
+      'item-details-copy': copyBtn,
+      'item-details-close': closeBtn,
+    };
+    const el = (id) => dom[id];
+
+    function formatSize(bytes) {
+      if (bytes < 1024) return `${bytes} B`;
+      const units = ['KB', 'MB', 'GB', 'TB'];
+      let v = bytes;
+      let i = -1;
+      do { v /= 1024; i++; } while (v >= 1024 && i < units.length - 1);
+      return `${v.toFixed(1)} ${units[i]}`;
     }
-  });
 
-  const backdropEvt = new MockEvent('click', { target: modal });
-  modal.dispatchEvent(backdropEvt);
-  assert.strictEqual(sheetClosed, true);
-  assert.strictEqual(modal.classList.contains('hidden'), true);
-  assert.strictEqual(backdropEvt._propagationStopped, true);
-  assert.strictEqual(backdropEvt._defaultPrevented, true);
+    let windowOpenedWith = null;
+    global.window = {
+      open: (url, target, features) => {
+        windowOpenedWith = { url, target, features };
+      }
+    };
 
-  console.log('✓ Test 10: Close button and backdrop tap dismiss bottom sheet with isolated events passed');
-})();
+    async function mockApi(url) {
+      if (url.startsWith('/api/download/link')) {
+        return { url: '/api/download?path=%2Fdata%2Farchive.zip&expires=1700000000&signature=abc' };
+      }
+      return {};
+    }
 
+    async function open_file_action(p) {
+      const data = await mockApi(`/api/download/link?path=${encodeURIComponent(p)}`);
+      if (data && data.url) {
+        window.open(data.url, '_blank', 'noopener,noreferrer');
+      }
+    }
 
-})().catch(e => { console.error(e); process.exit(1); }).then(() => console.log("\nAll LiteSync Filename Visibility JavaScript unit tests passed successfully!"));
+    function openItemDetailsModal(entry) {
+      el('item-details-name').textContent = entry.name;
+      el('item-details-path').textContent = entry.path;
+      el('item-details-size').textContent = entry.is_dir ? '—' : formatSize(entry.size || 0);
+
+      el('item-details-dismiss').onclick = (e) => {
+        e.stopPropagation();
+        el('item-details-modal').classList.add('hidden');
+      };
+      el('item-details-close').onclick = (e) => {
+        e.stopPropagation();
+        el('item-details-modal').classList.add('hidden');
+      };
+
+      if (entry.is_dir) {
+        el('item-details-open').classList.add('hidden');
+        el('item-details-copy').classList.add('hidden');
+      } else {
+        el('item-details-open').classList.remove('hidden');
+        el('item-details-copy').classList.remove('hidden');
+        el('item-details-copy').textContent = 'Copy Link';
+        el('item-details-open').onclick = async (e) => {
+          e.stopPropagation();
+          el('item-details-modal').classList.add('hidden');
+          await open_file_action(entry.path);
+        };
+      }
+      el('item-details-modal').classList.remove('hidden');
+    }
+
+    const fileEntry = { name: 'archive.zip', path: '/data/archive.zip', size: 1048576, is_dir: false };
+    openItemDetailsModal(fileEntry);
+
+    assert.strictEqual(modal.classList.contains('hidden'), false);
+    assert.strictEqual(nameEl.textContent, 'archive.zip');
+    assert.strictEqual(pathEl.textContent, '/data/archive.zip');
+    assert.strictEqual(sizeEl.textContent, '1.0 MB');
+    assert.strictEqual(openBtn.classList.contains('hidden'), false);
+    assert.strictEqual(copyBtn.classList.contains('hidden'), false);
+    assert.strictEqual(copyBtn.textContent, 'Copy Link');
+
+    // Test Open button click
+    const openEvt = new MockEvent('click');
+    await openBtn.onclick(openEvt);
+    assert.strictEqual(windowOpenedWith !== null, true);
+    assert.strictEqual(windowOpenedWith.url.includes('/api/download?path='), true);
+    assert.strictEqual(windowOpenedWith.target, '_blank');
+    assert.strictEqual(modal.classList.contains('hidden'), true);
+    console.log('✓ Test 8: Metadata (Name, Path, Size) and functional Open action pass');
+  })();
+
+  // 9. Dismiss (✕) and Close buttons dismiss modal cleanly
+  (() => {
+    const modal = new MockElement('div', 'item-details-modal');
+    modal.classList.remove('hidden');
+    const dismissBtn = new MockElement('button', 'item-details-dismiss');
+    const closeBtn = new MockElement('button', 'item-details-close');
+
+    dismissBtn.onclick = (e) => {
+      e.stopPropagation();
+      modal.classList.add('hidden');
+    };
+    closeBtn.onclick = (e) => {
+      e.stopPropagation();
+      modal.classList.add('hidden');
+    };
+
+    dismissBtn.onclick(new MockEvent('click'));
+    assert.strictEqual(modal.classList.contains('hidden'), true);
+
+    modal.classList.remove('hidden');
+    closeBtn.onclick(new MockEvent('click'));
+    assert.strictEqual(modal.classList.contains('hidden'), true);
+    console.log('✓ Test 9: Top-right dismiss (✕) and footer Close button dismiss modal passed');
+  })();
+
+  // 10. Copy Link reuses signed-link flow and auto-closes on success
+  await (async () => {
+    let signedLinkPath = null;
+    async function mockCopyDownloadLink(p) {
+      signedLinkPath = p;
+      return true;
+    }
+
+    const modal = new MockElement('div', 'item-details-modal');
+    modal.classList.remove('hidden');
+    const copyBtn = new MockElement('button', 'item-details-copy');
+
+    copyBtn.onclick = async (e) => {
+      e.stopPropagation();
+      const success = await mockCopyDownloadLink('/files/video.mp4');
+      if (success) modal.classList.add('hidden');
+    };
+
+    await copyBtn.onclick(new MockEvent('click'));
+    assert.strictEqual(signedLinkPath, '/files/video.mp4');
+    assert.strictEqual(modal.classList.contains('hidden'), true);
+    console.log('✓ Test 10: Copy Link reuses signed-link flow passed');
+  })();
+
+  // 11. Backdrop click dismisses dialog with isolated event
+  (() => {
+    const modal = new MockElement('div', 'item-details-modal');
+    modal.classList.remove('hidden');
+
+    let closed = false;
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        e.stopPropagation();
+        closed = true;
+        modal.classList.add('hidden');
+      }
+    });
+
+    modal.dispatchEvent(new MockEvent('click', { target: modal }));
+    assert.strictEqual(closed, true);
+    assert.strictEqual(modal.classList.contains('hidden'), true);
+    console.log('✓ Test 11: Backdrop click dismisses dialog with isolated event passed');
+  })();
+
+})().catch(e => { console.error(e); process.exit(1); }).then(() => console.log("\nAll LiteSync File Action Dialog & Gesture Unit Tests Passed Successfully!"));

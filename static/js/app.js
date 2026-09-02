@@ -717,6 +717,13 @@ async function init() {
       closeItemDetailsModal();
     });
   }
+  const itemDismissBtn = el('item-details-dismiss');
+  if (itemDismissBtn) {
+    itemDismissBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeItemDetailsModal();
+    });
+  }
   const itemModal = el('item-details-modal');
   if (itemModal) {
     itemModal.addEventListener('click', (e) => {

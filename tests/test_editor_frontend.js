@@ -291,31 +291,31 @@ class MockEvent {
       isMaximized = !isMaximized;
       if (isMaximized) {
         modalDialog.classList.add('maximized');
-        maxBtn.textContent = '🗗';
+        maxBtn.innerHTML = '<img src="/assets/icons/minimize.svg" class="ui-icon" alt="" />';
         maxBtn.title = 'Restore';
       } else {
         modalDialog.classList.remove('maximized');
-        maxBtn.textContent = '⛶';
+        maxBtn.innerHTML = '<img src="/assets/icons/maximize.svg" class="ui-icon" alt="" />';
         maxBtn.title = 'Maximize';
       }
     }
 
     dom['editor-maximize'] = new MockElement('button', 'editor-maximize');
-    dom['editor-maximize'].textContent = '⛶';
+    dom['editor-maximize'].innerHTML = '<img src="/assets/icons/maximize.svg" class="ui-icon" alt="" />';
     dom['editor-maximize'].title = 'Maximize';
 
     // Click maximize
     toggleMaximize();
     assert.strictEqual(isMaximized, true);
     assert.strictEqual(dom['editor-modal'].classList.contains('maximized'), true);
-    assert.strictEqual(dom['editor-maximize'].textContent, '🗗');
+    assert.strictEqual(dom['editor-maximize'].innerHTML.includes('minimize.svg'), true);
     assert.strictEqual(dom['editor-maximize'].title, 'Restore');
 
     // Click minimize / restore
     toggleMaximize();
     assert.strictEqual(isMaximized, false);
     assert.strictEqual(dom['editor-modal'].classList.contains('maximized'), false);
-    assert.strictEqual(dom['editor-maximize'].textContent, '⛶');
+    assert.strictEqual(dom['editor-maximize'].innerHTML.includes('maximize.svg'), true);
     assert.strictEqual(dom['editor-maximize'].title, 'Maximize');
     console.log('✓ Test 8: Maximize toggle expands/restores modal and updates icons correctly');
 
@@ -329,9 +329,9 @@ class MockEvent {
     // When opened, state is reset to non-maximized
     isMaximized = false;
     dom['editor-modal'].classList.remove('maximized');
-    dom['editor-maximize'].textContent = '⛶';
+    dom['editor-maximize'].innerHTML = '<img src="/assets/icons/maximize.svg" class="ui-icon" alt="" />';
     assert.strictEqual(dom['editor-modal'].classList.contains('maximized'), false);
-    assert.strictEqual(dom['editor-maximize'].textContent, '⛶');
+    assert.strictEqual(dom['editor-maximize'].innerHTML.includes('maximize.svg'), true);
     console.log('✓ Test 9: Maximized state resets to default on subsequent open sessions');
 
     // 10. Ctrl/Cmd+S and Escape work identically while maximized

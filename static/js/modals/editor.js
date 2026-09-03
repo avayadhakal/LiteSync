@@ -25,12 +25,12 @@ export function toggleEditorMaximize() {
   isMaximized = !isMaximized;
   if (isMaximized) {
     modalDialog.classList.add('maximized');
-    maxBtn.textContent = '🗗';
+    maxBtn.innerHTML = '<img src="/assets/icons/minimize.svg" class="ui-icon" alt="" />';
     maxBtn.title = 'Restore';
     maxBtn.setAttribute('aria-label', 'Restore');
   } else {
     modalDialog.classList.remove('maximized');
-    maxBtn.textContent = '⛶';
+    maxBtn.innerHTML = '<img src="/assets/icons/maximize.svg" class="ui-icon" alt="" />';
     maxBtn.title = 'Maximize';
     maxBtn.setAttribute('aria-label', 'Maximize');
   }
@@ -51,7 +51,7 @@ export async function openEditorModal(entry) {
   isMaximized = false;
   if (modalDialog) modalDialog.classList.remove('maximized');
   if (maxBtn) {
-    maxBtn.textContent = '⛶';
+    maxBtn.innerHTML = '<img src="/assets/icons/maximize.svg" class="ui-icon" alt="" />';
     maxBtn.title = 'Maximize';
     maxBtn.setAttribute('aria-label', 'Maximize');
   }
@@ -153,7 +153,7 @@ export async function closeEditorModal() {
   isMaximized = false;
   if (modalDialog) modalDialog.classList.remove('maximized');
   if (maxBtn) {
-    maxBtn.textContent = '⛶';
+    maxBtn.innerHTML = '<img src="/assets/icons/maximize.svg" class="ui-icon" alt="" />';
     maxBtn.title = 'Maximize';
     maxBtn.setAttribute('aria-label', 'Maximize');
   }

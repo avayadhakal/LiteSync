@@ -26,6 +26,8 @@ app.include_router(tasks_router)
 
 app.mount("/css", StaticFiles(directory=STATIC_DIR / "css"), name="css")
 app.mount("/js", StaticFiles(directory=STATIC_DIR / "js"), name="js")
+app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"), name="assets")
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 _scheduler_task: asyncio.Task | None = None
 

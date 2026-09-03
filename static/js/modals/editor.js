@@ -1,6 +1,7 @@
 import { el } from '../utils.js';
 import { api, toastSuccess, toastError } from '../api.js';
 import { loadActivity } from '../activity.js';
+import { confirmStyled } from '../app.js';
 
 let currentPath = null;
 let currentMtimeNs = null;
@@ -129,7 +130,7 @@ export async function saveEditorContent() {
   }
 }
 
-export function closeEditorModal() {
+export async function closeEditorModal() {
   const modal = el('editor-modal');
   const textarea = el('editor-textarea');
   const errorEl = el('editor-error');
@@ -137,7 +138,12 @@ export function closeEditorModal() {
   if (!modal || modal.classList.contains('hidden')) return;
 
   if (textarea && textarea.value !== originalContent) {
-    const ok = window.confirm('You have unsaved changes. Are you sure you want to discard them and close?');
+    const ok = await confirmStyled(
+      'Discard unsaved changes?',
+      'You have unsaved changes. Are you sure you want to discard them and close?',
+      'Discard',
+      true
+    );
     if (!ok) return;
   }
 

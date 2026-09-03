@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 ### Added
+- **Real-Time Transfer Metrics:** Display live transfer speed and copied/total size on active transfer cards.
+- **Per-Log Delete Button:** Added individual deletion for activity log entries with a corresponding `DELETE /api/activity/{id}` endpoint.
+- **Item Details Enhancements:** Added a modified date field and horizontal scrolling for long filenames.
 - **Download from URL & Unified Upload Modal:** Added a background "Download from URL" feature managed as an asynchronous task alongside existing file uploads within a unified Upload modal. Includes optional custom filename override, conflict resolution (skip, replace, keep both), real-time progress, cancellation, and max download size enforcement.
 - **SSRF & DNS Rebinding Protection:** Built-in connection-time DNS resolution and IP filtering rejecting loopback, private, link-local, reserved, and non-http(s) targets, including safe redirect validation across hops.
 - **URL Download Test Suite:** Added comprehensive test coverage for URL downloads, SSRF guard, redirects, size caps, and error cleanup (166 total tests passing).
@@ -23,6 +26,8 @@ All notable changes to this project will be documented in this file.
 - **Interactive File Sorting:** Implemented 2-tier column headers supporting instant ascending/descending sorts for Name, Modified, and Size with dynamic responsive layouts.
 
 ### Changed
+- **Modal Behavior & Text Editor:** Disabled backdrop click-to-dismiss across modals, standardized upload dialog height across tabs, enabled word wrap by default in the text editor, and replaced browser alerts with custom in-app confirmation dialogs.
+- **Activity Details:** Replaced process exit code and summary text with formatted source file size.
 - **Internal Modularization & Refactoring:** Restructured backend and frontend codebases into dedicated subsystems (`app/transfers/`, `app/browse/`, `static/js/modals/`, ES modules) with isolated concerns and focused test coverage.
 
 ### Fixed

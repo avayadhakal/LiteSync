@@ -6,12 +6,22 @@ import os
 import secrets
 import socket
 import ssl
+import time
 import urllib.parse
 import urllib.request
 from pathlib import Path
 
 _current_url_download_task_id: str | None = None
 _url_download_cancel_flag: bool = False
+
+
+def _format_speed(bytes_per_sec: float) -> str:
+    if bytes_per_sec >= 1024 * 1024:
+        return f"{bytes_per_sec / (1024 * 1024):.2f}MB/s"
+    elif bytes_per_sec >= 1024:
+        return f"{bytes_per_sec / 1024:.2f}kB/s"
+    else:
+        return f"{bytes_per_sec:.0f}B/s"
 
 
 def set_url_download_task_id(task_id: str | None) -> None:
@@ -249,6 +259,7 @@ def _sync_url_download_worker(
 
             chunk_size = 64 * 1024
             last_pct = -1
+            last_log_time = time.monotonic()
             last_logged_bytes = 0
 
             with open(temp_path, "wb") as out_f:
@@ -267,21 +278,31 @@ def _sync_url_download_worker(
 
                     out_f.write(chunk)
 
+                    now = time.monotonic()
                     if total_size is not None and total_size > 0:
                         pct = int((bytes_written / total_size) * 100)
-                        if pct != last_pct:
+                        if pct != last_pct or (now - last_log_time >= 0.2):
                             last_pct = pct
+                            dt = max(0.001, now - last_log_time)
+                            speed = (bytes_written - last_logged_bytes) / dt
+                            last_log_time = now
+                            last_logged_bytes = bytes_written
+                            speed_str = _format_speed(speed)
                             try:
-                                log_fh.write(f" {pct}%\n".encode("utf-8"))
+                                log_fh.write(f" {bytes_written}/{total_size} {pct}% {speed_str}\n".encode("utf-8"))
                                 log_fh.flush()
                             except OSError:
                                 pass
                     else:
-                        if bytes_written - last_logged_bytes >= 512 * 1024:
+                        if bytes_written - last_logged_bytes >= 512 * 1024 or (now - last_log_time >= 0.5):
+                            dt = max(0.001, now - last_log_time)
+                            speed = (bytes_written - last_logged_bytes) / dt
+                            last_log_time = now
                             last_logged_bytes = bytes_written
                             mb_str = f"{bytes_written / (1024 * 1024):.2f} MB"
+                            speed_str = _format_speed(speed)
                             try:
-                                log_fh.write(f"Downloaded {mb_str}\n".encode("utf-8"))
+                                log_fh.write(f"Downloaded {mb_str} ({speed_str})\n".encode("utf-8"))
                                 log_fh.flush()
                             except OSError:
                                 pass

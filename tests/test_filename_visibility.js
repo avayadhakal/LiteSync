@@ -501,24 +501,15 @@ class MockEvent {
     console.log('✓ Test 10: Copy Link reuses signed-link flow passed');
   })();
 
-  // 11. Backdrop click dismisses dialog with isolated event
+  // 11. Backdrop click does not dismiss dialog (click-to-dismiss disabled)
   (() => {
     const modal = new MockElement('div', 'item-details-modal');
     modal.classList.remove('hidden');
 
-    let closed = false;
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) {
-        e.stopPropagation();
-        closed = true;
-        modal.classList.add('hidden');
-      }
-    });
-
+    // Backdrop click does not attach dismissal listener
     modal.dispatchEvent(new MockEvent('click', { target: modal }));
-    assert.strictEqual(closed, true);
-    assert.strictEqual(modal.classList.contains('hidden'), true);
-    console.log('✓ Test 11: Backdrop click dismisses dialog with isolated event passed');
+    assert.strictEqual(modal.classList.contains('hidden'), false);
+    console.log('✓ Test 11: Backdrop click does NOT dismiss dialog (disabled overlay click) passed');
   })();
 
 })().catch(e => { console.error(e); process.exit(1); }).then(() => console.log("\nAll LiteSync File Action Dialog & Gesture Unit Tests Passed Successfully!"));

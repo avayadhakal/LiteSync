@@ -176,6 +176,7 @@ async def save_file_content(
             "name": resolved.name,
             "path": str(resolved),
             "destination": parent_str,
+            "size": len(encoded_bytes),
             "summary": f"{resolved.name} → {parent_str}",
             "error": None,
         },

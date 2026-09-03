@@ -20,6 +20,7 @@ from app.transfers.routes import (
     cancel_task,
     clear_activity,
     create_transfer,
+    delete_activity_entry,
     delete_all_completed_tasks,
     delete_task,
     get_activity,
@@ -384,6 +385,19 @@ class TestActivityLogIntegration(unittest.TestCase):
         del_res = asyncio.run(clear_activity(_user="test_user"))
         self.assertEqual(del_res, {"success": True})
         self.assertEqual(len(db.list_activity()), 0)
+
+    def test_delete_single_activity_api(self):
+        id1 = db.add_activity("mkdir", {"operation": "mkdir", "name": "dir1", "status": "succeeded"})
+        id2 = db.add_activity("delete", {"operation": "delete", "name": "file1", "status": "succeeded"})
+        self.assertEqual(len(db.list_activity()), 2)
+
+        # Delete only id1
+        del_res = asyncio.run(delete_activity_entry(id1, _user="test_user"))
+        self.assertEqual(del_res, {"success": True})
+
+        remaining = db.list_activity()
+        self.assertEqual(len(remaining), 1)
+        self.assertEqual(remaining[0]["id"], id2)
 
     def test_activity_persistence_across_db_reopen(self):
         db.add_activity("transfer", {"operation": "copy", "name": "doc.pdf", "status": "succeeded"})

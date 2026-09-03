@@ -355,6 +355,20 @@ def mark_finished(task_id: str, status: str, exit_code: int | None, error_messag
                 else:
                     summary = error_message or "cancelled by user"
 
+            file_size = None
+            try:
+                src_path_obj = Path(src_str)
+                if src_path_obj.exists() and not src_path_obj.is_dir():
+                    file_size = src_path_obj.stat().st_size
+                else:
+                    dst_path_obj = Path(dst_str)
+                    if dst_path_obj.exists() and not dst_path_obj.is_dir():
+                        file_size = dst_path_obj.stat().st_size
+                    elif (dst_path_obj / src_name).exists() and not (dst_path_obj / src_name).is_dir():
+                        file_size = (dst_path_obj / src_name).stat().st_size
+            except OSError:
+                pass
+
             msg_data = {
                 "operation": op,
                 "status": status,
@@ -362,6 +376,7 @@ def mark_finished(task_id: str, status: str, exit_code: int | None, error_messag
                 "destination": dst_str,
                 "name": src_name,
                 "summary": summary,
+                "size": file_size,
                 "exit_code": exit_code,
                 "error": error_message,
             }
@@ -472,6 +487,12 @@ def clear_activity() -> None:
     """Delete all records from the activity table."""
     with _lock, _connect() as conn:
         conn.execute("DELETE FROM activity")
+
+
+def delete_activity_entry(activity_id: int) -> None:
+    """Delete a single activity log entry by its ID."""
+    with _lock, _connect() as conn:
+        conn.execute("DELETE FROM activity WHERE id=?", (activity_id,))
 
 
 def prune_activity(keep_limit: int = 500) -> int:

@@ -89,12 +89,6 @@ function initUploadModal() {
   if (dismissBtn) dismissBtn.addEventListener('click', closeUploadModal);
   if (cancelBtn) cancelBtn.addEventListener('click', closeUploadModal);
 
-  if (modal) {
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) closeUploadModal();
-    });
-  }
-
   if (btnDevice) btnDevice.addEventListener('click', () => setUploadModalTab('device'));
   if (btnUrl) btnUrl.addEventListener('click', () => setUploadModalTab('url'));
 

@@ -187,10 +187,12 @@ class MockEvent {
       }
     }
 
-    function closeEditor() {
+    let mockConfirmStyled = async () => true;
+
+    async function closeEditor() {
       const textarea = el('editor-textarea');
       if (textarea.value !== originalContent) {
-        const ok = global.window.confirm('Discard changes?');
+        const ok = await mockConfirmStyled('Discard unsaved changes?', 'You have unsaved changes. Are you sure you want to discard them and close?', 'Discard', true);
         if (!ok) return false;
       }
       el('editor-modal').classList.add('hidden');
@@ -231,18 +233,18 @@ class MockEvent {
 
     // 5. Unsaved changes confirmation on close
     let confirmCalled = false;
-    global.window.confirm = (msg) => {
+    mockConfirmStyled = async (title, msg) => {
       confirmCalled = true;
       return false; // User clicks cancel on prompt
     };
-    const closeResult = closeEditor();
+    const closeResult = await closeEditor();
     assert.strictEqual(confirmCalled, true);
     assert.strictEqual(closeResult, false);
     assert.strictEqual(dom['editor-modal'].classList.contains('hidden'), false);
 
     // If user approves confirm
-    global.window.confirm = () => true;
-    const closed = closeEditor();
+    mockConfirmStyled = async () => true;
+    const closed = await closeEditor();
     assert.strictEqual(closed, true);
     assert.strictEqual(dom['editor-modal'].classList.contains('hidden'), true);
     console.log('✓ Test 5: Unsaved changes prompt guards against accidental close');
@@ -343,11 +345,18 @@ class MockEvent {
 
     // Test close with unsaved changes while maximized
     dom['editor-textarea'].value = 'unsaved text while maximized';
-    global.window.confirm = () => true;
-    const closedWhileMax = closeEditor();
+    mockConfirmStyled = async () => true;
+    const closedWhileMax = await closeEditor();
     assert.strictEqual(closedWhileMax, true);
     assert.strictEqual(dom['editor-modal'].classList.contains('hidden'), true);
     console.log('✓ Test 10: Save shortcut and Escape close with unsaved prompt work while maximized');
+
+    // 11. Editor word wrap CSS is enabled by default (white-space: pre-wrap)
+    const fs = require('fs');
+    const path = require('path');
+    const cssContent = fs.readFileSync(path.join(__dirname, '../static/css/app.css'), 'utf-8');
+    assert.strictEqual(cssContent.includes('white-space: pre-wrap;'), true, 'app.css should include white-space: pre-wrap for word wrapping');
+    console.log('✓ Test 11: Editor word wrap is enabled by default in app.css');
   })();
 
 })().catch(e => { console.error(e); process.exit(1); }).then(() => console.log("\nAll LiteSync Text Editor & Open Action Frontend Unit Tests Passed Successfully!"));

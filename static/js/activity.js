@@ -1,5 +1,5 @@
 import { api, toastSuccess, toastError, copyToClipboard } from './api.js';
-import { el, escapeHtml, normalizePath } from './utils.js';
+import { el, escapeHtml, normalizePath, formatSize } from './utils.js';
 import { state } from './state.js';
 
 export async function loadActivity() {
@@ -269,6 +269,7 @@ export function renderActivity() {
       <div class="log-meta">
         <span class="activity-time">${escapeHtml(formatActivityTime(entry.created_at || entry.ts))}</span>
         <button class="activity-details-btn" title="View Details">Details</button>
+        <button class="activity-delete-btn" title="Delete Log Entry">Delete</button>
       </div>
     `;
 
@@ -288,6 +289,21 @@ export function renderActivity() {
     const detailsBtn = card.querySelector('.activity-details-btn');
     if (detailsBtn) {
       detailsBtn.addEventListener('click', openDetails);
+    }
+
+    const deleteBtn = card.querySelector('.activity-delete-btn');
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        try {
+          await api(`/api/activity/${entry.id}`, { method: 'DELETE' });
+          state.activity = state.activity.filter((a) => a.id !== entry.id);
+          renderActivity();
+          toastSuccess('Activity log entry deleted.');
+        } catch (err) {
+          toastError(`Failed to delete activity log entry: ${err.message}`);
+        }
+      });
     }
 
     container.appendChild(card);
@@ -340,12 +356,12 @@ export function openActivityDetails(entry, info) {
   if (data.path && !data.source && !data.destination && !data.old_path) {
     rows.push({ label: 'Path', value: data.path, copyable: true });
   }
-  if (data.exit_code !== undefined && data.exit_code !== null) {
-    rows.push({ label: 'Exit Code', value: String(data.exit_code) });
-  }
-  if (data.summary) {
-    rows.push({ label: 'Summary', value: data.summary });
-  }
+  const sizeVal = (data.size !== undefined && data.size !== null && data.size !== '')
+    ? formatSize(Number(data.size))
+    : ((data.file_size !== undefined && data.file_size !== null && data.file_size !== '')
+      ? formatSize(Number(data.file_size))
+      : (data.bytes !== undefined && data.bytes !== null && data.bytes !== '' ? formatSize(Number(data.bytes)) : '—'));
+  rows.push({ label: 'File Size', value: sizeVal });
 
   body.innerHTML = '';
   for (const r of rows) {

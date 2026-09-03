@@ -822,6 +822,20 @@ tr.task-row:hover { background: rgba(255, 255, 255, 0.05); }
   opacity: 0.6;
 }
 
+.card-stats {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+.card-speed {
+  font-weight: 600;
+  color: var(--accent);
+}
+
 /* Tailwind-style utility classes */
 .relative { position: relative; }
 .absolute { position: absolute; }
@@ -939,6 +953,23 @@ tr.task-row:hover { background: rgba(255, 255, 255, 0.05); }
 @keyframes toast-in-mobile {
   from { opacity: 0; transform: translateY(20px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Upload Modal Sections */
+#upload-device-section,
+#upload-url-section {
+  min-height: 236px;
+  box-sizing: border-box;
+}
+
+.upload-dropzone {
+  min-height: 236px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  box-sizing: border-box;
 }
 
 /* In-flight upload progress card (toast stack component) */
@@ -1144,6 +1175,23 @@ tr.task-row:hover { background: rgba(255, 255, 255, 0.05); }
   border-color: var(--accent);
 }
 
+.activity-delete-btn {
+  background: transparent;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 4px;
+  color: #f87171;
+  font-size: 10px;
+  padding: 1px 6px;
+  line-height: 1.3;
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
+}
+.activity-delete-btn:hover {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+
 .activity-primary-line {
   font-size: 14px;
   font-weight: 500;
@@ -1318,6 +1366,19 @@ tr.task-row:hover { background: rgba(255, 255, 255, 0.05); }
   user-select: text;
 }
 
+.item-details-value.scrollable-name {
+  white-space: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+  scrollbar-width: thin;
+  padding: 6px 8px;
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
 .item-details-value.path-wrap {
   word-break: break-all;
   white-space: pre-wrap;
@@ -1378,8 +1439,10 @@ tr.task-row:hover { background: rgba(255, 255, 255, 0.05); }
   font-family: ui-monospace, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 13px;
   line-height: 1.5;
-  white-space: pre;
-  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: hidden;
+  overflow-y: auto;
   tab-size: 4;
 }
 

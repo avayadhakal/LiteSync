@@ -1,5 +1,6 @@
 import os
 import shutil
+import time
 from pathlib import Path
 
 _current_kernel_task_id: str | None = None
@@ -16,6 +17,14 @@ def cancel_kernel_task(task_id: str) -> bool:
         _kernel_cancel_flag = True
         return True
     return False
+
+def _format_speed(bytes_per_sec: float) -> str:
+    if bytes_per_sec >= 1024 * 1024:
+        return f"{bytes_per_sec / (1024 * 1024):.2f}MB/s"
+    elif bytes_per_sec >= 1024:
+        return f"{bytes_per_sec / 1024:.2f}kB/s"
+    else:
+        return f"{bytes_per_sec:.0f}B/s"
 
 def _sync_kernel_copy_worker(src_str: str, target_path_str: str, log_fh, overwrite: bool = False) -> None:
     """Synchronous worker to perform kernel copy (falling back to chunked read/write)."""
@@ -40,6 +49,10 @@ def _sync_kernel_copy_worker(src_str: str, target_path_str: str, log_fh, overwri
                 except OSError:
                     pass
             
+        start_time = time.monotonic()
+        last_log_time = start_time
+        last_logged_copied = 0
+
         try:
             # Attempt kernel copy
             if hasattr(os, 'copy_file_range'):
@@ -63,10 +76,16 @@ def _sync_kernel_copy_worker(src_str: str, target_path_str: str, log_fh, overwri
                             
                             if src_size > 0:
                                 pct = int((copied / src_size) * 100)
-                                if pct != last_pct:
+                                now = time.monotonic()
+                                if pct != last_pct or (now - last_log_time >= 0.2):
                                     last_pct = pct
+                                    dt = max(0.001, now - last_log_time)
+                                    speed = (copied - last_logged_copied) / dt
+                                    last_log_time = now
+                                    last_logged_copied = copied
+                                    speed_str = _format_speed(speed)
                                     try:
-                                        log_fh.write(f" {pct}%\n".encode("utf-8"))
+                                        log_fh.write(f" {copied}/{src_size} {pct}% {speed_str}\n".encode("utf-8"))
                                         log_fh.flush()
                                     except OSError:
                                         pass
@@ -86,6 +105,8 @@ def _sync_kernel_copy_worker(src_str: str, target_path_str: str, log_fh, overwri
             src_size = 0
         copied = 0
         last_pct = -1
+        last_log_time = time.monotonic()
+        last_logged_copied = 0
         with open(src_path, "rb") as in_f:
             with open(dst_path, "wb") as out_f:
                 while True:
@@ -99,10 +120,16 @@ def _sync_kernel_copy_worker(src_str: str, target_path_str: str, log_fh, overwri
                     
                     if src_size > 0:
                         pct = int((copied / src_size) * 100)
-                        if pct != last_pct:
+                        now = time.monotonic()
+                        if pct != last_pct or (now - last_log_time >= 0.2):
                             last_pct = pct
+                            dt = max(0.001, now - last_log_time)
+                            speed = (copied - last_logged_copied) / dt
+                            last_log_time = now
+                            last_logged_copied = copied
+                            speed_str = _format_speed(speed)
                             try:
-                                log_fh.write(f" {pct}%\n".encode("utf-8"))
+                                log_fh.write(f" {copied}/{src_size} {pct}% {speed_str}\n".encode("utf-8"))
                                 log_fh.flush()
                             except OSError:
                                 pass

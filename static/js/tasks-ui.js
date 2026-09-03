@@ -140,6 +140,20 @@ function bindCardEventListeners(task, card) {
   }
 }
 
+function parseByteValue(str) {
+  if (!str) return 0;
+  const s = str.replace(/,/g, '').trim();
+  const m = s.match(/^([\d\.]+)\s*([KMGTPkmgtp]?)(?:[iI]?[bB])?$/);
+  if (!m) {
+    const n = parseFloat(s);
+    return isNaN(n) ? 0 : n;
+  }
+  const val = parseFloat(m[1]);
+  const unit = m[2].toUpperCase();
+  const mult = { '': 1, 'K': 1024, 'M': 1024 * 1024, 'G': 1024 * 1024 * 1024, 'T': 1024 * 1024 * 1024 * 1024, 'P': 1024 * 1024 * 1024 * 1024 * 1024 };
+  return val * (mult[unit] || 1);
+}
+
 export function updateCardControlsInPlace(task) {
   const card = el(`card-${task.task_id}`);
   if (!card) return;
@@ -161,6 +175,15 @@ export function updateCardControlsInPlace(task) {
       detailEl.textContent = `Copying: ${streamData.currentFile}`;
     } else {
       detailEl.textContent = 'Starting transfer...';
+    }
+  }
+
+  const speedEl = el(`progress-speed-${task.task_id}`);
+  if (speedEl) {
+    if (task.status === 'paused') {
+      speedEl.textContent = '—';
+    } else if (task.status === 'queued') {
+      speedEl.textContent = '';
     }
   }
 }
@@ -215,6 +238,8 @@ export function renderActiveTransfers() {
     const currentDetail = task.status === 'paused' ? 'Paused' : (streamData && streamData.currentFile
       ? `Copying: ${streamData.currentFile}`
       : (task.status === 'queued' ? 'Queued...' : 'Starting transfer...'));
+    const currentSize = streamData && streamData.sizeText ? streamData.sizeText : '';
+    const currentSpeed = streamData && streamData.speed ? streamData.speed : (task.status === 'paused' ? '—' : '');
 
     card.innerHTML = `
       <div class="card-top" style="display: flex; justify-content: space-between; align-items: center;">
@@ -231,6 +256,10 @@ export function renderActiveTransfers() {
       </div>
       <div class="bg-gray-800 relative overflow-hidden" style="height: 8px; border-radius: 4px; margin-top: 4px;">
         <div class="absolute inset-0" id="progress-fill-${task.task_id}" style="background: var(--accent-dim); width: ${currentPct}%; transition: width 0.2s ease; border-radius: 4px;"></div>
+      </div>
+      <div class="card-stats" id="progress-stats-${task.task_id}" style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--text-dim); margin-top: 4px; font-family: ui-monospace, monospace;">
+        <span id="progress-size-${task.task_id}">${escapeHtml(currentSize)}</span>
+        <span id="progress-speed-${task.task_id}" class="card-speed">${escapeHtml(currentSpeed)}</span>
       </div>
     `;
 
@@ -251,6 +280,8 @@ export function attachTaskStream(task) {
     source: new EventSource(`/api/tasks/${taskId}/stream`),
     currentFile: '',
     pct: 0,
+    speed: '',
+    sizeText: '',
   };
   activeStreams.set(taskId, streamData);
 
@@ -264,9 +295,43 @@ export function attachTaskStream(task) {
     const fillEl = el(`progress-fill-${taskId}`);
     const pctEl = el(`progress-pct-${taskId}`);
     const detailEl = el(`progress-detail-${taskId}`);
+    const sizeEl = el(`progress-size-${taskId}`);
+    const speedEl = el(`progress-speed-${taskId}`);
 
-        // Check if line contains progress percentage
     const isDownload = task.operation === 'url_download';
+
+    // 1. Extract speed if present (e.g. 12.50MB/s or 500kB/s or 24.5 MB/s)
+    const speedMatch = trimmed.match(/([\d\.]+\s*(?:[KMGTPkmgtp]?[bB]\/s|bytes\/s))/i);
+    if (speedMatch) {
+      streamData.speed = speedMatch[1].replace(/\s+/g, '');
+      if (speedEl) speedEl.textContent = streamData.speed;
+    }
+
+    // 2. Extract copied and total size if present
+    // Format A: "157286400/1048576000" or "150MB/1.2GB"
+    const slashMatch = trimmed.match(/([\d\.,]+[KMGTPkmgtp]?B?)\s*\/\s*([\d\.,]+[KMGTPkmgtp]?B?)/i);
+    if (slashMatch) {
+      const b1 = parseByteValue(slashMatch[1]);
+      const b2 = parseByteValue(slashMatch[2]);
+      if (b1 > 0 && b2 > 0) {
+        streamData.sizeText = `${formatSize(b1)} / ${formatSize(b2)}`;
+        if (sizeEl) sizeEl.textContent = streamData.sizeText;
+      }
+    }
+
+    // Format B: rsync progress line "<copied_token> <pct>% <speed> <eta>"
+    const rsyncProgMatch = trimmed.match(/^\s*([\d\.,]+[KMGTPkmgtp]?B?)\s+(\d+)%\s+([\d\.,]+[KMGTPkmgtp]?B?\/s)/i);
+    if (rsyncProgMatch) {
+      const copiedBytes = parseByteValue(rsyncProgMatch[1]);
+      const pctVal = parseInt(rsyncProgMatch[2], 10);
+      if (pctVal > 0 && copiedBytes > 0 && !slashMatch) {
+        const totalBytes = Math.round(copiedBytes / (pctVal / 100));
+        streamData.sizeText = `${formatSize(copiedBytes)} / ${formatSize(totalBytes)}`;
+        if (sizeEl) sizeEl.textContent = streamData.sizeText;
+      }
+    }
+
+    // Check if line contains progress percentage
     const matches = trimmed.match(/(\d+)%/g);
     if (matches && matches.length > 0) {
       const lastMatch = matches[matches.length - 1];

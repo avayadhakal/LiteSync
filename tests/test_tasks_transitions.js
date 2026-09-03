@@ -275,11 +275,15 @@ global.fetch = async (path, opts) => {
     const detailEl = mockDocument.getElementById('progress-detail-task_q3');
     assert.strictEqual(detailEl.textContent, 'Copying: document.pdf');
 
-    es.simulateMessage('45% 1.2MB/s 0:00:02');
+    es.simulateMessage('150.00M 45% 1.2MB/s 0:00:02');
     const pctEl = mockDocument.getElementById('progress-pct-task_q3');
     const fillEl = mockDocument.getElementById('progress-fill-task_q3');
+    const speedEl = mockDocument.getElementById('progress-speed-task_q3');
+    const sizeEl = mockDocument.getElementById('progress-size-task_q3');
     assert.strictEqual(pctEl.textContent, '45%');
     assert.strictEqual(fillEl.style.width, '45%');
+    assert.strictEqual(speedEl.textContent, '1.2MB/s');
+    assert.strictEqual(sizeEl.textContent.includes('150.0 MB'), true);
   });
 
   await runTest('Test 4: Pause/Resume transitions update controls in place', async () => {
@@ -303,6 +307,30 @@ global.fetch = async (path, opts) => {
     const topControls = mockDocument.getElementById('top-controls-task_q4');
     assert.strictEqual(topControls.innerHTML.includes('resume-btn'), true, 'Resume button should be present when paused');
     assert.strictEqual(topControls.innerHTML.includes('badge-status-paused'), true, 'Paused badge should be present');
+  });
+
+  await runTest('Test 5: Explicit byte slash progress line updates copied/total size and speed', async () => {
+    const task = {
+      task_id: 'task_q5',
+      source: '/data/source/file5.txt',
+      destination: '/data/dest',
+      status: 'running',
+      use_rsync: false,
+      created_at: new Date().toISOString()
+    };
+    state.tasks = [task];
+
+    tasksUi.renderActiveTransfers();
+    const es = MockEventSource.instances[0];
+
+    es.simulateMessage(' 157286400/1073741824 15% 25.40MB/s');
+    const pctEl = mockDocument.getElementById('progress-pct-task_q5');
+    const speedEl = mockDocument.getElementById('progress-speed-task_q5');
+    const sizeEl = mockDocument.getElementById('progress-size-task_q5');
+
+    assert.strictEqual(pctEl.textContent, '15%');
+    assert.strictEqual(speedEl.textContent, '25.40MB/s');
+    assert.strictEqual(sizeEl.textContent, '150.0 MB / 1.0 GB');
   });
 
   console.log('All Tasks UI tests passed successfully.');

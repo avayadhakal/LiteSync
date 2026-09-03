@@ -224,7 +224,7 @@
   </div>
 
   <!-- Generic styled confirm popup (transfer-modal style) -->
-  <div class="modal-backdrop hidden" id="action-confirm-modal">
+  <div class="modal-backdrop hidden" id="action-confirm-modal" style="z-index: 2000;">
     <div class="modal">
       <h2 id="action-confirm-title">Are you sure?</h2>
       <div class="modal-hint" id="action-confirm-message"></div>
@@ -269,11 +269,15 @@
       <div id="item-details-body" class="item-details-body">
         <div class="item-details-field">
           <label class="item-details-label">Name</label>
-          <div id="item-details-name" class="item-details-value truncate"></div>
+          <div id="item-details-name" class="item-details-value scrollable-name"></div>
         </div>
         <div class="item-details-field">
           <label class="item-details-label">Full Path</label>
           <div id="item-details-path" class="item-details-value path-wrap"></div>
+        </div>
+        <div class="item-details-field">
+          <label class="item-details-label">Modified</label>
+          <div id="item-details-modified" class="item-details-value"></div>
         </div>
         <div class="item-details-field">
           <label class="item-details-label">Size</label>

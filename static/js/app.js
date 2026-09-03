@@ -438,15 +438,12 @@ export   function confirmStyled(title, message, okLabel = 'Confirm', isDanger = 
     const cleanup = () => {
       ok.removeEventListener('click', onOk);
       cancel.removeEventListener('click', onCancel);
-      modal.removeEventListener('click', onBackdrop);
       modal.classList.add('hidden');
     };
     const onOk = () => { cleanup(); resolve(true); };
     const onCancel = () => { cleanup(); resolve(false); };
-    const onBackdrop = (e) => { if (e.target === modal) onCancel(); };
     ok.addEventListener('click', onOk);
     cancel.addEventListener('click', onCancel);
-    modal.addEventListener('click', onBackdrop);
   });
 }
 
@@ -699,16 +696,6 @@ async function init() {
   if (detailsCloseBtn) {
     detailsCloseBtn.addEventListener('click', closeActivityDetails);
   }
-  const detailsModal = el('activity-details-modal');
-  if (detailsModal) {
-    detailsModal.addEventListener('click', (e) => {
-      if (e.target === detailsModal) {
-        e.stopPropagation();
-        e.preventDefault();
-        closeActivityDetails();
-      }
-    });
-  }
 
   // Item details modal wiring
   const itemCloseBtn = el('item-details-close');
@@ -723,16 +710,6 @@ async function init() {
     itemDismissBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       closeItemDetailsModal();
-    });
-  }
-  const itemModal = el('item-details-modal');
-  if (itemModal) {
-    itemModal.addEventListener('click', (e) => {
-      if (e.target === itemModal) {
-        e.stopPropagation();
-        e.preventDefault();
-        closeItemDetailsModal();
-      }
     });
   }
 
@@ -763,16 +740,6 @@ async function init() {
     editorSaveBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       saveEditorContent();
-    });
-  }
-  const editorModal = el('editor-modal');
-  if (editorModal) {
-    editorModal.addEventListener('click', (e) => {
-      if (e.target === editorModal) {
-        e.stopPropagation();
-        e.preventDefault();
-        closeEditorModal();
-      }
     });
   }
 

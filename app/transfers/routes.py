@@ -315,6 +315,12 @@ async def get_activity(limit: int = 100, offset: int = 0, _user: str = Depends(g
     return {"activity": db.list_activity(limit=limit, offset=offset)}
 
 
+@router.delete("/activity/{activity_id}")
+async def delete_activity_entry(activity_id: int, _user: str = Depends(get_current_user)):
+    db.delete_activity_entry(activity_id)
+    return {"success": True}
+
+
 @router.delete("/activity")
 async def clear_activity(_user: str = Depends(get_current_user)):
     db.clear_activity()

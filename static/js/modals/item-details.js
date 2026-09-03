@@ -1,4 +1,4 @@
-import { el, formatSize } from '../utils.js';
+import { el, formatSize, formatMtime } from '../utils.js';
 import { api, copyDownloadLink, toastError } from '../api.js';
 import { openEditorModal } from './editor.js';
 
@@ -46,6 +46,11 @@ export function openItemDetailsModal(entry, which = 'source') {
 
   el('item-details-name').textContent = entry.name;
   el('item-details-path').textContent = entry.path;
+
+  const modifiedEl = el('item-details-modified');
+  if (modifiedEl) {
+    modifiedEl.textContent = entry.mtime ? formatMtime(entry.mtime) : '—';
+  }
 
   const sizeEl = el('item-details-size');
   if (sizeEl) {

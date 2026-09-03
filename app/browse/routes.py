@@ -99,6 +99,13 @@ async def rename_entry(body: RenameRequest, _user: str = Depends(get_current_use
     if target.exists():
         raise HTTPException(status_code=400, detail="A file or directory with that name already exists")
 
+    file_size = None
+    try:
+        if not source.is_dir():
+            file_size = source.stat().st_size
+    except OSError:
+        pass
+
     try:
         source.rename(target)
     except OSError as e:
@@ -113,6 +120,7 @@ async def rename_entry(body: RenameRequest, _user: str = Depends(get_current_use
             "new_path": str(target),
             "old_name": source.name,
             "new_name": target.name,
+            "size": file_size,
             "summary": f"{source.name} → {target.name}",
             "error": None,
         },
@@ -130,6 +138,13 @@ async def delete_entry(body: DeleteRequest, _user: str = Depends(get_current_use
     if not target.exists() and not target.is_symlink():
         raise HTTPException(status_code=404, detail="Path does not exist")
 
+    file_size = None
+    try:
+        if not target.is_dir():
+            file_size = target.stat().st_size
+    except OSError:
+        pass
+
     try:
         if target.is_dir() and not target.is_symlink():
             shutil.rmtree(target)
@@ -145,6 +160,7 @@ async def delete_entry(body: DeleteRequest, _user: str = Depends(get_current_use
             "status": "succeeded",
             "path": str(target),
             "name": target.name,
+            "size": file_size,
             "summary": target.name,
             "error": None,
         },

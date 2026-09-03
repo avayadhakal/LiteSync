@@ -11,6 +11,8 @@ from app.transfers import db
 from app.transfers.conflict import resolve_conflict, ConflictSkipped
 from app.transfers import engine_rsync
 from app.transfers import engine_kernel
+from app.transfers import engine_url_download
+from app.transfers.engine_url_download import extract_inferred_filename
 
 # --- In-process scheduler state (event-loop owned) ---------------------------
 # At most ONE transfer is ever running; everything else waits as 'queued' rows
@@ -71,6 +73,8 @@ def terminate_task(task_id: str) -> bool:
         if engine_rsync.terminate_current_proc():
             return True
     if engine_kernel.cancel_kernel_task(task_id):
+        return True
+    if engine_url_download.cancel_url_download_task(task_id):
         return True
     return False
 
@@ -179,6 +183,64 @@ async def _run_task(task: dict, settings: Settings) -> None:
             db.mark_finished(task_id, "failed", None, f"Failed to open log file: {e}")
             return
     else:
+        if task["operation"] == "url_download":
+            url = task["source"]
+            dst_path = Path(task["destination"])
+            if dst_path.is_dir():
+                filename = extract_inferred_filename(url)
+                target_path = dst_path / filename
+            else:
+                target_path = dst_path
+            on_conflict = task.get("on_conflict", "skip")
+
+            try:
+                resolution = resolve_conflict(target_path, on_conflict, log_path, task_id)
+            except ConflictSkipped:
+                return
+
+            target_path = resolution.target_path
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                log_fh = open(log_path, "wb")
+            except OSError as e:
+                db.mark_finished(task_id, "failed", None, f"Failed to open log file: {e}")
+                return
+
+            max_bytes = settings.max_upload_size_mb * 1024 * 1024
+            engine_url_download.set_url_download_task_id(task_id)
+            try:
+                await asyncio.to_thread(
+                    engine_url_download._sync_url_download_worker,
+                    task_id,
+                    url,
+                    target_path,
+                    log_fh,
+                    max_size_bytes=max_bytes,
+                )
+                code = 0
+            except InterruptedError:
+                db.mark_finished(task_id, "interrupted", None, "Download cancelled by user")
+                return
+            except Exception as e:
+                err_msg = str(e)
+                try:
+                    log_fh.write(f"Error: {err_msg}\n".encode("utf-8"))
+                except OSError:
+                    pass
+                code = 1
+                db.mark_finished(task_id, "failed", code, err_msg)
+                return
+            finally:
+                log_fh.close()
+                engine_url_download.set_url_download_task_id(None)
+
+            latest = db.get_task(task_id)
+            if latest is None or latest["status"] != "running":
+                return
+
+            db.mark_finished(task_id, "succeeded", code, None)
+            return
+
         # Fast path: atomic rename on same filesystem for move operations
         if task["operation"] == "move":
             if _try_atomic_move(task, log_path):
@@ -378,6 +440,9 @@ async def shutdown_runner() -> None:
     if engine_kernel._current_kernel_task_id is not None:
         engine_kernel.cancel_kernel_task(engine_kernel._current_kernel_task_id)
         task_id = engine_kernel._current_kernel_task_id
+    elif engine_url_download._current_url_download_task_id is not None:
+        engine_url_download.cancel_url_download_task(engine_url_download._current_url_download_task_id)
+        task_id = engine_url_download._current_url_download_task_id
         
     for p_id, p in list(engine_rsync.get_all_paused_procs().items()):
         if p.returncode is None:

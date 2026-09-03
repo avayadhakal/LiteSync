@@ -28,9 +28,10 @@ Minimal-overhead Linux web app for dual-pane local directory browsing and backgr
 │       ├── __init__.py
 │       ├── conflict.py       # Conflict resolution strategies
 │       ├── db.py             # SQLite wrapper (init, CRUD, next_queued_task, activity log)
-│       ├── engine_kernel.py  # os.copy_file_range backend implementation
-│       ├── engine_rsync.py   # rsync subprocess wrapper
-│       ├── routes.py         # /api/transfer, /api/tasks, /api/activity endpoints
+│       ├── engine_kernel.py       # os.copy_file_range backend implementation
+│       ├── engine_rsync.py        # rsync subprocess wrapper
+│       ├── engine_url_download.py # HTTP/HTTPS streaming download backend & SSRF guard
+│       ├── routes.py              # /api/transfer, /api/transfer/url, /api/tasks, /api/activity endpoints
 │       └── scheduler.py      # Asyncio FIFO task queue and process lifecycle
 ├── static/                   # Vanilla HTML/JS/CSS frontend
 │   ├── login.html
@@ -85,7 +86,7 @@ CREATE TABLE tasks (
   id            TEXT PRIMARY KEY,          -- uuid4 hex
   source        TEXT NOT NULL,             -- single source path
   destination   TEXT NOT NULL,
-  operation     TEXT NOT NULL,             -- 'copy' | 'move'
+  operation     TEXT NOT NULL,             -- 'copy' | 'move' | 'url_download'
   status        TEXT NOT NULL,             -- 'queued' | 'running' | 'succeeded' | 'failed' | 'interrupted'
   created_at    TEXT NOT NULL,             -- ISO8601
   started_at    TEXT,
@@ -126,6 +127,7 @@ CREATE INDEX idx_activity_created ON activity(created_at DESC);
 | POST | `/api/rename` | `{path, new_name}` → `Path.rename()`. Refuses renaming roots. |
 | POST | `/api/delete` | `{path}` → `shutil.rmtree()` / `unlink()`. Refuses deleting roots. |
 | POST | `/api/upload` | `{path, on_conflict, files}` → Streamed multipart write straight to disk (`.litesync-upload-<hex>.tmp` → `os.rename`). |
+| POST | `/api/transfer/url` | `{url, destination, filename, on_conflict}` → Enforces upfront SSRF check and queues background `url_download` task. |
 | POST | `/api/transfer` | `{sources: [{path, excludes}], destination, operation, use_rsync, on_conflict}` → Queues 1 task **per source**. |
 | GET | `/api/tasks`, `/{id}` | Task history pagination and detail retrieval. |
 | GET | `/api/tasks/{id}/stream` | SSE: yields live log tail, closes with `status` event. |
@@ -143,6 +145,17 @@ CREATE INDEX idx_activity_created ON activity(created_at DESC);
 3. **Collision Safety:** Validates bare filename, writes to temp file, and enforces `on_conflict` policy (`skip`, `overwrite`, `rename`) natively during the atomic `os.rename()` resolution via `fsops.compute_next_available_name`.
 4. **Client Disconnect Handling:** Catches `ClientDisconnect`, immediately unlinks temporary files, and returns HTTP 499 with zero Activity Log entries (silent abandonment).
 5. **Activity Log:** Success records `[⬆] UPLOADED <name> → <dest_dir>`; genuine failures record `[✗] UPLOAD FAILED <name> → <dest_dir> (<error>)`.
+
+### URL Download Subsystem (Background Task Engine)
+
+1. **Standard Library HTTP Client:** Uses Python's standard library `urllib.request` and `http.client` exclusively with zero new external dependencies.
+2. **SSRF & DNS Rebinding (TOCTOU) Protection:**
+   - Pre-queuing check validates that URLs strictly use `http://` or `https://` schemes.
+   - Connection-time IP validation via custom `SafeHTTPConnection` and `SafeHTTPSConnection` resolves hostnames via `socket.getaddrinfo`, verifies every IP against private/loopback/link-local/reserved ranges via `ipaddress`, and connects directly to the validated IP while passing the original hostname for SNI/TLS validation.
+   - `SafeRedirectHandler` validates every HTTP 3xx redirect destination through the same SSRF guard before following.
+3. **Streaming & Size Limit:** Streams data in 64KB chunks to a temporary `.litesync-download-<hex>.tmp` file. Enforces `max_upload_size_mb` upfront on `Content-Length` and continuously on stream bytes.
+4. **Atomic Rename & Cleanup:** Atomically renames the temporary file into place on completion with conflict handling (`skip`, `overwrite`, `rename`). On failure or cancellation, deletes any partial temporary file.
+5. **Scheduler Integration & Progress:** Integrates directly with the existing `tasks` table and asyncio scheduler (`operation = "url_download"`), reporting percentage progress or byte counts through task log files to SSE. Supports Active Operations cancellation.
 
 ### Transfer Engine (Asyncio Subprocess & Threading)
 
@@ -176,7 +189,10 @@ CREATE INDEX idx_activity_created ON activity(created_at DESC);
 
 ### Uploads & Active Transfers UI
 
-* **Floating Upload Progress Card (`.upload-card`):** Self-contained multi-file progress card in bottom-right corner with stacked progress rows and independent `[✕]` cancel buttons (`xhr.abort()`).
+* **Unified Upload Modal (`#upload-modal`):** Central modal presenting two workflows:
+  * **From Device**: File picker and drag-and-drop zone using direct multipart streaming to disk.
+  * **From URL**: URL input, optional filename override, and conflict selection submitted to `/api/transfer/url` as a persistent background task.
+* **Floating Upload Progress Card (`.upload-card`):** Self-contained multi-file progress card in bottom-right corner with stacked progress rows and independent `[✕]` cancel buttons (`xhr.abort()`) for device uploads.
 * **Unbatched Transfer Cards:** Multi-item transfers spawn individual `.transfer-card` elements (one per item). Queued items show `Queued...` and can be canceled before execution.
 * **Selection Action Bar:** Hidden when count is 0; contains Summary, View, Clear, and Transfer controls.
 * **Transfer Confirmation Modal:** Contains operation options (`copy` vs `move`) directly under destination path.

@@ -15,6 +15,8 @@ from app.auth import get_current_user
 from app.config import get_settings
 from app.fsops import resolve_safe_path
 from app.transfers import db
+from app.browse.upload import validate_upload_filename
+from app.transfers.engine_url_download import validate_download_url, extract_inferred_filename
 from app.transfers.scheduler import queue_task, terminate_task, wake_scheduler, pause_task_runner, terminate_paused_task
 
 router = APIRouter(prefix="/api")
@@ -29,6 +31,63 @@ class TransferSourceItem(BaseModel):
     path: str
     excludes: list[str] = []
 
+
+
+class UrlDownloadRequest(BaseModel):
+    url: str
+    destination: str
+    filename: str | None = None
+    on_conflict: str = "skip"
+
+
+@router.post("/transfer/url")
+async def create_url_download(body: UrlDownloadRequest, user: str = Depends(get_current_user)):
+    settings = get_settings()
+
+    url = body.url.strip() if body.url else ""
+    if not url:
+        raise HTTPException(status_code=400, detail="URL is required")
+
+    try:
+        validate_download_url(url)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid or prohibited URL: {e}")
+
+    if body.on_conflict not in ("skip", "overwrite", "rename"):
+        raise HTTPException(status_code=400, detail="Invalid on_conflict. Must be 'skip', 'overwrite', or 'rename'")
+
+    resolved_destination = resolve_safe_path(body.destination, settings.allowed_roots)
+    if not resolved_destination.is_dir():
+        raise HTTPException(status_code=400, detail="Destination must be an existing directory")
+
+    if body.filename and body.filename.strip():
+        filename = validate_upload_filename(body.filename.strip())
+    else:
+        filename = extract_inferred_filename(url)
+        filename = validate_upload_filename(filename)
+
+    # Destination stores the target directory or path; if filename override is provided or inferred,
+    # target_path in scheduler will be resolved_destination / filename.
+    target_destination = str(resolved_destination / filename)
+
+    task_id = queue_task(
+        settings=settings,
+        source=url,
+        destination=target_destination,
+        operation="url_download",
+        excludes=[],
+        use_rsync=False,
+        on_conflict=body.on_conflict,
+    )
+
+    wake_scheduler()
+
+    return {
+        "task_id": task_id,
+        "task_ids": [task_id],
+        "filename": filename,
+        "destination": str(resolved_destination),
+    }
 
 class TransferRequest(BaseModel):
     sources: list[Union[str, TransferSourceItem]]

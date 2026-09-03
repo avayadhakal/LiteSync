@@ -4,6 +4,11 @@ import { state } from './state.js';
 import { loadPane } from './panes.js';
 import { showConflictModal } from './modals/transfer.js';
 import { loadActivity } from './activity.js';
+import { loadHistory } from './app.js';
+
+let currentUploadPane = 'source';
+let currentUploadPath = null;
+let uploadModalInitialized = false;
 
 export function openUploadPicker(pane) {
   const curPath = state[pane] && state[pane].path;
@@ -11,11 +16,182 @@ export function openUploadPicker(pane) {
     toastError(`Navigate to a folder in the ${pane === 'source' ? 'Source' : 'Destination'} pane first.`);
     return;
   }
+  currentUploadPane = pane;
+  currentUploadPath = curPath;
   state.pendingUploadPane = pane;
   state.pendingUploadPath = curPath;
+
+  initUploadModal();
+
+  const destEl = el('upload-modal-dest');
+  if (destEl) destEl.textContent = curPath;
+
+  const urlInput = el('upload-url-input');
+  if (urlInput) urlInput.value = '';
+  const fnInput = el('upload-url-filename');
+  if (fnInput) fnInput.value = '';
+  const errEl = el('upload-url-error');
+  if (errEl) {
+    errEl.textContent = '';
+    errEl.classList.add('hidden');
+  }
+
+  // Default to From Device
+  setUploadModalTab('device');
+
+  const modal = el('upload-modal');
+  if (modal) modal.classList.remove('hidden');
+}
+
+export function closeUploadModal() {
+  const modal = el('upload-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
+function setUploadModalTab(tab) {
+  const btnDevice = el('btn-upload-device');
+  const btnUrl = el('btn-upload-url');
+  const secDevice = el('upload-device-section');
+  const secUrl = el('upload-url-section');
+  const dlBtn = el('upload-url-download-btn');
+
+  if (tab === 'device') {
+    if (btnDevice) btnDevice.classList.add('active');
+    if (btnUrl) btnUrl.classList.remove('active');
+    if (secDevice) secDevice.classList.remove('hidden');
+    if (secUrl) secUrl.classList.add('hidden');
+    if (dlBtn) dlBtn.classList.add('hidden');
+  } else {
+    if (btnUrl) btnUrl.classList.add('active');
+    if (btnDevice) btnDevice.classList.remove('active');
+    if (secUrl) secUrl.classList.remove('hidden');
+    if (secDevice) secDevice.classList.add('hidden');
+    if (dlBtn) dlBtn.classList.remove('hidden');
+    const urlInput = el('upload-url-input');
+    if (urlInput) requestAnimationFrame(() => urlInput.focus());
+  }
+}
+
+function initUploadModal() {
+  if (uploadModalInitialized) return;
+  uploadModalInitialized = true;
+
+  const modal = el('upload-modal');
+  const dismissBtn = el('upload-modal-dismiss');
+  const cancelBtn = el('upload-modal-cancel');
+  const btnDevice = el('btn-upload-device');
+  const btnUrl = el('btn-upload-url');
+  const dropzone = el('upload-dropzone');
   const fileInput = el('upload-file-input');
-  if (fileInput) {
-    fileInput.click();
+  const downloadBtn = el('upload-url-download-btn');
+  const urlInput = el('upload-url-input');
+
+  if (dismissBtn) dismissBtn.addEventListener('click', closeUploadModal);
+  if (cancelBtn) cancelBtn.addEventListener('click', closeUploadModal);
+
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeUploadModal();
+    });
+  }
+
+  if (btnDevice) btnDevice.addEventListener('click', () => setUploadModalTab('device'));
+  if (btnUrl) btnUrl.addEventListener('click', () => setUploadModalTab('url'));
+
+  if (dropzone && fileInput) {
+    dropzone.addEventListener('click', () => {
+      closeUploadModal();
+      fileInput.click();
+    });
+
+    dropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropzone.style.borderColor = 'var(--accent)';
+      dropzone.style.background = 'rgba(79, 140, 255, 0.05)';
+    });
+
+    dropzone.addEventListener('dragleave', (e) => {
+      e.preventDefault();
+      dropzone.style.borderColor = 'var(--border)';
+      dropzone.style.background = '';
+    });
+
+    dropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropzone.style.borderColor = 'var(--border)';
+      dropzone.style.background = '';
+      const files = Array.from(e.dataTransfer.files || []);
+      if (files.length > 0) {
+        closeUploadModal();
+        startUploads(currentUploadPane, currentUploadPath, files);
+      }
+    });
+  }
+
+  if (downloadBtn) {
+    downloadBtn.addEventListener('click', submitUrlDownload);
+  }
+
+  if (urlInput) {
+    urlInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        submitUrlDownload();
+      } else if (e.key === 'Escape') {
+        closeUploadModal();
+      }
+    });
+  }
+}
+
+async function submitUrlDownload() {
+  const urlInput = el('upload-url-input');
+  const fnInput = el('upload-url-filename');
+  const errEl = el('upload-url-error');
+  const dlBtn = el('upload-url-download-btn');
+
+  const url = urlInput ? urlInput.value.trim() : '';
+  if (!url) {
+    if (errEl) {
+      errEl.textContent = 'URL is required.';
+      errEl.classList.remove('hidden');
+    }
+    return;
+  }
+
+  const filename = fnInput && fnInput.value.trim() ? fnInput.value.trim() : null;
+  const conflictRadio = document.querySelector('input[name="upload-url-conflict"]:checked');
+  const on_conflict = conflictRadio ? conflictRadio.value : 'skip';
+
+  if (dlBtn) dlBtn.disabled = true;
+  if (errEl) {
+    errEl.textContent = '';
+    errEl.classList.add('hidden');
+  }
+
+  try {
+    const res = await api('/api/transfer/url', {
+      method: 'POST',
+      body: JSON.stringify({
+        url,
+        destination: currentUploadPath,
+        filename,
+        on_conflict,
+      }),
+    });
+
+    closeUploadModal();
+    toastSuccess(`Queued download: ${res.filename || 'file'} → ${res.destination}`);
+    await loadHistory();
+  } catch (err) {
+    const errMsg = err.message || 'Failed to queue URL download';
+    if (errEl) {
+      errEl.textContent = errMsg;
+      errEl.classList.remove('hidden');
+    }
+    toastError(`Download failed to queue: ${errMsg}`);
+  } finally {
+    if (dlBtn) dlBtn.disabled = false;
   }
 }
 
@@ -221,4 +397,3 @@ export function startUploads(pane, destPath, files, resolvedConflictChoice = nul
     xhr.send(fd);
   });
 }
-

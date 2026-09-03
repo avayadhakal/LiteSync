@@ -328,12 +328,32 @@ def mark_finished(task_id: str, status: str, exit_code: int | None, error_messag
             dst_name = Path(dst_str).name or dst_str
             op = str(row["operation"])
 
-            if status == "succeeded":
-                summary = f"{src_name} → {dst_name} [source deleted]" if op == "move" else f"{src_name} → {dst_name}"
-            elif status == "failed":
-                summary = error_message or f"rsync exited with code {exit_code}"
+            if op == "url_download":
+                import urllib.parse
+                parsed_url = urllib.parse.urlsplit(src_str)
+                hostname = parsed_url.hostname or src_str
+                dst_p = Path(dst_str)
+                if dst_p.suffix or not dst_p.is_dir():
+                    inferred_name = dst_p.name
+                    dst_folder = str(dst_p.parent)
+                else:
+                    from app.transfers.engine_url_download import extract_inferred_filename
+                    inferred_name = extract_inferred_filename(src_str)
+                    dst_folder = dst_str
+                if status == "succeeded":
+                    summary = f"{inferred_name} → {dst_folder} (from {hostname})"
+                elif status == "failed":
+                    summary = error_message or "Download failed"
+                else:
+                    summary = error_message or "cancelled by user"
+                src_name = inferred_name
             else:
-                summary = error_message or "cancelled by user"
+                if status == "succeeded":
+                    summary = f"{src_name} → {dst_name} [source deleted]" if op == "move" else f"{src_name} → {dst_name}"
+                elif status == "failed":
+                    summary = error_message or f"rsync exited with code {exit_code}"
+                else:
+                    summary = error_message or "cancelled by user"
 
             msg_data = {
                 "operation": op,

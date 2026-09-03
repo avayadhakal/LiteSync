@@ -265,7 +265,8 @@ export function attachTaskStream(task) {
     const pctEl = el(`progress-pct-${taskId}`);
     const detailEl = el(`progress-detail-${taskId}`);
 
-    // Check if line contains rsync progress percentage
+        // Check if line contains progress percentage
+    const isDownload = task.operation === 'url_download';
     const matches = trimmed.match(/(\d+)%/g);
     if (matches && matches.length > 0) {
       const lastMatch = matches[matches.length - 1];
@@ -275,9 +276,9 @@ export function attachTaskStream(task) {
         if (fillEl) fillEl.style.width = `${pct}%`;
         if (pctEl) pctEl.textContent = `${pct}%`;
         if (detailEl) {
-          detailEl.textContent = streamData.currentFile
-            ? `Copying: ${streamData.currentFile}`
-            : `Syncing...`;
+          detailEl.textContent = isDownload
+            ? (streamData.currentFile || 'Downloading...')
+            : (streamData.currentFile ? `Copying: ${streamData.currentFile}` : 'Syncing...');
         }
       }
     } else {
@@ -294,7 +295,7 @@ export function attachTaskStream(task) {
       if (!isRsyncSystemLine) {
         streamData.currentFile = trimmed;
         if (detailEl) {
-          detailEl.textContent = `Copying: ${streamData.currentFile}`;
+          detailEl.textContent = isDownload ? trimmed : `Copying: ${trimmed}`;
         }
       }
     }

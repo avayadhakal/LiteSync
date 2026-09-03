@@ -58,6 +58,8 @@ Moves within the same filesystem use `os.rename()` directly instead of copying t
 ### File Management
 
 * Browse directories from the browser
+* Download files from URL directly to the destination directory
+* Unified upload modal for device uploads and URL downloads
 * Single-pane and dual-pane layouts
 * Create directories
 * Rename files and directories
@@ -81,13 +83,12 @@ Moves within the same filesystem use `os.rename()` directly instead of copying t
 * Resolve destination conflicts before starting a transfer
 * Exclude selected directories from rsync transfers
 
-### Uploads
+### Uploads and URL Downloads
 
-Browser uploads are streamed to disk instead of being accumulated in application memory.
+LiteSync provides a unified Upload modal with two options:
 
-Uploads are written to a temporary location first and moved into the destination using an atomic rename after the upload completes.
-
-This is particularly important on small Linux systems where `/tmp` may be backed by RAM.
+* **From Device**: Upload files directly from your browser via file picker or drag-and-drop. Uploads stream directly to disk in chunks and use an atomic rename upon completion to avoid memory exhaustion on systems with RAM-backed `/tmp`.
+* **From URL**: Download files directly to the server in the background by providing an HTTP or HTTPS URL. Supports optional custom filenames, conflict resolution (skip, replace, keep both), real-time progress, and cancellation.
 
 ### Persistence
 

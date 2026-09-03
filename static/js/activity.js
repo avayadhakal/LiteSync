@@ -138,6 +138,37 @@ function getActivityDisplayInfo(entry) {
       badgeText = 'Failed — Delete';
       secondaryHtml = escapeHtml(data.error || 'Failed to delete');
     }
+  } else if (op === 'url_download') {
+    const dst = data.destination ? normalizePath(data.destination) : '';
+    let host = '';
+    if (data.source) {
+      try {
+        const u = new URL(data.source);
+        host = u.hostname;
+      } catch (_) {
+        host = data.source;
+      }
+    }
+    if (status === 'succeeded') {
+      icon = '⬇';
+      badgeText = 'Downloaded';
+      statusClass = 'status-succeeded';
+      primaryText = data.name || (data.path ? normalizePath(data.path).split('/').pop() : 'file');
+      secondaryHtml = dst ? `→ <span style="font-family: ui-monospace, monospace;">${escapeHtml(dst)}</span> ${host ? `<span class="activity-tag">(from ${escapeHtml(host)})</span>` : ''}` : '';
+    } else if (status === 'interrupted') {
+      icon = '⊘';
+      badgeText = 'Interrupted — Download';
+      statusClass = 'status-interrupted';
+      primaryText = data.name || 'file';
+      secondaryHtml = escapeHtml(data.summary || data.error || 'cancelled by user');
+    } else {
+      icon = '✗';
+      badgeText = 'Download Failed';
+      statusClass = 'status-failed';
+      primaryText = data.name || 'file';
+      const reason = data.error || data.summary || 'Download failed';
+      secondaryHtml = dst ? `→ <span style="font-family: ui-monospace, monospace;">${escapeHtml(dst)}</span><br><span style="color: var(--danger); font-size: 11px;">${escapeHtml(reason)}</span>` : `<span style="color: var(--danger); font-size: 11px;">${escapeHtml(reason)}</span>`;
+    }
   } else if (op === 'upload') {
     const dst = data.destination ? normalizePath(data.destination) : '';
     if (status === 'succeeded') {
@@ -190,7 +221,7 @@ function getActivityDisplayInfo(entry) {
     badgeClass = 'badge-warning';
   } else {
     if (op === 'delete' || op === 'removed') badgeClass = 'badge-danger';
-    else if (op === 'upload' || op === 'copy' || op === 'transfer') badgeClass = 'badge-success';
+    else if (op === 'upload' || op === 'url_download' || op === 'copy' || op === 'transfer') badgeClass = 'badge-success';
     else if (op === 'rename' || op === 'move' || op === 'edit' || op === 'edited') badgeClass = 'badge-info';
   }
 

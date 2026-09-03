@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 ### Added
+- **Download from URL & Unified Upload Modal:** Added a background "Download from URL" feature managed as an asynchronous task alongside existing file uploads within a unified Upload modal. Includes optional custom filename override, conflict resolution (skip, replace, keep both), real-time progress, cancellation, and max download size enforcement.
+- **SSRF & DNS Rebinding Protection:** Built-in connection-time DNS resolution and IP filtering rejecting loopback, private, link-local, reserved, and non-http(s) targets, including safe redirect validation across hops.
+- **URL Download Test Suite:** Added comprehensive test coverage for URL downloads, SSRF guard, redirects, size caps, and error cleanup (166 total tests passing).
 - **Linux & Multi-Architecture Support:** Expanded installer (`install.sh`) to support both `arm64`/`aarch64` and `x86_64`/`amd64` architectures for general Linux deployments, single-board computers, NAS devices, and homelabs.
 - **Unified File-Action Dialog:** Replaced mobile long-press gestures with unified double-click (desktop) and double-tap (touch) interactions opening an Item Details dialog with file inspection, safe in-browser viewing, and link copying.
 - **Inline Text Editor & File Action Dialog:** Added a lightweight in-browser text editor for small supported text files like `.txt`, `.md`, `.py`, `.json`, `.toml`, and `.yaml` up to 2MB. Added file change checks, safe saving, maximize/restore, and activity logging. Larger or unsupported files continue to use the normal browser download

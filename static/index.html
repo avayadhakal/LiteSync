@@ -310,6 +310,72 @@
     </div>
   </div>
 
+  <!-- Upload Modal -->
+  <div class="modal-backdrop hidden" id="upload-modal">
+    <div class="modal" style="width: 480px;">
+      <div class="modal-header-row">
+        <h2>Upload</h2>
+        <button id="upload-modal-dismiss" class="modal-close-btn" title="Close" aria-label="Close">✕</button>
+      </div>
+
+      <div class="modal-hint" style="margin-top: -4px; margin-bottom: 14px;">
+        Destination: <span id="upload-modal-dest" style="color: var(--text); font-family: ui-monospace, monospace;"></span>
+      </div>
+
+      <!-- Segmented switch / Tabs for From Device vs From URL -->
+      <div class="segmented-control" id="upload-type-toggle" style="width: 100%; display: flex; margin-bottom: 16px;">
+        <button id="btn-upload-device" class="active" style="flex: 1; justify-content: center;">From Device</button>
+        <button id="btn-upload-url" style="flex: 1; justify-content: center;">From URL</button>
+      </div>
+
+      <!-- Section: From Device -->
+      <div id="upload-device-section">
+        <div id="upload-dropzone" class="upload-dropzone" style="border: 2px dashed var(--border); border-radius: 8px; padding: 28px 16px; text-align: center; cursor: pointer; transition: border-color 0.15s, background 0.15s;">
+          <div style="font-size: 28px; margin-bottom: 8px;">📁</div>
+          <div style="font-weight: 500; color: var(--text); margin-bottom: 4px;">Choose files or drag & drop here</div>
+          <div class="modal-hint" style="font-size: 11px;">Files will upload directly to destination</div>
+        </div>
+      </div>
+
+      <!-- Section: From URL -->
+      <div id="upload-url-section" class="hidden">
+        <div class="modal-field">
+          <label class="modal-label" for="upload-url-input">URL (HTTP / HTTPS)</label>
+          <input type="text" id="upload-url-input" placeholder="https://example.com/file.zip" autocomplete="off" autocapitalize="off" spellcheck="false" style="width: 100%;" />
+          <div class="modal-error hidden" id="upload-url-error"></div>
+        </div>
+
+        <div class="modal-field" style="margin-top: 10px;">
+          <label class="modal-label" for="upload-url-filename">Filename override (optional)</label>
+          <input type="text" id="upload-url-filename" placeholder="Inferred from URL if left empty" autocomplete="off" autocapitalize="off" spellcheck="false" style="width: 100%;" />
+        </div>
+
+        <div class="modal-field" style="margin-top: 10px;">
+          <label class="modal-label" style="margin-bottom: 6px;">If file exists</label>
+          <div class="modal-radio-group" style="margin-top: 0;">
+            <label class="modal-radio">
+              <input type="radio" name="upload-url-conflict" value="skip" checked />
+              <span>Skip</span>
+            </label>
+            <label class="modal-radio">
+              <input type="radio" name="upload-url-conflict" value="rename" />
+              <span>Keep Both</span>
+            </label>
+            <label class="modal-radio">
+              <input type="radio" name="upload-url-conflict" value="overwrite" />
+              <span>Replace</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="actions" style="margin-top: 18px;">
+        <button id="upload-modal-cancel">Cancel</button>
+        <button id="upload-url-download-btn" class="primary hidden">Download</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Top-right toast notification stack -->
   <div id="toast-stack" class="toast-stack"></div>
 

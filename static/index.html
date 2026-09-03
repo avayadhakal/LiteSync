@@ -82,29 +82,26 @@
     </section>
   </div>
 
-  <div class="controls">
-    <span class="spacer"></span>
-    <div class="selection-inline hidden" id="selection-inline">
-      <span id="selection-inline-count" class="selection-inline-count hidden"></span>
-      <button id="selection-view-btn" class="btn-sm selection-view-btn hidden" title="View selected items">View</button>
-      <button id="selection-clear-btn" class="btn-sm btn-ghost-danger hidden">Clear</button>
-
-      <div id="selection-preview" class="selection-preview hidden" role="dialog" aria-label="Selected items">
-        <div class="selection-preview-header">
-          <span id="selection-preview-count" class="selection-preview-count"></span>
-          <button id="selection-preview-close" class="selection-preview-close" aria-label="Close">&times;</button>
-        </div>
-        <ul id="selection-preview-list" class="selection-preview-list"></ul>
-      </div>
-    </div>
-    <button id="transfer-btn" class="primary" disabled>Transfer</button>
-  </div>
-
   <div id="horizontal-splitter" class="splitter-h"></div>
   <div class="history">
     <div class="tabs-bar">
       <button class="tab-btn active" id="tab-active-btn" data-tab="active">Active Operations</button>
       <button class="tab-btn" id="tab-activity-btn" data-tab="activity">Activity Log</button>
+      <span class="spacer" style="flex: 1;"></span>
+      <div class="selection-inline hidden" id="selection-inline">
+        <span id="selection-inline-count" class="selection-inline-count hidden"></span>
+        <button id="selection-view-btn" class="btn-sm selection-view-btn hidden" title="View selected items">View</button>
+        <button id="selection-clear-btn" class="btn-sm btn-ghost-danger hidden">Clear</button>
+        <button id="transfer-btn" class="primary" disabled>Transfer</button>
+
+        <div id="selection-preview" class="selection-preview hidden" role="dialog" aria-label="Selected items">
+          <div class="selection-preview-header">
+            <span id="selection-preview-count" class="selection-preview-count"></span>
+            <button id="selection-preview-close" class="selection-preview-close" aria-label="Close">&times;</button>
+          </div>
+          <ul id="selection-preview-list" class="selection-preview-list"></ul>
+        </div>
+      </div>
     </div>
     <div class="activity-utils hidden" id="activity-utils">
       <input type="search" id="activity-search" class="activity-search-input" placeholder="Filter logs...">

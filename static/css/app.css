@@ -574,6 +574,7 @@ input[type="text"], input[type="password"] {
   flex: none;
   min-width: 0;
   position: relative;
+  z-index: 100;
   isolation: isolate;  /* popover z-index resolves locally, not against the page */
   background: var(--panel-alt);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -721,7 +722,6 @@ input[type="text"], input[type="password"] {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  overflow: hidden; /* inner list containers scroll instead */
 }
 .history h2 { font-size: 13px; color: var(--text-dim); margin: 0 0 8px; text-transform: uppercase; letter-spacing: 0.04em; }
 

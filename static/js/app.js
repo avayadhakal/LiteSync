@@ -8,6 +8,7 @@ import { openMkdirModal, openRenameModal, openDeleteModal, setModalError } from 
 import { openUploadPicker, startUploads } from './uploads.js';
 import { updateTransferMethodUI, getPrimaryTitle, closeConfirmModal, showConflictModal } from './modals/transfer.js';
 import { closeItemDetailsModal } from './modals/item-details.js';
+import { isEditorOpen, saveEditorContent, closeEditorModal, toggleEditorMaximize } from './modals/editor.js';
 
 
 
@@ -735,6 +736,57 @@ async function init() {
     });
   }
 
+  // Text editor modal wiring
+  const editorMaximizeBtn = el('editor-maximize');
+  if (editorMaximizeBtn) {
+    editorMaximizeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleEditorMaximize();
+    });
+  }
+  const editorCloseBtn = el('editor-cancel');
+  if (editorCloseBtn) {
+    editorCloseBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeEditorModal();
+    });
+  }
+  const editorDismissBtn = el('editor-dismiss');
+  if (editorDismissBtn) {
+    editorDismissBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeEditorModal();
+    });
+  }
+  const editorSaveBtn = el('editor-save');
+  if (editorSaveBtn) {
+    editorSaveBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      saveEditorContent();
+    });
+  }
+  const editorModal = el('editor-modal');
+  if (editorModal) {
+    editorModal.addEventListener('click', (e) => {
+      if (e.target === editorModal) {
+        e.stopPropagation();
+        e.preventDefault();
+        closeEditorModal();
+      }
+    });
+  }
+
+  // Global keyboard shortcuts (Ctrl/Cmd+S for editor save, Escape for layered modal dismiss)
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+      if (isEditorOpen()) {
+        e.preventDefault();
+        e.stopPropagation();
+        saveEditorContent();
+      }
+    }
+  });
+
   initResizers();
 
   el('transfer-btn').addEventListener('click', openConfirmModal);
@@ -771,9 +823,13 @@ async function init() {
     if (e.target === el('selection-view-btn')) return;
     closeSelectionPreview();
   });
-  // Esc closes the preview and modals.
+  // Esc closes top-most modal or preview.
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
+      if (isEditorOpen()) {
+        closeEditorModal();
+        return;
+      }
       closeSelectionPreview();
       closeActivityDetails();
       closeItemDetailsModal();

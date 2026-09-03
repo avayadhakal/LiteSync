@@ -154,6 +154,18 @@ function getActivityDisplayInfo(entry) {
       const reason = data.error || data.summary || 'Upload failed';
       secondaryHtml = dst ? `→ <span style="font-family: ui-monospace, monospace;">${escapeHtml(dst)}</span><br><span style="color: var(--danger); font-size: 11px;">${escapeHtml(reason)}</span>` : `<span style="color: var(--danger); font-size: 11px;">${escapeHtml(reason)}</span>`;
     }
+  } else if (op === 'edit' || op === 'edited') {
+    const dst = data.destination ? normalizePath(data.destination) : '';
+    icon = '✎';
+    badgeText = 'Edited';
+    statusClass = status === 'failed' ? 'status-failed' : 'status-succeeded';
+    primaryText = data.name || (data.path ? normalizePath(data.path).split('/').pop() : 'file');
+    secondaryHtml = dst ? `→ <span style="font-family: ui-monospace, monospace;">${escapeHtml(dst)}</span>` : '';
+    if (status === 'failed') {
+      icon = '✗';
+      badgeText = 'Failed — Edit';
+      secondaryHtml = escapeHtml(data.error || 'Failed to edit file');
+    }
   } else {
     badgeText = (entry.kind || 'Info').charAt(0).toUpperCase() + (entry.kind || 'Info').slice(1).toLowerCase();
     statusClass = 'status-info';
@@ -179,7 +191,7 @@ function getActivityDisplayInfo(entry) {
   } else {
     if (op === 'delete' || op === 'removed') badgeClass = 'badge-danger';
     else if (op === 'upload' || op === 'copy' || op === 'transfer') badgeClass = 'badge-success';
-    else if (op === 'rename' || op === 'move') badgeClass = 'badge-info';
+    else if (op === 'rename' || op === 'move' || op === 'edit' || op === 'edited') badgeClass = 'badge-info';
   }
 
   return {

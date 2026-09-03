@@ -288,6 +288,28 @@
     </div>
   </div>
 
+  <!-- Text Editor Modal -->
+  <div class="modal-backdrop hidden" id="editor-modal">
+    <div class="modal modal-editor">
+      <div class="modal-header-row">
+        <h2 id="editor-title" class="truncate">Edit File</h2>
+        <div class="modal-header-actions">
+          <button id="editor-maximize" class="modal-header-btn" title="Maximize" aria-label="Maximize">⛶</button>
+          <button id="editor-dismiss" class="modal-close-btn" title="Close" aria-label="Close">✕</button>
+        </div>
+      </div>
+      <div class="modal-hint truncate" id="editor-path" style="margin-top: 0; margin-bottom: 8px; color: var(--text-dim); font-family: ui-monospace, monospace; font-size: 11px;"></div>
+      <div class="modal-error hidden" id="editor-error" style="margin-bottom: 8px;"></div>
+      <div class="editor-body">
+        <textarea id="editor-textarea" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"></textarea>
+      </div>
+      <div class="actions editor-actions">
+        <button id="editor-cancel">Close</button>
+        <button id="editor-save" class="primary">Save</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Top-right toast notification stack -->
   <div id="toast-stack" class="toast-stack"></div>
 

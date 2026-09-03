@@ -21,6 +21,7 @@ Minimal-overhead Linux web app for dual-pane local directory browsing and backgr
 │   ├── browse/               # Browser and upload subsystem
 │   │   ├── __init__.py
 │   │   ├── download.py       # /api/download endpoints
+│   │   ├── editor.py         # /api/file-content text editing and concurrency endpoints
 │   │   ├── routes.py         # /api/roots, /api/browse, /api/mkdir | rename | delete
 │   │   └── upload.py         # /api/upload direct-to-disk logic
 │   └── transfers/            # Background transfer engine
@@ -47,6 +48,7 @@ Minimal-overhead Linux web app for dual-pane local directory browsing and backgr
 │       ├── uploads.js        # Multipart streaming upload client
 │       ├── utils.js          # Formatting and helper utilities
 │       └── modals/           # Modal dialog controllers
+│           ├── editor.js
 │           ├── item-details.js
 │           ├── mkdir-rename-delete.js
 │           └── transfer.js
@@ -118,6 +120,8 @@ CREATE INDEX idx_activity_created ON activity(created_at DESC);
 | GET | `/api/browse?path=<abs>` | Returns `{path, parent, entries}`. Filters out-of-root symlinks. |
 | GET | `/api/download/link?path=<abs>&disposition=<attachment\|inline>` | Generates signed HMAC download URL with optional inline disposition. |
 | GET/HEAD | `/api/download?path=<abs>&expires=<ts>&signature=<hmac>&disposition=<attachment\|inline>` | Streaming & download endpoint supporting HTTP Range requests, safe MIME allowlist, and nosniff protection. |
+| GET | `/api/file-content?path=<abs>` | Returns UTF-8 file content and string `mtime_ns` for allowlisted text files <= 2MB. |
+| POST | `/api/file-content` | `{path, content, expected_mtime_ns}` → Atomic save with `mtime_ns` concurrency check (`.litesync-edit-<hex>.tmp` → `os.rename`). |
 | POST | `/api/mkdir` | `{path, name}` → `Path.mkdir()`. Rejects slashes/collisions. |
 | POST | `/api/rename` | `{path, new_name}` → `Path.rename()`. Refuses renaming roots. |
 | POST | `/api/delete` | `{path}` → `shutil.rmtree()` / `unlink()`. Refuses deleting roots. |

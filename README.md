@@ -66,6 +66,7 @@ Moves within the same filesystem use `os.rename()` directly instead of copying t
 * Sort files by name, size, or modification time
 * Copy file paths and links
 * View supported files directly in the browser
+* Edit small allowlisted text files directly in the browser with atomic writes and concurrency safety
 
 ### Transfers
 

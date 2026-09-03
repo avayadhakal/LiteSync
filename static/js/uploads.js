@@ -3,6 +3,7 @@ import { el, escapeHtml, formatSize, normalizePath } from './utils.js';
 import { state } from './state.js';
 import { loadPane } from './panes.js';
 import { showConflictModal } from './modals/transfer.js';
+import { loadActivity } from './activity.js';
 
 export function openUploadPicker(pane) {
   const curPath = state[pane] && state[pane].path;

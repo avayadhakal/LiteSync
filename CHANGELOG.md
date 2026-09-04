@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 ### Added
+- **Task Details Modal:** Added new transfer details view.
 - **Real-Time Transfer Metrics:** Display live transfer speed and copied/total size on active transfer cards.
 - **Per-Log Delete Button:** Added individual deletion for activity log entries with a corresponding `DELETE /api/activity/{id}` endpoint.
 - **Item Details Enhancements:** Added a modified date field and horizontal scrolling for long filenames.

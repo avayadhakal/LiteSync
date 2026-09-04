@@ -5,13 +5,20 @@ import { api, toastSuccess, toastError } from './api.js';
 import { el, formatSize, escapeHtml } from './utils.js';
 import { state } from './state.js';
 import { updateSelectionUI } from './panes.js';
+import {
+  openTaskDetailsModal,
+  closeTaskDetailsModal,
+  renderTaskDetailsModal,
+  refreshTaskDetailsProgress,
+  isTaskDetailsOpen,
+  getOpenDetailsTaskId
+} from './modals/task-details.js';
 
 export const TERMINAL_STATUSES = new Set(['succeeded', 'failed', 'interrupted']);
 
 export const ACTIVE_STATUSES = new Set(['queued', 'running', 'paused']);
 
-export const activeStreams = new Map(); // taskId -> { source, currentFile, pct }
-
+export const activeStreams = new Map(); // taskId -> { source, currentFile, pct, speed, sizeText, fileLog }
 
 export function pruneCompletedSelection(task) {
   // Sources of a successfully finished task were moved or copied,
@@ -48,6 +55,7 @@ function renderCardControlsHtml(task) {
   } else if (isPaused) {
     actionBtns += `<button class="btn-sm btn-primary resume-btn" data-id="${task.task_id}" style="margin-right: 8px;">Resume</button>`;
   }
+  actionBtns += `<button class="btn-sm btn-secondary details-btn" data-id="${task.task_id}" style="margin-right: 8px;">Details</button>`;
   actionBtns += `<button class="btn-sm btn-danger cancel-btn" data-id="${task.task_id}">Cancel</button>`;
 
   return `
@@ -136,6 +144,14 @@ function bindCardEventListeners(task, card) {
       } catch (err) {
         toastError(`Failed to cancel task: ${err.message}`);
       }
+    });
+  }
+
+  const detailsBtn = card.querySelector('.details-btn');
+  if (detailsBtn) {
+    detailsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openTaskDetailsModal(detailsBtn.getAttribute('data-id'));
     });
   }
 }
@@ -282,6 +298,7 @@ export function attachTaskStream(task) {
     pct: 0,
     speed: '',
     sizeText: '',
+    fileLog: [], // accumulated completed files: [{name: string}]
   };
   activeStreams.set(taskId, streamData);
 
@@ -336,6 +353,7 @@ export function attachTaskStream(task) {
     if (matches && matches.length > 0) {
       const lastMatch = matches[matches.length - 1];
       const pct = parseInt(lastMatch.replace('%', ''), 10);
+      
       if (!isNaN(pct)) {
         streamData.pct = pct;
         if (fillEl) fillEl.style.width = `${pct}%`;
@@ -345,6 +363,8 @@ export function attachTaskStream(task) {
             ? (streamData.currentFile || 'Downloading...')
             : (streamData.currentFile ? `Copying: ${streamData.currentFile}` : 'Syncing...');
         }
+        // Lightweight modal progress refresh on every pct tick
+        if (getOpenDetailsTaskId() === taskId) refreshTaskDetailsProgress(taskId);
       }
     } else {
       const isRsyncSystemLine =
@@ -358,10 +378,16 @@ export function attachTaskStream(task) {
         trimmed.includes('bytes/sec');
 
       if (!isRsyncSystemLine) {
+        // File transition: push previous file into the completed log
+        if (streamData.currentFile && streamData.currentFile !== trimmed) {
+          streamData.fileLog.push({ name: streamData.currentFile });
+        }
         streamData.currentFile = trimmed;
         if (detailEl) {
           detailEl.textContent = isDownload ? trimmed : `Copying: ${trimmed}`;
         }
+        // Full file-list re-render when modal is open
+        if (getOpenDetailsTaskId() === taskId) renderTaskDetailsModal(taskId);
       }
     }
   };
@@ -377,6 +403,8 @@ export function attachTaskStream(task) {
     if (TERMINAL_STATUSES.has(status)) {
       source.close();
       activeStreams.delete(taskId);
+      // If the details modal is open for this task, close it cleanly
+      if (getOpenDetailsTaskId() === taskId) closeTaskDetailsModal();
       // Task reached a terminal state ('succeeded' | 'failed' | 'interrupted'):
       // prune stale selections, auto-remove the card, refresh both panes.
       onTaskFinished(status, task).catch((err) => console.error('Post-task refresh failed:', err));
@@ -393,4 +421,3 @@ export function attachTaskStream(task) {
     loadHistory();
   };
 }
-

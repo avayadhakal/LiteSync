@@ -5,6 +5,7 @@ import { openItemDetailsModal } from './modals/item-details.js';
 
 const DOUBLE_TAP_DELAY_MS = 300;
 const MOVE_THRESHOLD_PX = 10;
+const lastClickedIndex = new Map(); // which -> index
 
 export function isActionDialogEligible(e) {
   if (!e || !e.target) return false;
@@ -88,6 +89,7 @@ export function sortPaneEntries(which) {
 }
 
 export function renderPane(which) {
+  lastClickedIndex.delete(which);
   const pane = state[which];
   const sel = paneSelection(which);
   const pathElId = which === 'pickerDest' ? 'transfer-picker-path' : `${which}-path`;
@@ -119,14 +121,17 @@ export function renderPane(which) {
     fragment.appendChild(up);
   }
 
-  for (const entry of pane.entries) {
+  for (let i = 0; i < pane.entries.length; i++) {
+    const entry = pane.entries[i];
     const row = document.createElement('div');
-    row.className = `entry ${entry.is_dir ? 'dir' : 'file'}`;
+    const isSelected = sel.isPathSelected(entry.path);
+    row.className = `entry ${entry.is_dir ? 'dir' : 'file'}${isSelected && !entry.is_dir ? ' selected' : ''}`;
     row.setAttribute('data-path', entry.path);
+    row.setAttribute('data-index', i);
 
     const cb = document.createElement('input');
     cb.type = 'checkbox';
-    cb.checked = sel.isPathSelected(entry.path);
+    cb.checked = isSelected;
     if (entry.is_dir) {
       cb.indeterminate = sel.isPathIndeterminate(entry.path);
     }
@@ -169,7 +174,7 @@ export function renderPane(which) {
   
   body.appendChild(fragment);
   body.scrollTop = prevScrollTop;
-  refreshPaneCheckboxes(which);
+  updateMasterCheckboxState(which);
 }
 
 
@@ -209,8 +214,7 @@ export function updateSelectionUI() {
 export function refreshPaneCheckboxes(which) {
   const body = el(which + '-body');
   if (!body) return;
-  const paneKey = which === 'pickerDest' ? 'pickerDest' : which;
-  const sel = which === 'pickerDest' ? state.pickerDestSelection : state.selection;
+  const sel = paneSelection(which);
   const checkboxes = body.querySelectorAll('input[type="checkbox"]');
   for (const cb of checkboxes) {
     const row = cb.closest('.entry');
@@ -218,15 +222,26 @@ export function refreshPaneCheckboxes(which) {
     const path = row.getAttribute('data-path');
     if (!path) continue;
     const isDir = row.classList.contains('dir');
-    cb.checked = sel.isPathSelected(path);
+    const isSelected = sel.isPathSelected(path);
+    if (cb.checked !== isSelected) cb.checked = isSelected;
+    if (!isDir && isSelected !== row.classList.contains('selected')) {
+      row.classList.toggle('selected', isSelected);
+    }
     if (isDir) {
-      cb.indeterminate = sel.isPathIndeterminate(path);
+      const ind = sel.isPathIndeterminate(path);
+      if (cb.indeterminate !== ind) cb.indeterminate = ind;
     }
   }
+  updateMasterCheckboxState(which);
+}
 
+export function updateMasterCheckboxState(which) {
   const masterCb = document.querySelector(`.pane-master-cb[data-pane="${which}"]`);
+  if (!masterCb) return;
+  const paneKey = which === 'pickerDest' ? 'pickerDest' : which;
   const paneState = state[paneKey];
-  if (masterCb && paneState && paneState.entries && paneState.entries.length > 0) {
+  const sel = paneSelection(which);
+  if (paneState && paneState.entries && paneState.entries.length > 0) {
     let allSelected = true;
     let someSelected = false;
     for (const entry of paneState.entries) {
@@ -238,10 +253,28 @@ export function refreshPaneCheckboxes(which) {
     }
     masterCb.checked = allSelected;
     masterCb.indeterminate = someSelected && !allSelected;
-  } else if (masterCb) {
+  } else {
     masterCb.checked = false;
     masterCb.indeterminate = false;
   }
+}
+
+function applySingleRowCheckbox(row, cb, which) {
+  const path = row.getAttribute('data-path');
+  const sel = paneSelection(which);
+  const isDir = row.classList.contains('dir');
+  const isSelected = sel.isPathSelected(path);
+
+  if (cb.checked !== isSelected) cb.checked = isSelected;
+  if (!isDir && isSelected !== row.classList.contains('selected')) {
+    row.classList.toggle('selected', isSelected);
+  }
+  if (isDir) {
+    const ind = sel.isPathIndeterminate(path);
+    if (cb.indeterminate !== ind) cb.indeterminate = ind;
+  }
+
+  updateMasterCheckboxState(which);
 }
 
 export function renderSelectionPreview() {
@@ -301,13 +334,35 @@ export function bindPaneDelegation(paneId, which) {
     if (cb && row) {
       e.stopPropagation();
       const path = row.getAttribute('data-path');
-      const sel = which === 'pickerDest' ? state.pickerDestSelection : state.selection;
-      if (cb.checked) {
-        sel.select(path);
+      const sel = paneSelection(which);
+      const rowIndex = parseInt(row.getAttribute('data-index') ?? '-1', 10);
+      
+      if (e.shiftKey && rowIndex >= 0 && lastClickedIndex.has(which)) {
+        // Shift-click: range select/deselect based on anchor's final checked state
+        const anchorIndex = lastClickedIndex.get(which);
+        const paneState = state[which === 'pickerDest' ? 'pickerDest' : which];
+        const from = Math.min(anchorIndex, rowIndex);
+        const to = Math.max(anchorIndex, rowIndex);
+        // Use the current checkbox state (post-browser-toggle) to determine intent
+        const doSelect = cb.checked;
+        for (let i = from; i <= to; i++) {
+          const entry = paneState.entries[i];
+          if (!entry) continue;
+          if (doSelect) sel.select(entry.path);
+          else sel.unselect(entry.path);
+        }
+        refreshPaneCheckboxes(which);
       } else {
-        sel.unselect(path);
+        // Single click
+        if (cb.checked) {
+          sel.select(path);
+        } else {
+          sel.unselect(path);
+        }
+        applySingleRowCheckbox(row, cb, which);
       }
-      refreshPaneCheckboxes(which);
+
+      if (rowIndex >= 0) lastClickedIndex.set(which, rowIndex);
       updateSelectionUI();
       if (typeof updateTransferMethodUI === 'function' && el('confirm-modal') && !el('confirm-modal').classList.contains('hidden')) {
         updateTransferMethodUI();

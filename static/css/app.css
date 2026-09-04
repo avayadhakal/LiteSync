@@ -526,6 +526,12 @@ input[type="text"], input[type="password"] {
 .entry.dir:has(input[type="checkbox"]:checked):hover {
   background: var(--panel-alt);
 }
+.entry.file.selected {
+  background: rgba(79, 140, 255, 0.06);
+}
+.entry.file.selected:hover {
+  background: rgba(79, 140, 255, 0.10);
+}
 .entry .name::before {
   display: inline-block;
   vertical-align: -0.3em;
@@ -1376,6 +1382,56 @@ tr.task-row:hover { background: rgba(255, 255, 255, 0.05); }
 .modal.modal-wide {
   width: 520px;
   max-width: 92vw;
+}
+.modal.modal-extra-wide {
+  width: 720px;
+  max-width: 95vw;
+}
+
+/* Task Details Modal — file list rows */
+.task-details-file-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  font-family: ui-monospace, monospace;
+  color: var(--text-dim);
+}
+.task-details-file-done {
+  opacity: 0.65;
+}
+.task-details-file-active {
+  color: var(--text);
+  background: rgba(79, 140, 255, 0.06);
+}
+.task-details-file-status {
+  flex: none;
+  width: 16px;
+  text-align: center;
+  margin-top: 1px;
+}
+.task-details-file-name {
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+.task-details-empty {
+  color: var(--text-dim);
+  font-size: 12px;
+  text-align: center;
+  padding: 16px 0;
+  font-style: italic;
+}
+@keyframes task-details-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+.task-details-pulse {
+  animation: task-details-pulse 1.4s ease-in-out infinite;
+  color: var(--accent);
 }
 
 .activity-details-body {

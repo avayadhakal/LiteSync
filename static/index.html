@@ -378,6 +378,41 @@
     </div>
   </div>
 
+  <!-- Transfer Details Modal -->
+  <div class="modal-backdrop hidden" id="task-details-modal">
+    <div class="modal modal-extra-wide">
+      <div class="modal-header-row">
+        <h2 id="task-details-title" class="truncate">Transfer Details</h2>
+        <button id="task-details-dismiss" class="modal-close-btn" title="Close" aria-label="Close">✕</button>
+      </div>
+
+      <!-- Aggregate status + speed -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin: 8px 0 4px; font-size: 12px;">
+        <span id="task-details-status-badge" style="font-weight: 600; color: var(--text);"></span>
+        <span id="task-details-speed" style="font-family: ui-monospace, monospace; color: var(--accent); font-weight: 600;"></span>
+      </div>
+
+      <!-- Overall progress bar (transform: scaleX avoids layout recalc) -->
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
+        <div style="flex: 1; height: 7px; border-radius: 4px; background: var(--bg-alt); overflow: hidden;">
+          <div id="task-details-progress-fill"
+               style="height: 100%; border-radius: 4px; background: var(--accent-dim);
+                      transform: scaleX(0); transform-origin: left; transition: transform 0.2s ease; will-change: transform;">
+          </div>
+        </div>
+        <span id="task-details-progress-pct" style="font-size: 12px; font-family: ui-monospace, monospace; color: var(--text-dim); min-width: 34px; text-align: right;">0%</span>
+      </div>
+      <div id="task-details-size" style="font-size: 11px; color: var(--text-dim); font-family: ui-monospace, monospace; margin-bottom: 12px;"></div>
+
+      <!-- Scrollable file list -->
+      <div id="task-details-file-list" style="max-height: 280px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px;"></div>
+
+      <div class="actions" style="margin-top: 14px;">
+        <button id="task-details-close" class="primary">Close</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Top-right toast notification stack -->
   <div id="toast-stack" class="toast-stack"></div>
 

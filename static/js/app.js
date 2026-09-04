@@ -7,6 +7,7 @@ import { renderActiveTransfers, TERMINAL_STATUSES, ACTIVE_STATUSES, pruneComplet
 import { openMkdirModal, openRenameModal, openDeleteModal, setModalError } from './modals/mkdir-rename-delete.js';
 import { openUploadPicker, startUploads } from './uploads.js';
 import { updateTransferMethodUI, getPrimaryTitle, closeConfirmModal, showConflictModal } from './modals/transfer.js';
+import { closeTaskDetailsModal, isTaskDetailsOpen } from './modals/task-details.js';
 import { closeItemDetailsModal } from './modals/item-details.js';
 import { isEditorOpen, saveEditorContent, closeEditorModal, toggleEditorMaximize } from './modals/editor.js';
 
@@ -616,6 +617,11 @@ async function init() {
         paneState.entries.forEach(entry => sel.select(entry.path));
       } else {
         paneState.entries.forEach(entry => sel.unselect(entry.path));
+        // Also unselect the folder itself so it doesn't remain in `include` 
+        // with every single file added to `exclude`.
+        if (paneState.path && paneState.path !== '/') {
+          sel.unselect(paneState.path);
+        }
       }
       
       refreshPaneCheckboxes(pane);
@@ -797,11 +803,21 @@ async function init() {
         closeEditorModal();
         return;
       }
+      if (isTaskDetailsOpen()) {
+        closeTaskDetailsModal();
+        return;
+      }
       closeSelectionPreview();
       closeActivityDetails();
       closeItemDetailsModal();
     }
   });
+
+  // Task details modal wiring
+  const taskDetailsClose = el('task-details-close');
+  if (taskDetailsClose) taskDetailsClose.addEventListener('click', closeTaskDetailsModal);
+  const taskDetailsDismiss = el('task-details-dismiss');
+  if (taskDetailsDismiss) taskDetailsDismiss.addEventListener('click', closeTaskDetailsModal);
 
   await loadActivity();
 

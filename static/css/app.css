@@ -434,7 +434,7 @@ input[type="text"], input[type="password"] {
 .entry .name::-webkit-scrollbar {
   display: none;
 }
-.entry .size { color: var(--text-dim); font-size: 12px; opacity: 0.6; }
+.entry .size { color: var(--text-dim); opacity: 0.6; }
 
 @media (max-width: 768px) {
   .entry .size,

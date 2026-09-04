@@ -1,7 +1,7 @@
 import { el, normalizePath } from './utils.js';
 import { api, toastSuccess, toastError, showToast } from './api.js';
 import { state } from './state.js';
-import { loadPane, renderPane, paneSelection, updateSelectionUI, closeSelectionPreview, toggleSelectionPreview } from './panes.js';
+import { loadPane, renderPane, refreshPaneCheckboxes, bindPaneDelegation, paneSelection, updateSelectionUI, closeSelectionPreview, toggleSelectionPreview } from './panes.js';
 import { loadActivity, clearActivity, filterActivity, closeActivityDetails, renderActivity } from './activity.js';
 import { renderActiveTransfers, TERMINAL_STATUSES, ACTIVE_STATUSES, pruneCompletedSelection } from './tasks-ui.js';
 import { openMkdirModal, openRenameModal, openDeleteModal, setModalError } from './modals/mkdir-rename-delete.js';
@@ -618,7 +618,7 @@ async function init() {
         paneState.entries.forEach(entry => sel.unselect(entry.path));
       }
       
-      renderPane(pane);
+      refreshPaneCheckboxes(pane);
       updateSelectionUI();
       if (typeof updateTransferMethodUI === 'function' && el('confirm-modal') && !el('confirm-modal').classList.contains('hidden')) {
         updateTransferMethodUI();
@@ -808,6 +808,9 @@ async function init() {
   const roots = await api('/api/roots');
   state.roots = roots.roots;
 
+  bindPaneDelegation('source-body', 'source');
+  bindPaneDelegation('dest-body', 'dest');
+  bindPaneDelegation('transfer-picker-body', 'pickerDest');
   await loadPane('source', null);
   await loadPane('dest', null);
   await loadHistory();

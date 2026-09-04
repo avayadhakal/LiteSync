@@ -8,7 +8,11 @@
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square" alt="License"></a>
   </p>
 
-  <img src="docs/logo.svg" width="96" height="96" alt="LiteSync Logo" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/logo_dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/logo_light.svg">
+    <img alt="LiteSync Logo" src="docs/logo_light.svg" width="96" height="96">
+  </picture>
 
   <h1>LiteSync</h1>
 

@@ -3,7 +3,6 @@ import { el, formatSize, formatMtime, escapeHtml, normalizePath } from './utils.
 import { state } from './state.js';
 import { openItemDetailsModal } from './modals/item-details.js';
 
-const rowTouchState = new WeakMap();
 const DOUBLE_TAP_DELAY_MS = 300;
 const MOVE_THRESHOLD_PX = 10;
 
@@ -99,102 +98,38 @@ export function renderPane(which) {
   requestAnimationFrame(() => {
     pathEl.scrollLeft = pathEl.scrollWidth;
   });
-  const body = el(bodyElId);
-  if (!body) return;
-  const prevScrollTop = body.scrollTop;
-  body.innerHTML = '';
-
-  sortPaneEntries(which);
-
-  // Update sort icons
-  const sortState = state.sort[which];
-  if (sortState) {
-    document.querySelectorAll(`.pane-column-header button[data-pane="${which}"]`).forEach(btn => {
-      const icon = btn.querySelector('.sort-icon');
-      if (!icon) return;
-      if (btn.getAttribute('data-sort') === sortState.col) {
-        icon.textContent = sortState.dir === 'asc' ? '▲' : '▼';
-      } else {
-        icon.textContent = '';
-      }
-    });
-  }
-
+  
   if (which === 'pickerDest') {
     const okBtn = el('confirm-ok');
     if (okBtn) okBtn.disabled = pane.path === null;
   }
 
-  const masterCb = el(`${which}-master-cb`);
-  if (masterCb && pane.entries) {
-    const total = pane.entries.length;
-    let selectedCount = 0;
-    let indeterminateCount = 0;
-
-    for (const entry of pane.entries) {
-      if (sel.isPathSelected(entry.path)) {
-        selectedCount++;
-      } else if (sel.isPathIndeterminate(entry.path)) {
-        indeterminateCount++;
-      }
-    }
-
-    if (total === 0) {
-      masterCb.checked = false;
-      masterCb.indeterminate = false;
-      masterCb.disabled = true;
-    } else {
-      masterCb.disabled = false;
-      if (selectedCount === total) {
-        masterCb.checked = true;
-        masterCb.indeterminate = false;
-      } else if (selectedCount > 0 || indeterminateCount > 0) {
-        masterCb.checked = false;
-        masterCb.indeterminate = true;
-      } else {
-        masterCb.checked = false;
-        masterCb.indeterminate = false;
-      }
-    }
-  }
+  const body = el(bodyElId);
+  if (!body) return;
+  const prevScrollTop = body.scrollTop;
+  body.innerHTML = '';
+  const fragment = document.createDocumentFragment();
 
   if (pane.path !== null) {
     const up = document.createElement('div');
     up.className = 'entry parent';
     up.innerHTML = '<span class="name">..</span>';
+    up.title = 'Up to parent directory';
     up.addEventListener('click', () => loadPane(which, pane.parent));
-    body.appendChild(up);
+    fragment.appendChild(up);
   }
 
   for (const entry of pane.entries) {
     const row = document.createElement('div');
     row.className = `entry ${entry.is_dir ? 'dir' : 'file'}`;
+    row.setAttribute('data-path', entry.path);
 
-    // Both panes expose selection checkboxes so the user can mark items for
-    // New Folder (parent), Rename, and Delete in either pane. Only the
-    // source pane's selection is used to build the Transfer payload.
     const cb = document.createElement('input');
     cb.type = 'checkbox';
-    const isSelected = sel.isPathSelected(entry.path);
-    cb.checked = isSelected;
-    // Directory tri-state: fully checked when the dir itself is selected with no excludes,
-    // indeterminate when partially selected / partially excluded.
+    cb.checked = sel.isPathSelected(entry.path);
     if (entry.is_dir) {
       cb.indeterminate = sel.isPathIndeterminate(entry.path);
     }
-    cb.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (cb.checked) {
-        sel.select(entry.path);
-      } else {
-        sel.unselect(entry.path);
-      }
-      renderPane(which);
-      updateSelectionUI();
-  if (typeof updateTransferMethodUI === 'function' && el('confirm-modal') && !el('confirm-modal').classList.contains('hidden')) {
-    updateTransferMethodUI();
-  }
-    });
     row.appendChild(cb);
 
     const name = document.createElement('span');
@@ -220,18 +155,6 @@ export function renderPane(which) {
       copyBtn.className = 'icon-btn btn-copy-path';
       copyBtn.innerHTML = '📋';
       copyBtn.title = 'Copy download link';
-      copyBtn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        const success = await copyDownloadLink(entry.path);
-        if (success) {
-          copyBtn.innerHTML = '✓';
-          copyBtn.style.color = 'var(--success)';
-          setTimeout(() => {
-            copyBtn.innerHTML = '📋';
-            copyBtn.style.color = '';
-          }, 1500);
-        }
-      });
       row.appendChild(copyBtn);
     } else {
       const copyBtnSpacer = document.createElement('span');
@@ -241,75 +164,14 @@ export function renderPane(which) {
     }
 
     row.title = entry.path;
-
-    if (entry.is_dir) {
-      // Directories strictly navigate on click / double-click without opening Item Details modal
-      row.addEventListener('click', (e) => {
-        if (!isActionDialogEligible(e)) return;
-        loadPane(which, entry.path);
-      });
-      row.addEventListener('dblclick', (e) => {
-        if (!isActionDialogEligible(e)) return;
-        e.preventDefault();
-        loadPane(which, entry.path);
-      });
-    } else {
-      // Desktop double-click for files
-      row.addEventListener('dblclick', (e) => {
-        if (!isActionDialogEligible(e)) return;
-        openItemDetailsModal(entry, which);
-      });
-
-      // Mobile touch double-tap with movement threshold (<10px) to ignore scrolls/swipes
-      row.addEventListener('touchstart', (e) => {
-        if (e.touches.length !== 1 || !isActionDialogEligible(e)) return;
-        const t = e.touches[0];
-        const s = rowTouchState.get(row) || { lastTouchEnd: 0 };
-        rowTouchState.set(row, {
-          lastTouchEnd: s.lastTouchEnd,
-          startX: t.clientX,
-          startY: t.clientY,
-          touchMoved: false,
-        });
-      }, { passive: true });
-
-      row.addEventListener('touchmove', (e) => {
-        const s = rowTouchState.get(row);
-        if (!s || e.touches.length !== 1) return;
-        const t = e.touches[0];
-        if (Math.abs(t.clientX - s.startX) > MOVE_THRESHOLD_PX ||
-            Math.abs(t.clientY - s.startY) > MOVE_THRESHOLD_PX) {
-          s.touchMoved = true;
-          s.lastTouchEnd = 0; // Invalidate double-tap sequence on movement
-        }
-      }, { passive: true });
-
-      row.addEventListener('touchend', (e) => {
-        const s = rowTouchState.get(row);
-        if (!s || s.touchMoved || !isActionDialogEligible(e)) {
-          if (s) s.lastTouchEnd = 0;
-          return;
-        }
-        const now = Date.now();
-        if (now - s.lastTouchEnd < DOUBLE_TAP_DELAY_MS) {
-          e.preventDefault(); // Suppress mobile double-tap zoom
-          s.lastTouchEnd = 0;
-          openItemDetailsModal(entry, which);
-        } else {
-          s.lastTouchEnd = now;
-        }
-      });
-
-      row.addEventListener('touchcancel', () => {
-        const s = rowTouchState.get(row);
-        if (s) s.lastTouchEnd = 0;
-      }, { passive: true });
-    }
-
-    body.appendChild(row);
+    fragment.appendChild(row);
   }
+  
+  body.appendChild(fragment);
   body.scrollTop = prevScrollTop;
+  refreshPaneCheckboxes(which);
 }
+
 
 export function paneSelection(which) {
   if (which === 'pickerDest') return state.pickerDestSelection;
@@ -341,6 +203,44 @@ export function updateSelectionUI() {
   const preview = el('selection-preview');
   if (preview && !preview.classList.contains('hidden')) {
     renderSelectionPreview();
+  }
+}
+
+export function refreshPaneCheckboxes(which) {
+  const body = el(which + '-body');
+  if (!body) return;
+  const paneKey = which === 'pickerDest' ? 'pickerDest' : which;
+  const sel = which === 'pickerDest' ? state.pickerDestSelection : state.selection;
+  const checkboxes = body.querySelectorAll('input[type="checkbox"]');
+  for (const cb of checkboxes) {
+    const row = cb.closest('.entry');
+    if (!row) continue;
+    const path = row.getAttribute('data-path');
+    if (!path) continue;
+    const isDir = row.classList.contains('dir');
+    cb.checked = sel.isPathSelected(path);
+    if (isDir) {
+      cb.indeterminate = sel.isPathIndeterminate(path);
+    }
+  }
+
+  const masterCb = document.querySelector(`.pane-master-cb[data-pane="${which}"]`);
+  const paneState = state[paneKey];
+  if (masterCb && paneState && paneState.entries && paneState.entries.length > 0) {
+    let allSelected = true;
+    let someSelected = false;
+    for (const entry of paneState.entries) {
+      if (sel.isPathSelected(entry.path)) {
+        someSelected = true;
+      } else {
+        allSelected = false;
+      }
+    }
+    masterCb.checked = allSelected;
+    masterCb.indeterminate = someSelected && !allSelected;
+  } else if (masterCb) {
+    masterCb.checked = false;
+    masterCb.indeterminate = false;
   }
 }
 
@@ -384,3 +284,134 @@ export function toggleSelectionPreview() {
   else closeSelectionPreview();
 }
 
+
+
+const rowTouchState = new Map(); // path -> { startX, startY, lastTouchEnd, touchMoved }
+
+export function bindPaneDelegation(paneId, which) {
+  const container = el(paneId);
+  if (!container) return;
+  
+  container.addEventListener('click', (e) => {
+    const cb = e.target.closest('input[type="checkbox"]');
+    const btn = e.target.closest('.btn-copy-path');
+    const parentRow = e.target.closest('.entry.parent');
+    const row = e.target.closest('.entry[data-path]');
+    
+    if (cb && row) {
+      e.stopPropagation();
+      const path = row.getAttribute('data-path');
+      const sel = which === 'pickerDest' ? state.pickerDestSelection : state.selection;
+      if (cb.checked) {
+        sel.select(path);
+      } else {
+        sel.unselect(path);
+      }
+      refreshPaneCheckboxes(which);
+      updateSelectionUI();
+      if (typeof updateTransferMethodUI === 'function' && el('confirm-modal') && !el('confirm-modal').classList.contains('hidden')) {
+        updateTransferMethodUI();
+      }
+      return;
+    }
+    
+    if (btn && row) {
+      e.stopPropagation();
+      const path = row.getAttribute('data-path');
+      copyDownloadLink(path).then(success => {
+        if (success) {
+          btn.innerHTML = '✓';
+          btn.style.color = 'var(--success)';
+          setTimeout(() => {
+            btn.innerHTML = '📋';
+            btn.style.color = '';
+          }, 1500);
+        }
+      });
+      return;
+    }
+    
+    if (parentRow) {
+      return;
+    }
+    
+    if (row && row.classList.contains('dir')) {
+      if (!isActionDialogEligible(e)) return;
+      loadPane(which, row.getAttribute('data-path'));
+    }
+  });
+
+  container.addEventListener('dblclick', (e) => {
+    if (!isActionDialogEligible(e)) return;
+    const row = e.target.closest('.entry[data-path]');
+    if (!row) return;
+    const path = row.getAttribute('data-path');
+    
+    if (row.classList.contains('dir')) {
+      e.preventDefault();
+      loadPane(which, path);
+    } else {
+      const pane = state[which === 'pickerDest' ? 'pickerDest' : which];
+      const entry = pane.entries.find(en => en.path === path);
+      if (entry) openItemDetailsModal(entry, which);
+    }
+  });
+
+  container.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1 || !isActionDialogEligible(e)) return;
+    const row = e.target.closest('.entry[data-path]:not(.dir)');
+    if (!row) return;
+    const path = row.getAttribute('data-path');
+    const t = e.touches[0];
+    const s = rowTouchState.get(path) || { lastTouchEnd: 0 };
+    rowTouchState.set(path, {
+      lastTouchEnd: s.lastTouchEnd,
+      startX: t.clientX,
+      startY: t.clientY,
+      touchMoved: false,
+    });
+  }, { passive: true });
+
+  container.addEventListener('touchmove', (e) => {
+    if (e.touches.length !== 1) return;
+    const row = e.target.closest('.entry[data-path]:not(.dir)');
+    if (!row) return;
+    const path = row.getAttribute('data-path');
+    const s = rowTouchState.get(path);
+    if (!s) return;
+    const t = e.touches[0];
+    if (Math.abs(t.clientX - s.startX) > 10 || Math.abs(t.clientY - s.startY) > 10) {
+      s.touchMoved = true;
+      s.lastTouchEnd = 0;
+    }
+  }, { passive: true });
+
+  container.addEventListener('touchend', (e) => {
+    const row = e.target.closest('.entry[data-path]:not(.dir)');
+    if (!row || !isActionDialogEligible(e)) return;
+    const path = row.getAttribute('data-path');
+    const s = rowTouchState.get(path);
+    if (!s || s.touchMoved) {
+      if (s) s.lastTouchEnd = 0;
+      return;
+    }
+    const now = Date.now();
+    if (now - s.lastTouchEnd < 300) {
+      e.preventDefault();
+      s.lastTouchEnd = 0;
+      const pane = state[which === 'pickerDest' ? 'pickerDest' : which];
+      const entry = pane.entries.find(en => en.path === path);
+      if (entry) openItemDetailsModal(entry, which);
+    } else {
+      s.lastTouchEnd = now;
+    }
+  });
+
+  container.addEventListener('touchcancel', (e) => {
+    const row = e.target.closest('.entry[data-path]:not(.dir)');
+    if (!row) return;
+    const path = row.getAttribute('data-path');
+    const s = rowTouchState.get(path);
+    if (s) s.lastTouchEnd = 0;
+  }, { passive: true });
+}

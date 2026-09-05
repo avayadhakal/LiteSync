@@ -52,6 +52,7 @@ Minimal-overhead Linux web app for dual-pane local directory browsing and backgr
 │           ├── editor.js
 │           ├── item-details.js
 │           ├── mkdir-rename-delete.js
+│           ├── task-details.js
 │           └── transfer.js
 ├── data/                     # Gitignored runtime data
 │   ├── litesync.db           # SQLite database (tasks + activity tables)
@@ -194,6 +195,7 @@ CREATE INDEX idx_activity_created ON activity(created_at DESC);
   * **From URL**: URL input, optional filename override, and conflict selection submitted to `/api/transfer/url` as a persistent background task.
 * **Floating Upload Progress Card (`.upload-card`):** Self-contained multi-file progress card in bottom-right corner with stacked progress rows and independent `[✕]` cancel buttons (`xhr.abort()`) for device uploads.
 * **Unbatched Transfer Cards:** Multi-item transfers spawn individual `.transfer-card` elements (one per item). Queued items show `Queued...` and can be canceled before execution.
+* **Task Details Modal:** Dedicated `modal-extra-wide` view launched from transfer cards displaying a scrollable list of completed files and the currently active processing file with live progress stats.
 * **Selection Action Bar:** Hidden when count is 0; contains Summary, View, Clear, and Transfer controls.
 * **Transfer Confirmation Modal:** Contains operation options (`copy` vs `move`) directly under destination path.
 * **Contextual View Popover:** Displays full paths of selected items and exclusions with overflow scrolling.

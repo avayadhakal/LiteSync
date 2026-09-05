@@ -11,7 +11,7 @@
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/logo_dark.svg">
     <source media="(prefers-color-scheme: light)" srcset="docs/logo_light.svg">
-    <img alt="LiteSync Logo" src="docs/logo_light.svg" width="96" height="96">
+    <img alt="LiteSync Logo" src="docs/logo_light.svg" width="128" height="128">
   </picture>
 
   <h1>LiteSync</h1>

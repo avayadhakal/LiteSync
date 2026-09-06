@@ -394,6 +394,37 @@ class TestUrlDownload(unittest.TestCase):
             self.assertEqual(task["status"], "queued")
             self.assertEqual(task["on_conflict"], "rename")
 
+    # 13. Real HTTPS download end-to-end to verify SafeHTTPSConnection SSL context fix
+    def test_real_https_download_e2e(self):
+        import pytest
+        import socket
+        
+        # Ensure network access is available to prevent confusing failures in offline environments
+        try:
+            socket.create_connection(("example.com", 443), timeout=3).close()
+        except OSError:
+            pytest.skip("Network access to example.com is unavailable")
+
+        # We perform a real download from example.com to verify our custom connection wrapper
+        # actually correctly configures SSL and passes the SNI validation without raising AttributeError.
+        target_file = self.dest_dir / "example.html"
+        task_id = scheduler.queue_task(
+            settings=self.settings,
+            source="https://example.com/",
+            destination=str(target_file),
+            operation="url_download",
+        )
+        db.mark_running(task_id)
+        task = db.get_task(task_id)
+
+        # Do NOT patch validate_and_resolve_host; we want the real socket and SSL wrapping!
+        asyncio.run(scheduler._run_task(task, self.settings))
+
+        finished = db.get_task(task_id)
+        self.assertEqual(finished["status"], "succeeded")
+        self.assertTrue(target_file.exists())
+        self.assertTrue(len(target_file.read_bytes()) > 0)
+
 
 if __name__ == "__main__":
     unittest.main()

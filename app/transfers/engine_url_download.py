@@ -150,9 +150,9 @@ class SafeHTTPSConnection(http.client.HTTPSConnection):
             sock = self.sock
 
         server_hostname = self._tunnel_host or self.host
-        if self.context is None:
-            self.context = ssl.create_default_context()
-        self.sock = self.context.wrap_socket(sock, server_hostname=server_hostname)
+        if self._context is None:
+            self._context = ssl.create_default_context()
+        self.sock = self._context.wrap_socket(sock, server_hostname=server_hostname)
 
 
 class SafeHTTPHandler(urllib.request.HTTPHandler):

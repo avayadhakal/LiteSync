@@ -11,9 +11,8 @@
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/logo_dark.svg">
     <source media="(prefers-color-scheme: light)" srcset="docs/logo_light.svg">
-    <img alt="LiteSync Logo" src="docs/logo_light.svg" width="128" height="128">
+    <img alt="LiteSync Logo" src="docs/logo_light.svg" width="228" height="228">
   </picture>
-
   <h1>LiteSync</h1>
 
   <p>Web-based file management and transfer for Linux.</p>

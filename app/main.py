@@ -39,7 +39,19 @@ async def csrf_protection(request: Request, call_next):
                 
             settings = get_settings()
             
-            if not source_origin or source_origin not in settings.allowed_origins:
+            is_valid = False
+            if source_origin:
+                if settings.allowed_origins:
+                    if source_origin in settings.allowed_origins:
+                        is_valid = True
+                elif settings.host in ("0.0.0.0", "::", ""):
+                    parsed = urlparse(source_origin)
+                    expected_scheme = "https" if settings.secure_cookie else "http"
+                    port = parsed.port or (443 if parsed.scheme == "https" else 80)
+                    if parsed.scheme == expected_scheme and port == settings.port:
+                        is_valid = True
+            
+            if not is_valid:
                 return JSONResponse(status_code=403, content={"detail": "CSRF check failed: Origin/Referer mismatch"})
                 
     return await call_next(request)
@@ -75,10 +87,16 @@ async def root(_user: str = Depends(get_current_user)):
     return FileResponse(STATIC_DIR / "index.html")
 
 
+import logging
+logger = logging.getLogger("litesync")
+
 @app.on_event("startup")
 async def on_startup():
     global _scheduler_task
     settings = get_settings()
+    
+    if settings.host in ("0.0.0.0", "::", "") and not settings.allowed_origins:
+        logger.warning("Running on wildcard host without explicit allowed_origins. For tighter security in production, set allowed_origins in config.toml.")
     db.init_db(settings.data_dir)
     
     # Secondary/defensive fix for upload spooling. 

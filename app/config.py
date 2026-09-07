@@ -33,16 +33,11 @@ class Settings:
     def __post_init__(self):
         if not self.allowed_origins:
             scheme = "https" if self.secure_cookie else "http"
-            if self.host == "0.0.0.0":
-                origins = [f"{scheme}://localhost:{self.port}", f"{scheme}://127.0.0.1:{self.port}"]
-                if (scheme == "http" and self.port == 80) or (scheme == "https" and self.port == 443):
-                    origins.extend([f"{scheme}://localhost", f"{scheme}://127.0.0.1"])
-            else:
+            if self.host not in ("0.0.0.0", "::", ""):
                 origin = f"{scheme}://{self.host}:{self.port}"
                 if (scheme == "http" and self.port == 80) or (scheme == "https" and self.port == 443):
                     origin = f"{scheme}://{self.host}"
-                origins = [origin]
-            object.__setattr__(self, "allowed_origins", origins)
+                object.__setattr__(self, "allowed_origins", [origin])
 
     def find_user(self, username: str) -> User | None:
         for user in self.users:

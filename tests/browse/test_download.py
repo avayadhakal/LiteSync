@@ -24,6 +24,17 @@ async def make_request(
     """Execute an ASGI request directly against the FastAPI app."""
     if headers is None:
         headers = []
+    header_keys = {k.lower() for k, v in headers}
+    if "host" not in header_keys:
+        headers.append(("Host", "127.0.0.1:8000"))
+    if "origin" not in header_keys and method.upper() in ("POST", "PUT", "DELETE", "PATCH"):
+        from app.config import get_settings
+        settings = get_settings()
+        if settings and settings.allowed_origins:
+            headers.append(("Origin", settings.allowed_origins[0]))
+        else:
+            headers.append(("Origin", "http://127.0.0.1:8000"))
+
     raw_headers = [(k.lower().encode("latin-1"), v.encode("latin-1")) for k, v in headers]
     scope = {
         "type": "http",

@@ -415,6 +415,7 @@ The application includes several restrictions around filesystem access:
 * Configured `allowed_roots`
 * Path traversal validation
 * Authenticated application access
+* CSRF protection via Origin/Referer header validation
 * Signed file links
 * MIME allowlisting for inline file viewing
 * Temporary upload files

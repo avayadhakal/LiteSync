@@ -4,7 +4,7 @@
 Minimal-overhead Linux web app for dual-pane local directory browsing and background `rsync` / zero-copy kernel transfers (supporting `x86_64`, `arm64`, Raspberry Pi, NAS, and homelab environments).
 * **Stack**: Python + FastAPI (async, SSE-friendly) on `uvicorn` (`--workers 1`). Vanilla HTML/JS/CSS frontend.
 * **Auth**: Built-in lightweight auth (TOML hashed passwords, signed session cookies).
-* **Security**: Filesystem constrained to admin-configured "allowed roots". `fsops.resolve_safe_path()` strictly validates all paths against traversal/symlink escapes.
+* **Security**: Filesystem constrained to admin-configured "allowed roots". `fsops.resolve_safe_path()` strictly validates all paths against traversal/symlink escapes. CSRF protection on state-changing endpoints via Origin/Referer validation.
 * **Transfer Engine**: Background asyncio subprocess worker. Survives browser closures. Logs pipe directly to per-task files, streamed to UI via SSE.
 * **Browser Uploads**: Direct browser-to-filesystem multipart streaming straight to destination directory. Fully decoupled from `tasks` table and background runner.
 * **UI Paradigms**: Single-page application (SPA). Independent transfer cards (1 per source). Real-time byte upload progress card. Contextual modals for file mutation. Toast notifications. SQLite persistent activity log.

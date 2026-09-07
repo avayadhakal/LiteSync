@@ -4,7 +4,7 @@ import hashlib
 import hmac
 import os
 import tomllib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 
@@ -24,9 +24,25 @@ class Settings:
     data_dir: Path
     host: str
     port: int
+    allowed_origins: list[str] = field(default_factory=list)
     download_expiry: int = 86400
     download_secret_key: str | None = None
     max_upload_size_mb: int = 5120
+
+
+    def __post_init__(self):
+        if not self.allowed_origins:
+            scheme = "https" if self.secure_cookie else "http"
+            if self.host == "0.0.0.0":
+                origins = [f"{scheme}://localhost:{self.port}", f"{scheme}://127.0.0.1:{self.port}"]
+                if (scheme == "http" and self.port == 80) or (scheme == "https" and self.port == 443):
+                    origins.extend([f"{scheme}://localhost", f"{scheme}://127.0.0.1"])
+            else:
+                origin = f"{scheme}://{self.host}:{self.port}"
+                if (scheme == "http" and self.port == 80) or (scheme == "https" and self.port == 443):
+                    origin = f"{scheme}://{self.host}"
+                origins = [origin]
+            object.__setattr__(self, "allowed_origins", origins)
 
     def find_user(self, username: str) -> User | None:
         for user in self.users:
@@ -61,6 +77,11 @@ def load_settings(config_path_override: Path | str | None = None) -> Settings:
     users = [User(username=u["username"], password_hash=u["password_hash"]) for u in raw.get("users", [])]
     data_dir = Path(raw.get("data_dir", "./data")).resolve()
 
+    allowed_origins_raw = raw.get("allowed_origins")
+    allowed_origins = []
+    if allowed_origins_raw is not None:
+        allowed_origins = [str(o).rstrip("/") for o in allowed_origins_raw]
+
     return Settings(
         allowed_roots=allowed_roots,
         users=users,
@@ -70,6 +91,7 @@ def load_settings(config_path_override: Path | str | None = None) -> Settings:
         data_dir=data_dir,
         host=raw.get("host", "0.0.0.0"),
         port=int(raw.get("port", 8000)),
+        allowed_origins=allowed_origins,
         download_expiry=int(raw.get("download_expiry", 86400)),
         download_secret_key=raw.get("download_secret_key"),
         max_upload_size_mb=int(raw.get("max_upload_size_mb", 5120)),

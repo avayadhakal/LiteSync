@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 ### Added
+- **CSRF Protection:** Added global FastAPI middleware to validate `Origin` or `Referer` headers against configured `allowed_origins` for all state-changing endpoints.
 - **Task Details Modal:** Added new transfer details view.
 - **Real-Time Transfer Metrics:** Display live transfer speed and copied/total size on active transfer cards.
 - **Per-Log Delete Button:** Added individual deletion for activity log entries with a corresponding `DELETE /api/activity/{id}` endpoint.
@@ -32,6 +33,7 @@ All notable changes to this project will be documented in this file.
 - **Internal Modularization & Refactoring:** Restructured backend and frontend codebases into dedicated subsystems (`app/transfers/`, `app/browse/`, `static/js/modals/`, ES modules) with isolated concerns and focused test coverage.
 
 ### Fixed
+- **URL Download SSL Context:** Fixed an `AttributeError` during HTTPS downloads caused by a mismatched SSL context attribute in the custom `SafeHTTPSConnection` SSRF guard.
 - **Transfer Queue UI Transitions:** Resolved an issue where queued operations failed to dynamically render active controls upon state shifts.
 - **UI & State:** Resolved action button visibility loss when toggling pause/resume on active transfers.
 - **Uploads:** Automated cleanup of completed upload toast notifications.

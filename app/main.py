@@ -20,6 +20,30 @@ STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
 app = FastAPI(title="LiteSync")
 
+from urllib.parse import urlparse
+from fastapi import Request
+from fastapi.responses import JSONResponse
+
+@app.middleware("http")
+async def csrf_protection(request: Request, call_next):
+    if request.method in ("POST", "DELETE", "PUT", "PATCH"):
+        # Exclude requests authenticated explicitly via Authorization header
+        if not request.headers.get("authorization"):
+            origin = request.headers.get("origin")
+            referer = request.headers.get("referer")
+            
+            source_origin = origin
+            if not source_origin and referer:
+                parsed = urlparse(referer)
+                source_origin = f"{parsed.scheme}://{parsed.netloc}"
+                
+            settings = get_settings()
+            
+            if not source_origin or source_origin not in settings.allowed_origins:
+                return JSONResponse(status_code=403, content={"detail": "CSRF check failed: Origin/Referer mismatch"})
+                
+    return await call_next(request)
+
 app.include_router(auth_router)
 app.include_router(browse_router)
 app.include_router(tasks_router)

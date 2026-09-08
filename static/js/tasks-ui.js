@@ -186,7 +186,7 @@ export function updateCardControlsInPlace(task) {
     if (task.status === 'paused') {
       detailEl.textContent = 'Paused';
     } else if (task.status === 'queued') {
-      detailEl.textContent = 'Queued...';
+      detailEl.textContent = activeStreams.has(task.task_id) ? 'Queued...' : 'Waiting for connection slot...';
     } else if (streamData && streamData.currentFile) {
       detailEl.textContent = `Copying: ${streamData.currentFile}`;
     } else {
@@ -220,18 +220,29 @@ export function renderActiveTransfers() {
       return new Date(a.created_at) - new Date(b.created_at);
     });
 
-  // Clean up streams for tasks that are no longer active
   const activeTaskIds = new Set(activeTasks.map((t) => t.task_id));
-  for (const [id, streamObj] of activeStreams.entries()) {
-    if (!activeTaskIds.has(id)) {
-      streamObj.source.close();
-      activeStreams.delete(id);
+
+  let streamCount = 0;
+  const tasksToStream = new Set();
+
+  for (const task of activeTasks) {
+    if (task.status === 'running' || task.status === 'paused') {
+      tasksToStream.add(task.task_id);
+      streamCount++;
+    }
+  }
+  for (const task of activeTasks) {
+    if (task.status === 'queued' && streamCount < 3 && !tasksToStream.has(task.task_id)) {
+      tasksToStream.add(task.task_id);
+      streamCount++;
     }
   }
 
-  for (const task of activeTasks) {
-    if (!activeStreams.has(task.task_id) && (task.status === 'queued' || task.status === 'running' || task.status === 'paused')) {
-      attachTaskStream(task);
+  // Clean up streams for tasks that are no longer active OR no longer fit in the slot limit
+  for (const [id, streamObj] of activeStreams.entries()) {
+    if (!activeTaskIds.has(id) || !tasksToStream.has(id)) {
+      streamObj.source.close();
+      activeStreams.delete(id);
     }
   }
 
@@ -251,9 +262,18 @@ export function renderActiveTransfers() {
     const sourceText = task.source || (Array.isArray(task.sources) ? task.sources.join(', ') : (task.sources || ''));
     const streamData = activeStreams.get(task.task_id);
     const currentPct = streamData ? streamData.pct : 0;
-    const currentDetail = task.status === 'paused' ? 'Paused' : (streamData && streamData.currentFile
-      ? `Copying: ${streamData.currentFile}`
-      : (task.status === 'queued' ? 'Queued...' : 'Starting transfer...'));
+    
+    let currentDetail = '';
+    if (task.status === 'paused') {
+      currentDetail = 'Paused';
+    } else if (streamData && streamData.currentFile) {
+      currentDetail = `Copying: ${streamData.currentFile}`;
+    } else if (task.status === 'queued') {
+      currentDetail = tasksToStream.has(task.task_id) ? 'Queued...' : 'Waiting for connection slot...';
+    } else {
+      currentDetail = 'Starting transfer...';
+    }
+
     const currentSize = streamData && streamData.sizeText ? streamData.sizeText : '';
     const currentSpeed = streamData && streamData.speed ? streamData.speed : (task.status === 'paused' ? '—' : '');
 
@@ -283,8 +303,10 @@ export function renderActiveTransfers() {
 
     activeContainer.appendChild(card);
 
-    // Attach SSE stream if running/queued
-    attachTaskStream(task);
+    // Attach SSE stream if running/queued and in our allowed list
+    if (tasksToStream.has(task.task_id)) {
+      attachTaskStream(task);
+    }
   }
 }
 

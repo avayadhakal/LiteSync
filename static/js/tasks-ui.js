@@ -186,7 +186,7 @@ export function updateCardControlsInPlace(task) {
     if (task.status === 'paused') {
       detailEl.textContent = 'Paused';
     } else if (task.status === 'queued') {
-      detailEl.textContent = activeStreams.has(task.task_id) ? 'Queued...' : 'Waiting for connection slot...';
+      detailEl.textContent = 'Queued...';
     } else if (streamData && streamData.currentFile) {
       detailEl.textContent = `Copying: ${streamData.currentFile}`;
     } else {
@@ -222,19 +222,10 @@ export function renderActiveTransfers() {
 
   const activeTaskIds = new Set(activeTasks.map((t) => t.task_id));
 
-  let streamCount = 0;
   const tasksToStream = new Set();
-
   for (const task of activeTasks) {
     if (task.status === 'running' || task.status === 'paused') {
       tasksToStream.add(task.task_id);
-      streamCount++;
-    }
-  }
-  for (const task of activeTasks) {
-    if (task.status === 'queued' && streamCount < 3 && !tasksToStream.has(task.task_id)) {
-      tasksToStream.add(task.task_id);
-      streamCount++;
     }
   }
 
@@ -269,7 +260,7 @@ export function renderActiveTransfers() {
     } else if (streamData && streamData.currentFile) {
       currentDetail = `Copying: ${streamData.currentFile}`;
     } else if (task.status === 'queued') {
-      currentDetail = tasksToStream.has(task.task_id) ? 'Queued...' : 'Waiting for connection slot...';
+      currentDetail = 'Queued...';
     } else {
       currentDetail = 'Starting transfer...';
     }

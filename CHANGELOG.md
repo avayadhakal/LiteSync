@@ -33,6 +33,7 @@ All notable changes to this project will be documented in this file.
 - **Internal Modularization & Refactoring:** Restructured backend and frontend codebases into dedicated subsystems (`app/transfers/`, `app/browse/`, `static/js/modals/`, ES modules) with isolated concerns and focused test coverage.
 
 ### Fixed
+- **SSE Streams:** Simplified connection limiting to use exactly 1 active stream strictly for the currently running or paused task, and removed the "Waiting for connection slot..." UI workaround.
 - **URL Download SSL Context:** Fixed an `AttributeError` during HTTPS downloads caused by a mismatched SSL context attribute in the custom `SafeHTTPSConnection` SSRF guard.
 - **Transfer Queue UI Transitions:** Resolved an issue where queued operations failed to dynamically render active controls upon state shifts.
 - **UI & State:** Resolved action button visibility loss when toggling pause/resume on active transfers.

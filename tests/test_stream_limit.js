@@ -207,34 +207,19 @@ global.fetch = async (path, opts) => {
     }
   };
 
-  await runTest('10 Tasks: 3 Streams Limit, Unstreamed UI treatment', async () => {
-    // Create 10 tasks: 1 running, 2 paused, 7 queued
+  await runTest('Strict 1 Stream Limit (Running or Paused)', async () => {
     const tasks = [];
     
     // Add 1 running task
     tasks.push({
-      task_id: 'task_running_1',
+      task_id: 'task_active_1',
       source: '/src/run1', destination: '/dst',
       status: 'running', use_rsync: true,
       created_at: new Date(Date.now() - 10000).toISOString()
     });
     
-    // Add 2 paused tasks
-    tasks.push({
-      task_id: 'task_paused_1',
-      source: '/src/pause1', destination: '/dst',
-      status: 'paused', use_rsync: true,
-      created_at: new Date(Date.now() - 9000).toISOString()
-    });
-    tasks.push({
-      task_id: 'task_paused_2',
-      source: '/src/pause2', destination: '/dst',
-      status: 'paused', use_rsync: true,
-      created_at: new Date(Date.now() - 8000).toISOString()
-    });
-
-    // Add 7 queued tasks
-    for (let i = 1; i <= 7; i++) {
+    // Add 9 queued tasks
+    for (let i = 1; i <= 9; i++) {
       tasks.push({
         task_id: `task_queued_${i}`,
         source: `/src/q${i}`, destination: '/dst',
@@ -246,51 +231,62 @@ global.fetch = async (path, opts) => {
     state.tasks = tasks;
     tasksUi.renderActiveTransfers();
 
-    // Assert (a): Exactly 3 connections are opened
-    assert.strictEqual(MockEventSource.activeCount, 3, "Should be exactly 3 active EventSource streams");
-    
-    // Assert streams are attached to running and paused tasks
-    assert.strictEqual(tasksUi.activeStreams.has('task_running_1'), true, 'Running task should have stream');
-    assert.strictEqual(tasksUi.activeStreams.has('task_paused_1'), true, 'Paused task 1 should have stream');
-    assert.strictEqual(tasksUi.activeStreams.has('task_paused_2'), true, 'Paused task 2 should have stream');
-    assert.strictEqual(tasksUi.activeStreams.has('task_queued_1'), false, 'Queued task should NOT have stream due to cap');
+    // Assert Exactly 1 connection is opened for the running task
+    assert.strictEqual(MockEventSource.activeCount, 1, "Should be exactly 1 active EventSource stream");
+    assert.strictEqual(tasksUi.activeStreams.has('task_active_1'), true, 'Running task should have stream');
+    assert.strictEqual(tasksUi.activeStreams.has('task_queued_1'), false, 'Queued task should NOT have stream');
 
-    // Assert (c): Unstreamed queued task has full card but specific waiting message
-    const activeContainer = mockDocument.getElementById('active-transfers-container');
-    const card4 = activeContainer.children.find(c => c.id === 'card-task_queued_1');
-    assert.ok(card4, 'Card for task_queued_1 should render');
+    // Simulate pausing the running task
+    const activeTask = state.tasks.find(t => t.task_id === 'task_active_1');
+    activeTask.status = 'paused';
     
-    // In mock elements we set innerHTML on the card
-    const html = card4.innerHTML;
+    tasksUi.renderActiveTransfers();
+    
+    // Assert the paused task retains the stream
+    assert.strictEqual(MockEventSource.activeCount, 1, "Should be exactly 1 active EventSource stream");
+    assert.strictEqual(tasksUi.activeStreams.has('task_active_1'), true, 'Paused task should retain stream');
+
+    // Simulate resuming the paused task
+    activeTask.status = 'running';
+    
+    tasksUi.renderActiveTransfers();
+    
+    // Assert the resumed running task retains the stream
+    assert.strictEqual(MockEventSource.activeCount, 1, "Should be exactly 1 active EventSource stream");
+    assert.strictEqual(tasksUi.activeStreams.has('task_active_1'), true, 'Resumed task should retain stream');
+
+    // Assert Unstreamed queued task has full card but no waiting message
+    const activeContainer = mockDocument.getElementById('active-transfers-container');
+    const queuedCard = activeContainer.children.find(c => c.id === 'card-task_queued_1');
+    assert.ok(queuedCard, 'Card for task_queued_1 should render');
+    
+    const html = queuedCard.innerHTML;
     
     assert.strictEqual(html.includes('badge-status-queued'), true, 'Should have Queued badge HTML');
     assert.strictEqual(html.includes('cancel-btn'), true, 'Should have Cancel button HTML');
-    
-    // And for the detail text
-    assert.strictEqual(html.includes('Waiting for connection slot...'), true, 'Should show waiting text HTML');
-    
-    // Assert (b): Simulate running task finishing
-    console.log("Simulating running task finishing...");
-    const runningStreamObj = tasksUi.activeStreams.get('task_running_1');
+    assert.strictEqual(html.includes('Queued...'), true, 'Should show Queued... text HTML');
+    assert.strictEqual(html.includes('Waiting for connection' + ' slot...'), false, 'Should NOT show waiting text HTML');
+
+    // Simulate active task finishing
+    const runningStreamObj = tasksUi.activeStreams.get('task_active_1');
     
     runningStreamObj.source.simulateStatus('succeeded');
     
     await new Promise(r => setTimeout(r, 50));
     
-    state.tasks = state.tasks.filter(t => t.task_id !== 'task_running_1');
+    // Simulate the scheduler removing the finished task and picking up the next queued task
+    state.tasks = state.tasks.filter(t => t.task_id !== 'task_active_1');
+    const nextTask = state.tasks.find(t => t.task_id === 'task_queued_1');
+    nextTask.status = 'running';
     
     tasksUi.renderActiveTransfers();
     
-    // Assert 4th connection opens and 1st closes
-    assert.strictEqual(tasksUi.activeStreams.has('task_running_1'), false, 'Finished task stream should be deleted');
+    // Assert exactly 1 stream remains, switching from the finished task to the newly running one
+    assert.strictEqual(tasksUi.activeStreams.has('task_active_1'), false, 'Finished task stream should be deleted');
     assert.strictEqual(runningStreamObj.source.readyState, 2, 'Finished task stream should be closed');
     
-    assert.strictEqual(MockEventSource.activeCount, 3, "Should still be exactly 3 active streams");
-    assert.strictEqual(tasksUi.activeStreams.has('task_queued_1'), true, 'First queued task should now have gotten the freed stream slot');
-    
-    const newCard4 = mockDocument.getElementById('active-transfers-container').children.find(c => c.id === 'card-task_queued_1');
-    const newHtml = newCard4.innerHTML; 
-    assert.strictEqual(newHtml.includes('Queued...'), true, 'Task with newly attached stream should now just show "Queued..."');
+    assert.strictEqual(MockEventSource.activeCount, 1, "Should still be exactly 1 active stream");
+    assert.strictEqual(tasksUi.activeStreams.has('task_queued_1'), true, 'Newly running task should have the stream slot');
   });
 
   console.log('All Stream Limit UI tests passed successfully.');

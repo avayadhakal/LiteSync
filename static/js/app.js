@@ -10,6 +10,7 @@ import { updateTransferMethodUI, getPrimaryTitle, closeConfirmModal, showConflic
 import { closeTaskDetailsModal, isTaskDetailsOpen } from './modals/task-details.js';
 import { closeItemDetailsModal } from './modals/item-details.js';
 import { isEditorOpen, saveEditorContent, closeEditorModal, toggleEditorMaximize } from './modals/editor.js';
+import { initSettingsModal } from './modals/settings.js';
 
 
 
@@ -585,12 +586,45 @@ async function init() {
   });
 
   const who = await api('/api/whoami');
-  el('whoami').textContent = who.username;
+  if (el('menu-user-banner')) el('menu-user-banner').textContent = `Logged in as ${who.username}`;
 
-  el('logout-btn').addEventListener('click', async () => {
-    await api('/api/logout', { method: 'POST' });
-    window.location.href = '/login.html';
-  });
+  if (el('menu-logout')) {
+    el('menu-logout').addEventListener('click', async () => {
+      await api('/api/logout', { method: 'POST' });
+      window.location.href = '/login.html';
+    });
+  }
+
+  // Gear menu logic
+  const gearBtn = el('gear-btn');
+  const gearMenu = el('gear-menu');
+  if (gearBtn && gearMenu) {
+    gearBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      gearMenu.classList.toggle('hidden');
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!gearMenu.contains(e.target) && !gearBtn.contains(e.target)) {
+        gearMenu.classList.add('hidden');
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        gearMenu.classList.add('hidden');
+      }
+    });
+
+    gearMenu.addEventListener('click', (e) => {
+      if (e.target.tagName === 'BUTTON') {
+        gearMenu.classList.add('hidden');
+      }
+    });
+  }
+
+  // Settings modal logic
+  initSettingsModal();
 
   // Both panes expose Upload / New Folder / Rename / Delete via [data-pane-action][data-pane]
   document.querySelectorAll('[data-pane-action]').forEach((btn) => {

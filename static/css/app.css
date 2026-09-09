@@ -115,7 +115,7 @@ button.primary { background: var(--accent-dim); border-color: var(--accent); }
 button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
 button.danger-outline { border-color: var(--danger); }
 
-input[type="text"], input[type="password"], input[type="search"] {
+input[type="text"], input[type="password"], input[type="search"], select.modal-select {
   font: inherit;
   background: var(--panel-alt);
   color: var(--text);
@@ -1023,7 +1023,7 @@ tr.task-row:hover { background: rgba(255, 255, 255, 0.05); }
 
 /* Transfer-popup-style modal fields */
 .modal-field { margin: 12px 0 4px; }
-.modal-field input[type="text"] {
+.modal-field input[type="text"], .modal-field input[type="password"], .modal-field select {
   width: 100%;
   font-size: 16px; /* >=16px prevents iOS auto-zoom on focus */
   padding: 8px 10px;
@@ -1880,4 +1880,214 @@ body.single-pane #source-pane {
     right: -4px;
     bottom: -9px;
   }
+}
+
+/* Gear Icon Button */
+#gear-btn {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  height: var(--hit-action-desktop);
+  width: var(--hit-action-desktop);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+#gear-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* Gear Icon Dropdown Popover */
+.dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  min-width: 180px;
+  z-index: 1000;
+  padding: 4px 0;
+}
+.dropdown-header {
+  padding: 8px 16px;
+  color: var(--text-dim);
+  font-size: 13px;
+  user-select: none;
+  text-align: center;
+}
+.dropdown-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+.dropdown-item {
+  display: block;
+  width: 100%;
+  text-align: center;
+  padding: 8px 16px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  color: var(--text);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.dropdown-item:hover {
+  background: var(--panel-alt);
+}
+.dropdown-item.danger:hover {
+  background: rgba(225, 86, 86, 0.1);
+  color: var(--danger);
+  border-color: transparent;
+}
+
+/* Mobile Settings (< 600px) */
+@media (max-width: 600px) {
+  #gear-btn {
+    width: var(--hit-action-mobile);
+    height: var(--hit-action-mobile);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #settings-modal .modal-field {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  #settings-modal input,
+  #settings-modal select {
+    font-size: 16px; /* Prevents auto-zoom */
+  }
+}
+
+/* Light Theme Overrides */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #eef0f4;
+  --panel: #f5f6f8;
+  --panel-alt: #eaedf1;
+  --border: #c1c9d2;
+  --text: #212529;
+  --text-dim: #6c757d;
+  --accent: #2563eb;
+  --accent-dim: #dbeafe;
+  --danger: #dc3545;
+  --success: #198754;
+  --warn: #ffc107;
+}
+
+[data-theme="light"] .segmented-control,
+[data-theme="light"] #gear-btn {
+  background: rgba(0, 0, 0, 0.05);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .segmented-control button {
+  color: var(--text-dim);
+}
+
+[data-theme="light"] .segmented-control button.active {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+[data-theme="light"] .segmented-control button:hover:not(.active),
+[data-theme="light"] #gear-btn:hover {
+  background: rgba(0, 0, 0, 0.1);
+  border-color: rgba(0, 0, 0, 0.15);
+}
+
+[data-theme="light"] .modal ul,
+[data-theme="light"] .toast-file-name,
+[data-theme="light"] .toast-host,
+[data-theme="light"] .activity-search-input,
+[data-theme="light"] .activity-primary-line,
+[data-theme="light"] .item-details-value.path-wrap,
+[data-theme="light"] .task-details-file-name {
+  color: var(--text); /* Overrides hardcoded #ffffff */
+}
+
+/* Subtle fixes for hardcoded badge backgrounds in light mode */
+[data-theme="light"] .badge.succeeded { background: #d1e7dd; color: #0f5132; }
+[data-theme="light"] .badge.failed, 
+[data-theme="light"] .badge.interrupted { background: #f8d7da; color: #842029; }
+[data-theme="light"] .icon-btn.danger:hover { background: #f8d7da; }
+
+/* Text color fixes for hardcoded whites */
+[data-theme="light"] .pane-path,
+[data-theme="light"] .selection-preview-list,
+[data-theme="light"] .activity-search-input {
+  color: var(--text);
+}
+[data-theme="light"] .activity-search-input {
+  background: var(--panel-alt);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+[data-theme="light"] .selection-inline,
+[data-theme="light"] .selection-preview {
+  border-color: rgba(0, 0, 0, 0.1);
+}
+[data-theme="light"] th,
+[data-theme="light"] td,
+[data-theme="light"] .activity-card,
+[data-theme="light"] .activity-utils,
+[data-theme="light"] .activity-details-row {
+  border-bottom-color: rgba(0, 0, 0, 0.05);
+}
+
+/* Splitter drag handle */
+[data-theme="light"] .splitter-v::after, 
+[data-theme="light"] .splitter-h::after {
+  background: rgba(0, 0, 0, 0.2);
+}
+[data-theme="light"] .splitter-v:hover::after,
+[data-theme="light"] .splitter-dragging.splitter-v::after,
+[data-theme="light"] .splitter-h:hover::after,
+[data-theme="light"] .splitter-dragging.splitter-h::after {
+  background: rgba(0, 0, 0, 0.5);
+}
+[data-theme="light"] .card-path,
+[data-theme="light"] .card-details,
+[data-theme="light"] .activity-time,
+[data-theme="light"] .activity-secondary-line {
+  color: var(--text-dim);
+}
+
+/* Terminal Log View styling */
+[data-theme="light"] .log-view {
+  background: var(--panel-alt);
+  color: var(--text);
+}
+
+/* Fixes for translucent badges and tags */
+[data-theme="light"] .badge-danger { color: #dc3545; border-color: rgba(220, 53, 69, 0.4); }
+[data-theme="light"] .badge-success { color: #15803d; border-color: rgba(21, 128, 61, 0.4); }
+[data-theme="light"] .badge-info { color: #1d4ed8; border-color: rgba(29, 78, 216, 0.4); }
+[data-theme="light"] .badge-warning { color: #b45309; border-color: rgba(180, 83, 9, 0.4); }
+[data-theme="light"] .activity-tag {
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--text-dim);
+}
+[data-theme="light"] .task-details-file-active {
+  background: rgba(37, 99, 235, 0.1);
+}
+[data-theme="light"] .activity-secondary-line span[style*="color: var(--danger)"] {
+  color: #dc3545 !important;
+}
+
+/* Icons for light mode */
+[data-theme="light"] .entry:not(.dir):not(.parent) .name::before {
+  background: url('/assets/icons/file_light.svg') no-repeat center / contain;
+}
+
+/* Logo swap for light mode */
+[data-theme="light"] .app-logo {
+  content: url('/assets/icons/logo_light.svg');
 }

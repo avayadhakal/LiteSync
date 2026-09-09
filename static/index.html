@@ -17,18 +17,25 @@
     <div class="nav-center">
       <div class="segmented-control" id="layout-toggle">
         <button id="btn-single-pane">
-          <svg width="14" height="14" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="1.5" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+          <div class="ui-icon" style="background-color: currentColor; -webkit-mask: url('/assets/icons/single-pane.svg') no-repeat center / contain; mask: url('/assets/icons/single-pane.svg') no-repeat center / contain;"></div>
           <span class="toggle-label">Single</span>
         </button>
         <button id="btn-dual-pane">
-          <svg width="14" height="14" viewBox="0 0 16 16"><rect x="2" y="3" width="5" height="10" rx="1" stroke="currentColor" stroke-width="1.5" fill="none"/><rect x="9" y="3" width="5" height="10" rx="1" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+          <div class="ui-icon" style="background-color: currentColor; -webkit-mask: url('/assets/icons/dual-pane.svg') no-repeat center / contain; mask: url('/assets/icons/dual-pane.svg') no-repeat center / contain;"></div>
           <span class="toggle-label">Dual</span>
         </button>
       </div>
     </div>
-    <div class="nav-right">
-      <span id="whoami" class="user-display" style="color: var(--text-dim);"></span>
-      <button id="logout-btn" class="btn-logout">Log out</button>
+    <div class="nav-right" style="position: relative;">
+      <button id="gear-btn" class="icon-btn" aria-label="Settings and more" aria-haspopup="true">
+        <div class="ui-icon" style="width: 20px; height: 20px; background-color: currentColor; -webkit-mask: url('/assets/icons/gear.svg') no-repeat center / contain; mask: url('/assets/icons/gear.svg') no-repeat center / contain;"></div>
+      </button>
+      <div id="gear-menu" class="dropdown-menu hidden">
+        <div class="dropdown-header" id="menu-user-banner">Logged in as ...</div>
+        <div class="dropdown-divider"></div>
+        <button class="dropdown-item" id="menu-settings">Settings</button>
+        <button class="dropdown-item danger" id="menu-logout">Log out</button>
+      </div>
     </div>
   </header>
 
@@ -121,7 +128,7 @@
 
       <div id="transfer-picker-container" class="hidden" style="margin-top: 14px; margin-bottom: 14px;">
         <label class="modal-label" style="margin-bottom: 8px;">Destination</label>
-        <div class="pane-header" style="padding: 4px 8px; font-size: 0.9em; background: var(--bg-alt); border: 1px solid var(--border);">
+        <div class="pane-header" style="padding: 4px 8px; font-size: 0.9em; background: var(--panel-alt); border: 1px solid var(--border);">
             <span class="pane-path" id="transfer-picker-path"></span>
             <div class="pane-actions">
               <button class="icon-btn" id="transfer-picker-mkdir" data-pane-action="mkdir" data-pane="pickerDest" title="New Folder"><img src="/assets/icons/folder.svg" class="ui-icon" alt="New Folder" /><span class="btn-plus-badge">+</span></button>
@@ -390,9 +397,9 @@
 
       <!-- Overall progress bar (transform: scaleX avoids layout recalc) -->
       <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
-        <div style="flex: 1; height: 7px; border-radius: 4px; background: var(--bg-alt); overflow: hidden;">
+        <div style="flex: 1; height: 7px; border-radius: 4px; background: var(--panel-alt); overflow: hidden;">
           <div id="task-details-progress-fill"
-               style="height: 100%; border-radius: 4px; background: var(--accent-dim);
+               style="height: 100%; border-radius: 4px; background: var(--accent);
                       transform: scaleX(0); transform-origin: left; transition: transform 0.2s ease; will-change: transform;">
           </div>
         </div>
@@ -405,6 +412,53 @@
 
       <div class="actions" style="margin-top: 14px;">
         <button id="task-details-close" class="primary">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="modal-backdrop hidden" id="settings-modal">
+    <div class="modal">
+      <div class="modal-header-row">
+        <h2>Settings</h2>
+        <button id="settings-modal-dismiss" class="modal-close-btn" title="Close" aria-label="Close">✕</button>
+      </div>
+
+      <div class="modal-field" style="margin-top: 14px;">
+        <label class="modal-label">Change Password</label>
+        <input type="password" id="settings-current-password" placeholder="Current password" style="margin-bottom: 8px;" />
+        <input type="password" id="settings-new-password" placeholder="New password" style="margin-bottom: 8px;" />
+        <input type="password" id="settings-confirm-password" placeholder="Confirm new password" />
+      </div>
+
+      <div class="modal-field">
+        <label class="modal-label" for="settings-theme">Theme</label>
+        <select id="settings-theme" class="modal-select">
+          <option value="system">System Preference</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </div>
+
+      <div class="modal-field">
+        <label class="modal-label" style="display: flex; align-items: center; gap: 8px;">
+          <input type="checkbox" id="settings-show-hidden" />
+          <span>Show hidden files and folders</span>
+        </label>
+      </div>
+
+      <div class="modal-field">
+        <label class="modal-label" for="settings-language">Language</label>
+        <select id="settings-language" class="modal-select">
+          <option value="en">English</option>
+          <option value="es">Español</option>
+          <option value="fr">Français</option>
+        </select>
+      </div>
+
+      <div class="actions">
+        <button id="settings-cancel">Cancel</button>
+        <button id="settings-save" class="primary">Save Changes</button>
       </div>
     </div>
   </div>

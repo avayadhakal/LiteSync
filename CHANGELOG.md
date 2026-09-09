@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 ### Added
+- **Docker Support:** Added comprehensive Docker and Docker Compose deployment support with environment variable configuration (`DATA_DIR`, `STATIC_DIR`) and full deployment docs.
+- **Light Theme & Settings:** Implemented comprehensive Light Mode UI support with dynamically swapped icons, tuned contrasts, and a synchronous `theme-init.js` bootloader to prevent page flashing. Replaced the header username badge with a unified Settings gear dropdown and dedicated preferences modal.
 - **Security Headers & strict CSP:** Added global FastAPI middleware enforcing strict Content-Security-Policy (no 'unsafe-inline' scripts), X-Content-Type-Options, X-Frame-Options, Referrer-Policy, and Permissions-Policy.
 - **CSRF Protection:** Added global FastAPI middleware to validate `Origin` or `Referer` headers against configured `allowed_origins` for all state-changing endpoints.
 - **Task Details Modal:** Added new transfer details view.

@@ -176,6 +176,43 @@ download_expiry = 3600
         key = get_download_signing_key(settings)
         self.assertEqual(key, b"custom_download_secret")
 
+    def test_env_var_allowed_roots_override(self):
+        config_content = """
+allowed_roots = ["/mnt/original"]
+secret_key = "secret"
+[[users]]
+username = "test"
+password_hash = "hash"
+"""
+        config_path = self.config_dir / "env_roots.toml"
+        config_path.write_text(config_content)
+        
+        old_env = os.environ.get("LITESYNC_ALLOWED_ROOTS")
+        try:
+            # Test override with multiple paths
+            os.environ["LITESYNC_ALLOWED_ROOTS"] = "/mnt/new1:/mnt/new2"
+            settings = load_settings(config_path)
+            self.assertEqual(len(settings.allowed_roots), 2)
+            self.assertEqual(settings.allowed_roots[0], Path("/mnt/new1").resolve())
+            self.assertEqual(settings.allowed_roots[1], Path("/mnt/new2").resolve())
+            
+            # Test empty string falls back to config.toml
+            os.environ["LITESYNC_ALLOWED_ROOTS"] = ""
+            settings_empty = load_settings(config_path)
+            self.assertEqual(len(settings_empty.allowed_roots), 1)
+            self.assertEqual(settings_empty.allowed_roots[0], Path("/mnt/original").resolve())
+            
+            # Test absent env var falls back to config.toml
+            del os.environ["LITESYNC_ALLOWED_ROOTS"]
+            settings_absent = load_settings(config_path)
+            self.assertEqual(len(settings_absent.allowed_roots), 1)
+            self.assertEqual(settings_absent.allowed_roots[0], Path("/mnt/original").resolve())
+        finally:
+            if old_env is not None:
+                os.environ["LITESYNC_ALLOWED_ROOTS"] = old_env
+            else:
+                os.environ.pop("LITESYNC_ALLOWED_ROOTS", None)
+
 
 if __name__ == "__main__":
     unittest.main()

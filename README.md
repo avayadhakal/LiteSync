@@ -273,6 +273,13 @@ Then open:
 http://<host-or-pi-ip>:8000/
 ```
 
+### Docker Support
+
+LiteSync fully supports containerized deployment using Docker and Docker Compose. 
+You can easily map your external drives to the container and manage configurations using environment variables.
+
+See the [Docker Documentation](docs/docker.md) for full setup instructions and `docker-compose.yml` examples.
+
 ### Updating
 
 Download the new release archive and run the installer again.

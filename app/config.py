@@ -68,7 +68,12 @@ def load_settings(config_path_override: Path | str | None = None) -> Settings:
     with open(config_path, "rb") as f:
         raw = tomllib.load(f)
 
-    allowed_roots = [Path(p).resolve() for p in raw.get("allowed_roots", [])]
+    env_roots_str = os.environ.get("LITESYNC_ALLOWED_ROOTS")
+    if env_roots_str:
+        allowed_roots = [Path(p).resolve() for p in env_roots_str.split(":") if p]
+    else:
+        allowed_roots = [Path(p).resolve() for p in raw.get("allowed_roots", [])]
+
     users = [User(username=u["username"], password_hash=u["password_hash"]) for u in raw.get("users", [])]
     data_dir = Path(raw.get("data_dir", "./data")).resolve()
 

@@ -46,12 +46,14 @@ Minimal-overhead Linux web app for dual-pane local directory browsing and backgr
 │       ├── selection.js      # Hierarchical selection logic
 │       ├── state.js          # Shared frontend application state
 │       ├── tasks-ui.js       # Transfer progress and SSE listeners
+│       ├── theme-init.js     # Synchronous theme loader (anti-flicker)
 │       ├── uploads.js        # Multipart streaming upload client
 │       ├── utils.js          # Formatting and helper utilities
 │       └── modals/           # Modal dialog controllers
 │           ├── editor.js
 │           ├── item-details.js
 │           ├── mkdir-rename-delete.js
+│           ├── settings.js       # Settings and theme modal
 │           ├── task-details.js
 │           └── transfer.js
 ├── data/                     # Gitignored runtime data
@@ -60,6 +62,7 @@ Minimal-overhead Linux web app for dual-pane local directory browsing and backgr
 │   └── tmp/                  # Spooled large file uploads
 ├── docs/                     # Documentation and project assets
 │   ├── architecture.md       # Architecture and design doc (this file)
+│   ├── docker.md             # Docker deployment documentation
 │   ├── logo.svg
 │   └── screenshots/          # README assets
 ├── tests/                    # Pytest and Node.js test suites
@@ -68,6 +71,8 @@ Minimal-overhead Linux web app for dual-pane local directory browsing and backgr
 │   └── ...                   # Miscellaneous JS/PY test files
 ├── config.example.toml
 ├── config.toml               # Gitignored (chmod 600)
+├── Dockerfile                # Docker build instructions
+├── docker-compose.yml        # Docker orchestration configuration
 ├── install.sh                # Automated installer & deployment helper
 ├── uninstall.sh              # Automated service and file uninstaller
 ├── requirements.txt
@@ -179,6 +184,7 @@ CREATE INDEX idx_activity_created ON activity(created_at DESC);
 
 * **CSS Variables:** Layout dimensions (`--left-width`, `--top-height`, `--bottom-height`) applied to `:root`. JS `initResizers()` updates CSS vars on drag.
 * **Mobile View (`max-width: 768px`):** Panes stack vertically. Pane headers wrap dynamically.
+* **Theming:** Full Light and Dark mode support configured via the Settings dropdown, persisted in `localStorage`, and initialized synchronously by `theme-init.js` to prevent FOUS (Flash of Unstyled Content) during startup.
 * **Layout Toggle:** Persistent single-pane or dual-pane layout mode. Single-pane hides the destination pane for simpler workflows and merges destination picking into the Transfer modal.
 * **Dual-Pane Logic:** Both Source and Dest panes share identical toolbars (`⬆️`, `📁+`, `✏️`, `🗑️`). Selections are isolated.
 

@@ -56,6 +56,17 @@ async def csrf_protection(request: Request, call_next):
                 
     return await call_next(request)
 
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=(), interest-cohort=()"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Content-Security-Policy"] = "default-src 'self'; style-src 'self' 'unsafe-inline';"
+    return response
+
+
 app.include_router(auth_router)
 app.include_router(browse_router)
 app.include_router(tasks_router)

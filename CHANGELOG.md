@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 ### Added
+- **Security Headers & strict CSP:** Added global FastAPI middleware enforcing strict Content-Security-Policy (no 'unsafe-inline' scripts), X-Content-Type-Options, X-Frame-Options, Referrer-Policy, and Permissions-Policy.
 - **CSRF Protection:** Added global FastAPI middleware to validate `Origin` or `Referer` headers against configured `allowed_origins` for all state-changing endpoints.
 - **Task Details Modal:** Added new transfer details view.
 - **Real-Time Transfer Metrics:** Display live transfer speed and copied/total size on active transfer cards.

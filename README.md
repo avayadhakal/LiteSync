@@ -416,6 +416,7 @@ The application includes several restrictions around filesystem access:
 * Path traversal validation
 * Authenticated application access
 * CSRF protection via Origin/Referer header validation
+* Strict Content-Security-Policy (CSP) and global security headers
 * Signed file links
 * MIME allowlisting for inline file viewing
 * Temporary upload files

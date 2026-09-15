@@ -51,15 +51,15 @@ function renderCardControlsHtml(task) {
 
   let actionBtns = '';
   if (isRunning && task.use_rsync) {
-    actionBtns += `<button class="btn-sm btn-secondary pause-btn" data-id="${task.task_id}" style="margin-right: 8px;">Pause</button>`;
+    actionBtns += `<button class="card-action-btn pause-btn" data-id="${task.task_id}" style="margin-right: 8px;">Pause</button>`;
   } else if (isPaused) {
-    actionBtns += `<button class="btn-sm btn-primary resume-btn" data-id="${task.task_id}" style="margin-right: 8px;">Resume</button>`;
+    actionBtns += `<button class="card-action-btn resume-btn" data-id="${task.task_id}" style="margin-right: 8px;">Resume</button>`;
   }
-  actionBtns += `<button class="btn-sm btn-secondary details-btn" data-id="${task.task_id}" style="margin-right: 8px;">Details</button>`;
-  actionBtns += `<button class="btn-sm btn-danger cancel-btn" data-id="${task.task_id}">Cancel</button>`;
+  actionBtns += `<button class="card-action-btn details-btn" data-id="${task.task_id}" style="margin-right: 8px;">Details</button>`;
+  actionBtns += `<button class="card-action-btn cancel-btn" data-id="${task.task_id}">Cancel</button>`;
 
   return `
-    <div id="progress-text-${task.task_id}" style="color: #94a3b8; font-size: 13px; font-weight: 600; margin-right: 12px; display: flex; align-items: center;">
+    <div id="progress-text-${task.task_id}" style="color: var(--text-dim); font-size: 13px; font-weight: 600; margin-right: 12px; display: flex; align-items: center;">
       ${statusBadge}
       <span id="progress-pct-${task.task_id}">${currentPct}%</span>
     </div>
@@ -281,8 +281,8 @@ export function renderActiveTransfers() {
       <div class="card-details truncate" id="progress-detail-${task.task_id}" style="margin-top: 4px;">
         ${escapeHtml(currentDetail)}
       </div>
-      <div class="bg-gray-800 relative overflow-hidden" style="height: 8px; border-radius: 4px; margin-top: 4px;">
-        <div class="absolute inset-0" id="progress-fill-${task.task_id}" style="background: var(--accent-dim); width: ${currentPct}%; transition: width 0.2s ease; border-radius: 4px;"></div>
+      <div style="height: 7px; border-radius: 4px; background: var(--panel-alt); overflow: hidden; position: relative; margin-top: 4px;">
+        <div class="absolute inset-0" id="progress-fill-${task.task_id}" style="background: var(--accent); width: ${currentPct}%; transition: width 0.2s ease; border-radius: 4px;"></div>
       </div>
       <div class="card-stats" id="progress-stats-${task.task_id}" style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--text-dim); margin-top: 4px; font-family: ui-monospace, monospace;">
         <span id="progress-size-${task.task_id}">${escapeHtml(currentSize)}</span>

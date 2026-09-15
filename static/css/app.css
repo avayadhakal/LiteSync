@@ -850,6 +850,23 @@ tr.task-row:hover { background: rgba(255, 255, 255, 0.05); }
   color: var(--text);
   font-weight: 600;
 }
+
+/* Card action buttons */
+.card-action-btn {
+  background: var(--panel-alt);
+  color: var(--text);
+  border: 1px solid transparent;
+  padding: 4px 10px;
+  font-size: 11px;
+  border-radius: var(--radius-sm);
+  transition: all 0.2s ease;
+  height: 24px;
+}
+.card-action-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: transparent;
+}
+
 .btn-sm {
   padding: 2px 8px;
   font-size: 11px;
@@ -1299,18 +1316,27 @@ tr.task-row:hover { background: rgba(255, 255, 255, 0.05); }
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
   padding: 12px 16px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   margin-bottom: 8px;
 }
 .activity-search-input {
-  height: 32px;
-  padding: 0 10px;
+  height: var(--hit-action-desktop);
+  flex: 1;
+  padding: 0 12px;
   font-size: 13px;
-  border-radius: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(0, 0, 0, 0.2);
-  color: #fff;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--panel-alt);
+  color: var(--text);
+}
+#clear-activity-btn {
+  height: var(--hit-action-desktop);
+  padding: 0 16px;
+  font-size: 13px;
+  border-radius: var(--radius-md);
+  white-space: nowrap;
 }
 
 .activity-time {
@@ -1341,20 +1367,20 @@ tr.task-row:hover { background: rgba(255, 255, 255, 0.05); }
 
 .activity-delete-btn {
   background: transparent;
-  border: 1px solid rgba(255, 107, 107, 0.6);
+  border: 1px solid var(--border);
   border-radius: 4px;
-  color: #ff6b6b;
+  color: var(--text-dim);
   font-size: 10px;
   padding: 4px 12px;
   line-height: 1.3;
   cursor: pointer;
-  transition: color 0.12s, border-color 0.12s, background 0.12s;
+  transition: all 0.12s;
   text-align: center;
 }
 .activity-delete-btn:hover {
-  background: var(--danger);
-  border-color: var(--danger);
-  color: #fff;
+  color: var(--danger);
+  border-color: rgba(225, 86, 86, 0.4);
+  background: rgba(225, 86, 86, 0.1);
 }
 
 .activity-primary-line {
@@ -1694,7 +1720,7 @@ body.single-pane #source-pane {
 /* Segmented Control */
 .segmented-control {
   display: inline-flex;
-  padding: 3px;
+  padding: 2px;
   height: var(--hit-action-desktop);
   align-items: center;
   border-radius: 6px;
@@ -1846,14 +1872,6 @@ body.single-pane #source-pane {
   header {
     padding: 0 16px;
   }
-  .segmented-control {
-    height: auto;
-    min-height: var(--hit-action-mobile);
-  }
-  .segmented-control button {
-    min-height: var(--hit-action-mobile);
-    padding: 10px 14px;
-  }
   .nav-right .btn-logout {
     min-height: var(--hit-action-mobile);
     padding: 10px 16px;
@@ -1948,14 +1966,6 @@ body.single-pane #source-pane {
 
 /* Mobile Settings (< 600px) */
 @media (max-width: 600px) {
-  #gear-btn {
-    width: var(--hit-action-mobile);
-    height: var(--hit-action-mobile);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
   #settings-modal .modal-field {
     display: flex;
     flex-direction: column;
@@ -1975,7 +1985,7 @@ body.single-pane #source-pane {
   --panel-alt: #eaedf1;
   --border: #c1c9d2;
   --text: #212529;
-  --text-dim: #6c757d;
+  --text-dim: #495057;
   --accent: #2563eb;
   --accent-dim: #dbeafe;
   --danger: #dc3545;
@@ -2022,13 +2032,8 @@ body.single-pane #source-pane {
 
 /* Text color fixes for hardcoded whites */
 [data-theme="light"] .pane-path,
-[data-theme="light"] .selection-preview-list,
-[data-theme="light"] .activity-search-input {
+[data-theme="light"] .selection-preview-list {
   color: var(--text);
-}
-[data-theme="light"] .activity-search-input {
-  background: var(--panel-alt);
-  border-color: rgba(0, 0, 0, 0.1);
 }
 [data-theme="light"] .selection-inline,
 [data-theme="light"] .selection-preview {
@@ -2090,4 +2095,35 @@ body.single-pane #source-pane {
 /* Logo swap for light mode */
 [data-theme="light"] .app-logo {
   content: url('/assets/icons/logo_light.svg');
+}
+
+/* Light Theme UI Refinements */
+[data-theme="light"] .card-action-btn {
+  background: rgba(0, 0, 0, 0.05);
+}
+[data-theme="light"] .card-action-btn:hover {
+  background: rgba(0, 0, 0, 0.1);
+}
+[data-theme="light"] .transfer-card {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+[data-theme="light"] .splitter-v::before,
+[data-theme="light"] .splitter-h::before {
+  background: rgba(0, 0, 0, 0.08);
+}
+[data-theme="light"] .btn-danger-solid {
+  background: rgba(220, 53, 69, 0.1);
+  color: #dc3545;
+  border-color: rgba(220, 53, 69, 0.2);
+}
+[data-theme="light"] .badge-danger { background: rgba(220, 53, 69, 0.1); }
+[data-theme="light"] .badge-success { background: rgba(21, 128, 61, 0.1); }
+[data-theme="light"] .badge-info { background: rgba(29, 78, 216, 0.1); }
+[data-theme="light"] .badge-warning { background: rgba(180, 83, 9, 0.1); }
+[data-theme="light"] .activity-details-error {
+  background: #f8d7da;
+  color: #842029;
+  border: 1px solid #f5c2c7;
 }

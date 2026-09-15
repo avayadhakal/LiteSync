@@ -432,8 +432,9 @@ export   function confirmStyled(title, message, okLabel = 'Confirm', isDanger = 
     el('action-confirm-message').textContent = message || '';
     const okBtn = el('action-confirm-ok');
     okBtn.textContent = okLabel;
-    okBtn.style.background = isDanger ? 'var(--danger)' : '';
-    okBtn.style.borderColor = isDanger ? 'var(--danger)' : '';
+    okBtn.className = isDanger ? 'btn-danger-solid' : 'primary';
+    okBtn.style.background = '';
+    okBtn.style.borderColor = '';
     modal.classList.remove('hidden');
     const ok = el('action-confirm-ok');
     const cancel = el('action-confirm-cancel');

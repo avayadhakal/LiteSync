@@ -31,6 +31,7 @@ All notable changes to this project will be documented in this file.
 - **Interactive File Sorting:** Implemented 2-tier column headers supporting instant ascending/descending sorts for Name, Modified, and Size with dynamic responsive layouts.
 
 ### Changed
+- **UI & Light Theme Enhancements:** Standardized action buttons (Pause, Details, Cancel) and modal confirmation buttons to use unified CSS classes, removing disjointed outlines and heavy inline styles.
 - **Modal Behavior & Text Editor:** Disabled backdrop click-to-dismiss across modals, standardized upload dialog height across tabs, enabled word wrap by default in the text editor, and replaced browser alerts with custom in-app confirmation dialogs.
 - **Activity Details:** Replaced process exit code and summary text with formatted source file size.
 - **Internal Modularization & Refactoring:** Restructured backend and frontend codebases into dedicated subsystems (`app/transfers/`, `app/browse/`, `static/js/modals/`, ES modules) with isolated concerns and focused test coverage.

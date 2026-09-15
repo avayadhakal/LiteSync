@@ -27,16 +27,12 @@ function formatActivityTime(ts) {
   if (!ts) return '';
   const d = new Date(ts);
   if (isNaN(d.getTime())) return String(ts);
-  const now = new Date();
-  const isToday = d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-  if (isToday) {
-    return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-  }
   return d.toLocaleString(undefined, {
+    year: 'numeric',
     month: 'short',
     day: 'numeric',
     hour: 'numeric',
-    minute: '2-digit',
+    minute: '2-digit'
   });
 }
 
@@ -337,7 +333,7 @@ export function openActivityDetails(entry, info) {
   const createdStr = entry.created_at || (entry.ts ? new Date(entry.ts).toISOString() : '');
 
   const rows = [];
-  rows.push({ label: 'Timestamp', value: `${formatActivityTime(createdStr)} (${createdStr})` });
+  rows.push({ label: 'Timestamp', value: formatActivityTime(createdStr) });
   rows.push({ label: 'Operation', value: (data.operation || entry.kind || 'unknown').toUpperCase() });
   rows.push({ label: 'Status', value: (data.status || 'succeeded').toUpperCase() });
 
@@ -376,8 +372,19 @@ export function openActivityDetails(entry, info) {
     if (r.copyable) {
       valEl.className += ' activity-details-copyable';
       const textSpan = document.createElement('span');
-      textSpan.textContent = r.value;
-      textSpan.style.wordBreak = 'break-all';
+      if (r.value.includes('/')) {
+        const lastSlash = r.value.lastIndexOf('/');
+        const dir = r.value.substring(0, lastSlash + 1);
+        const file = r.value.substring(lastSlash + 1);
+        textSpan.style.display = 'inline-flex';
+        textSpan.style.maxWidth = '100%';
+        textSpan.style.minWidth = '0';
+        textSpan.title = r.value;
+        textSpan.innerHTML = `<span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left;">&lrm;${escapeHtml(dir)}</span><span style="white-space: nowrap; flex-shrink: 0;">${escapeHtml(file)}</span>`;
+      } else {
+        textSpan.textContent = r.value;
+        textSpan.style.wordBreak = 'break-all';
+      }
       const copyBtn = document.createElement('button');
       copyBtn.className = 'icon-btn';
       copyBtn.innerHTML = '📋';

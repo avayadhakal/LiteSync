@@ -3,10 +3,11 @@ import { el, normalizePath } from '../utils.js';
 import { state } from '../state.js';
 import { loadPane, paneSelection } from '../panes.js';
 import { openModal } from '../app.js';
+import { I18n } from '../i18n.js';
 
 export function openMkdirModal(which = 'source') {
   if (!state[which].path) {
-    toastError(`Navigate to a folder in the ${which === 'source' ? 'Source' : 'Destination'} pane first.`);
+    toastError(I18n.t('messages.navigate_first', { pane: which === 'source' ? I18n.t('panes.source') : I18n.t('panes.destination') }));
     return;
   }
   el('mkdir-modal').dataset.pane = which;
@@ -19,7 +20,7 @@ export function openRenameModal(which) {
   const sel = paneSelection(which);
   const roots = sel.getTopLevelIncludes();
   if (roots.length !== 1) {
-    toastError('Select exactly one item to rename.');
+    toastError(I18n.t('messages.select_one_rename'));
     return;
   }
   const selectedPath = roots[0];
@@ -35,7 +36,7 @@ export function openDeleteModal(which) {
   const sel = paneSelection(which);
   const paths = sel.getTopLevelIncludes();
   if (paths.length === 0) {
-    toastError('Select one or more items to delete.');
+    toastError(I18n.t('messages.select_delete'));
     return;
   }
   // Snapshot selection at open time so submitDelete doesn't depend on live state.

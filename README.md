@@ -60,6 +60,7 @@ Moves within the same filesystem use `os.rename()` directly instead of copying t
 
 ### File Management
 
+* Multilingual UI support (English, Spanish, French, German, Portuguese, Mandarin)
 * Browse directories from the browser
 * Download files from URL directly to the destination directory
 * Unified upload modal for device uploads and URL downloads

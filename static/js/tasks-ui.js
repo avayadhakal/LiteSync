@@ -1,3 +1,4 @@
+import { I18n } from './i18n.js';
 import { confirmStyled, loadHistory } from './app.js';
 import { getPrimaryTitle } from './modals/transfer.js';
 import { onTaskFinished } from './app.js';
@@ -6,6 +7,7 @@ import { el, formatSize, escapeHtml } from './utils.js';
 import { state } from './state.js';
 import { updateSelectionUI } from './panes.js';
 import {
+
   openTaskDetailsModal,
   closeTaskDetailsModal,
   renderTaskDetailsModal,
@@ -84,7 +86,7 @@ function bindCardEventListeners(task, card) {
       } catch (err) {
         pauseBtn.disabled = false;
         pauseBtn.textContent = 'Pause';
-        toastError(`Failed to pause task: ${err.message}`);
+        toastError(I18n.t('messages.pause_failed', { err: err.message }));
       }
     });
   }
@@ -117,7 +119,7 @@ function bindCardEventListeners(task, card) {
       } catch (err) {
         resumeBtn.disabled = false;
         resumeBtn.textContent = 'Resume';
-        toastError(`Failed to resume task: ${err.message}`);
+        toastError(I18n.t('messages.resume_failed', { err: err.message }));
       }
     });
   }
@@ -128,9 +130,9 @@ function bindCardEventListeners(task, card) {
       e.stopPropagation();
       const title = getPrimaryTitle(task.source || task.sources);
       const ok = await confirmStyled(
-        `Cancel transfer: ${title}?`,
-        'The active transfer will be stopped.',
-        'Cancel Transfer',
+        I18n.t('messages.cancel_transfer') + `: ${title}?`,
+        I18n.t('messages.cancel_transfer_hint'),
+        I18n.t('messages.cancel_transfer'),
         true
       );
       if (!ok) return;
@@ -142,7 +144,7 @@ function bindCardEventListeners(task, card) {
         await api(`/api/tasks/${task.task_id}/cancel`, { method: 'POST' });
         await onTaskFinished('interrupted', task);
       } catch (err) {
-        toastError(`Failed to cancel task: ${err.message}`);
+        toastError(I18n.t('messages.cancel_failed', { err: err.message }));
       }
     });
   }
@@ -184,13 +186,13 @@ export function updateCardControlsInPlace(task) {
   if (detailEl) {
     const streamData = activeStreams.get(task.task_id);
     if (task.status === 'paused') {
-      detailEl.textContent = 'Paused';
+      detailEl.textContent = I18n.t('messages.paused');
     } else if (task.status === 'queued') {
-      detailEl.textContent = 'Queued...';
+      detailEl.textContent = I18n.t('messages.queued');
     } else if (streamData && streamData.currentFile) {
-      detailEl.textContent = `Copying: ${streamData.currentFile}`;
+      detailEl.textContent = I18n.t('messages.copying', { file: streamData.currentFile });
     } else {
-      detailEl.textContent = 'Starting transfer...';
+      detailEl.textContent = I18n.t('messages.starting_transfer');
     }
   }
 
@@ -240,7 +242,7 @@ export function renderActiveTransfers() {
   activeContainer.innerHTML = '';
 
   if (activeTasks.length === 0) {
-    activeContainer.innerHTML = `<div class="empty-state">No active operations</div>`;
+    activeContainer.innerHTML = `<div class="empty-state">${I18n.t('messages.no_active')}</div>`;
     return;
   }
 
@@ -256,13 +258,13 @@ export function renderActiveTransfers() {
     
     let currentDetail = '';
     if (task.status === 'paused') {
-      currentDetail = 'Paused';
+      currentDetail = I18n.t('messages.paused');
     } else if (streamData && streamData.currentFile) {
-      currentDetail = `Copying: ${streamData.currentFile}`;
+      currentDetail = I18n.t('messages.copying', { file: streamData.currentFile });
     } else if (task.status === 'queued') {
-      currentDetail = 'Queued...';
+      currentDetail = I18n.t('messages.queued');
     } else {
-      currentDetail = 'Starting transfer...';
+      currentDetail = I18n.t('messages.starting_transfer');
     }
 
     const currentSize = streamData && streamData.sizeText ? streamData.sizeText : '';
@@ -373,8 +375,8 @@ export function attachTaskStream(task) {
         if (pctEl) pctEl.textContent = `${pct}%`;
         if (detailEl) {
           detailEl.textContent = isDownload
-            ? (streamData.currentFile || 'Downloading...')
-            : (streamData.currentFile ? `Copying: ${streamData.currentFile}` : 'Syncing...');
+            ? (streamData.currentFile ? I18n.t('messages.downloading_file', { file: streamData.currentFile }) : I18n.t('messages.downloading'))
+            : (streamData.currentFile ? I18n.t('messages.copying', { file: streamData.currentFile }) : I18n.t('messages.syncing'));
         }
         // Lightweight modal progress refresh on every pct tick
         if (getOpenDetailsTaskId() === taskId) refreshTaskDetailsProgress(taskId);
@@ -397,7 +399,7 @@ export function attachTaskStream(task) {
         }
         streamData.currentFile = trimmed;
         if (detailEl) {
-          detailEl.textContent = isDownload ? trimmed : `Copying: ${trimmed}`;
+          detailEl.textContent = isDownload ? I18n.t('messages.downloading_file', { file: trimmed }) : I18n.t('messages.copying', { file: trimmed });
         }
         // Full file-list re-render when modal is open
         if (getOpenDetailsTaskId() === taskId) renderTaskDetailsModal(taskId);

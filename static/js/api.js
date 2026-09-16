@@ -1,3 +1,4 @@
+import { I18n } from './i18n.js';
 import { el } from './utils.js';
 export async function api(path, opts) {
   const res = await fetch(path, {
@@ -65,10 +66,10 @@ export async function copyDownloadLink(path) {
     const data = await api(`/api/download/link?path=${encodeURIComponent(path)}`);
     const fullUrl = new URL(data.url, window.location.origin).href;
     await copyToClipboard(fullUrl);
-    toastSuccess('Download link copied');
+    toastSuccess(I18n.t('messages.link_copied'));
     return true;
   } catch (err) {
-    toastError(err.message || 'Failed to copy link');
+    toastError(err.message || I18n.t('messages.link_failed'));
     return false;
   }
 }

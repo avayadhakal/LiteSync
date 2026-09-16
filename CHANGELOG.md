@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 ### Added
+- **Internationalization (i18n):** Implemented a lightweight, zero-dependency client-side i18n engine supporting dynamic language switching (English, Spanish, French, German, Portuguese, Mandarin) with fallback handling and real-time DOM updates.
 - **Docker Support:** Added comprehensive Docker and Docker Compose deployment support with environment variable configuration (`DATA_DIR`, `STATIC_DIR`) and full deployment docs.
 - **Light Theme & Settings:** Implemented comprehensive Light Mode UI support with dynamically swapped icons, tuned contrasts, and a synchronous `theme-init.js` bootloader to prevent page flashing. Replaced the header username badge with a unified Settings gear dropdown and dedicated preferences modal.
 - **Security Headers & strict CSP:** Added global FastAPI middleware enforcing strict Content-Security-Policy (no 'unsafe-inline' scripts), X-Content-Type-Options, X-Frame-Options, Referrer-Policy, and Permissions-Policy.

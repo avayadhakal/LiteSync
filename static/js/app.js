@@ -11,6 +11,7 @@ import { closeTaskDetailsModal, isTaskDetailsOpen } from './modals/task-details.
 import { closeItemDetailsModal } from './modals/item-details.js';
 import { isEditorOpen, saveEditorContent, closeEditorModal, toggleEditorMaximize } from './modals/editor.js';
 import { initSettingsModal } from './modals/settings.js';
+import { I18n } from './i18n.js';
 
 
 
@@ -76,7 +77,7 @@ async function submitMkdir() {
   const which = el('mkdir-modal').dataset.pane || 'source';
   const name = el('mkdir-input').value.trim();
   if (!name) {
-    setModalError('mkdir', 'Folder name is required.');
+    setModalError('mkdir', I18n.t('modals.mkdir.folder_name'));
     return;
   }
   if (name.includes('/') || name.includes('\\')) {
@@ -90,7 +91,7 @@ async function submitMkdir() {
     });
     closeModal('mkdir');
     await loadPane(which, state[which].path, true);
-    toastSuccess(`Created folder: ${name}`);
+    toastSuccess(I18n.t('messages.created_folder', { name }));
     await loadActivity();
   } catch (err) {
     setModalError('mkdir', err.message);
@@ -131,7 +132,7 @@ async function submitRename() {
     updateTransferMethodUI();
   }
     await loadPane(which, state[which].path, true);
-    toastSuccess(`Renamed to: ${name}`);
+    toastSuccess(I18n.t('messages.renamed_to', { name }));
     await loadActivity();
   } catch (err) {
     setModalError('rename', err.message);
@@ -164,9 +165,9 @@ async function submitDelete() {
   await loadPane(which, state[which].path, true);
 
   if (failures.length === 0) {
-    toastSuccess(paths.length === 1 ? 'Deleted.' : `Deleted ${paths.length} items.`);
+    toastSuccess(paths.length === 1 ? I18n.t('messages.deleted') : I18n.t('messages.deleted_items', { count: paths.length }));
   } else {
-    toastError(`Some items could not be deleted: ${failures.join('; ')}`);
+    toastError(I18n.t('messages.delete_failed', { failures: failures.join('; ') }));
   }
   await loadActivity();
 }
@@ -206,7 +207,7 @@ export async function openConfirmModal() {
     el('transfer-options-field').classList.remove('hidden');
     el('transfer-change-dest-btn').classList.add('hidden');
     const confirmDest = el('confirm-dest');
-    confirmDest.textContent = state.dest.path || '(select a destination)';
+    confirmDest.textContent = state.dest.path || I18n.t('panes.select_root');
     confirmDest.title = state.dest.path || '';
     el('confirm-ok').disabled = state.dest.path === null;
   }
@@ -288,12 +289,12 @@ async function submitTransfer(resolvedConflictChoice = null) {
   try {
     result = await api('/api/transfer', { method: 'POST', body: JSON.stringify(body) });
   } catch (err) {
-    toastError(`Transfer failed to start: ${err.message}`);
+    toastError(I18n.t('messages.transfer_failed_start', { err: err.message }));
     return;
   }
   const itemCount = Array.isArray(result.task_ids) ? result.task_ids.length : body.sources.length;
   const opLabel = operation === 'move' ? 'move' : 'copy';
-  toastSuccess(`Queued ${itemCount} ${opLabel}${itemCount === 1 ? '' : 's'} → ${body.destination}`);
+  toastSuccess(I18n.t('messages.queued_items', { count: itemCount, op: opLabel }) + ` → ${body.destination}`);
   // Reset the form to defaults after a successful queue (matches the
   // selection Clear button flow): empty the selection, redraw the source
   // pane so checkbox ticks clear, and restore the operation selection.
@@ -401,12 +402,12 @@ export async function onTaskFinished(status, task) {
   const dest = task && task.destination ? task.destination : '';
   if (status === 'succeeded') {
     const opLabel = task && task.operation === 'move' ? 'Move' : 'Transfer';
-    toastSuccess(`${opLabel} complete: ${title}${dest ? ` → ${dest}` : ''}`);
+    toastSuccess(I18n.t('messages.transfer_complete', { title }) + `${dest ? ` → ${dest}` : ''}`);
   } else if (status === 'failed') {
     const reason = (task && (task.error_message || task.error)) || `exit code ${task ? task.exit_code : '?'}`;
-    toastError(`Transfer failed: ${title} — ${reason}`);
+    toastError(I18n.t('messages.transfer_failed', { title, reason }));
   } else if (status === 'interrupted') {
-    showToast(`Transfer canceled: ${title}`, 'warn');
+    showToast(I18n.t('messages.transfer_canceled', { title }), 'warn');
   }
   // 3) Refresh activity log from server
   await loadActivity();
@@ -423,7 +424,7 @@ export async function onTaskFinished(status, task) {
 
 
 // Reusable styled confirm modal (matches transfer-confirm look).
-export   function confirmStyled(title, message, okLabel = 'Confirm', isDanger = false) {
+export   function confirmStyled(title, message, okLabel = I18n.t('modals.confirm.confirm'), isDanger = false) {
   return new Promise((resolve) => {
     const modal = el('action-confirm-modal');
     const titleEl = el('action-confirm-title');
@@ -531,6 +532,7 @@ export   function initResizers() {
 // --- Init ---
 
 async function init() {
+  await I18n.init();
   // Determine layout state and update UI immediately before any async yielding
   const btnSingle = el('btn-single-pane');
   const btnDual = el('btn-dual-pane');
@@ -718,9 +720,9 @@ async function init() {
   el('clear-activity-btn').addEventListener('click', async () => {
     if (state.activity.length === 0) return;
     const ok = await confirmStyled(
-      'Clear Activity Log?',
-      'This will permanently clear the activity log history.',
-      'Clear Log',
+      I18n.t('messages.clear_log_title'),
+      I18n.t('messages.clear_log_hint'),
+      I18n.t('messages.clear_log_btn'),
       true
     );
     if (!ok) return;
@@ -811,7 +813,7 @@ async function init() {
     updateTransferMethodUI();
   }
     renderPane('source');
-    toastSuccess('Selection cleared.');
+    toastSuccess(I18n.t('messages.selection_cleared'));
   });
 
   // View button: toggle the selected-items preview popover.

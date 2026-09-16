@@ -2,6 +2,7 @@ import { api, copyDownloadLink } from './api.js';
 import { el, formatSize, formatMtime, escapeHtml, normalizePath } from './utils.js';
 import { state } from './state.js';
 import { openItemDetailsModal } from './modals/item-details.js';
+import { I18n } from './i18n.js';
 
 const DOUBLE_TAP_DELAY_MS = 300;
 const MOVE_THRESHOLD_PX = 10;
@@ -95,7 +96,7 @@ export function renderPane(which) {
   const pathElId = which === 'pickerDest' ? 'transfer-picker-path' : `${which}-path`;
   const bodyElId = which === 'pickerDest' ? 'transfer-picker-body' : `${which}-body`;
   const pathEl = el(pathElId);
-  pathEl.textContent = pane.path === null ? '(select a root)' : pane.path;
+  pathEl.textContent = pane.path === null ? I18n.t('panes.select_root') : pane.path;
   pathEl.title = pane.path === null ? '' : pane.path;
   requestAnimationFrame(() => {
     pathEl.scrollLeft = pathEl.scrollWidth;
@@ -116,7 +117,7 @@ export function renderPane(which) {
     const up = document.createElement('div');
     up.className = 'entry parent';
     up.innerHTML = '<span class="name">..</span>';
-    up.title = 'Up to parent directory';
+    up.title = I18n.t('panes.up_parent');
     up.addEventListener('click', () => loadPane(which, pane.parent));
     fragment.appendChild(up);
   }
@@ -159,7 +160,7 @@ export function renderPane(which) {
       const copyBtn = document.createElement('button');
       copyBtn.className = 'icon-btn btn-copy-path';
       copyBtn.innerHTML = '📋';
-      copyBtn.title = 'Copy download link';
+      copyBtn.title = I18n.t('panes.copy_link');
       row.appendChild(copyBtn);
     } else {
       const copyBtnSpacer = document.createElement('span');
@@ -197,7 +198,7 @@ export function updateSelectionUI() {
   const inlineGroup = el('selection-inline');
   const hasSel = count > 0;
   if (countEl) {
-    countEl.textContent = hasSel ? `${count} selected` : '';
+    countEl.textContent = hasSel ? I18n.t('panes.selected_count', { count }) : '';
     countEl.classList.toggle('hidden', !hasSel);
   }
   if (viewBtn) viewBtn.classList.toggle('hidden', !hasSel);
@@ -282,7 +283,7 @@ export function renderSelectionPreview() {
   const countEl = el('selection-preview-count');
   if (!list || !countEl) return;
   const sources = state.selection.toTransferSources();
-  countEl.textContent = `${sources.length} selected`;
+  countEl.textContent = I18n.t('panes.selected_count', { count: sources.length });
   list.innerHTML = '';
   for (const item of sources) {
     const li = document.createElement('li');

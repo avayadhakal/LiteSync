@@ -5,6 +5,9 @@ import { loadPane } from './panes.js';
 import { showConflictModal } from './modals/transfer.js';
 import { loadActivity } from './activity.js';
 import { loadHistory } from './app.js';
+import { I18n } from "./i18n.js";
+
+
 
 let currentUploadPane = 'source';
 let currentUploadPath = null;
@@ -13,7 +16,7 @@ let uploadModalInitialized = false;
 export function openUploadPicker(pane) {
   const curPath = state[pane] && state[pane].path;
   if (!curPath) {
-    toastError(`Navigate to a folder in the ${pane === 'source' ? 'Source' : 'Destination'} pane first.`);
+    toastError(I18n.t('messages.navigate_first', { pane: pane === 'source' ? I18n.t('panes.source') : I18n.t('panes.destination') }));
     return;
   }
   currentUploadPane = pane;
@@ -175,7 +178,7 @@ async function submitUrlDownload() {
     });
 
     closeUploadModal();
-    toastSuccess(`Queued download: ${res.filename || 'file'} → ${res.destination}`);
+    toastSuccess(I18n.t('messages.queued_download', { file: res.filename || 'file', dest: res.destination }));
     await loadHistory();
   } catch (err) {
     const errMsg = err.message || 'Failed to queue URL download';
@@ -183,7 +186,7 @@ async function submitUrlDownload() {
       errEl.textContent = errMsg;
       errEl.classList.remove('hidden');
     }
-    toastError(`Download failed to queue: ${errMsg}`);
+    toastError(I18n.t('messages.download_failed_queue', { err: errMsg }));
   } finally {
     if (dlBtn) dlBtn.disabled = false;
   }
@@ -337,7 +340,7 @@ export function startUploads(pane, destPath, files, resolvedConflictChoice = nul
       if (item.status === 'aborted') return;
       if (xhr.status >= 200 && xhr.status < 300) {
         item.status = 'succeeded';
-        toastSuccess(`Uploaded ${item.file.name}`);
+        toastSuccess(I18n.t('messages.uploaded', { file: item.file.name }));
       } else {
         item.status = 'failed';
         let errMsg = 'Upload failed';
@@ -347,7 +350,7 @@ export function startUploads(pane, destPath, files, resolvedConflictChoice = nul
         } catch (_) {
           if (xhr.statusText) errMsg = xhr.statusText;
         }
-        toastError(`Upload failed for ${item.file.name}: ${errMsg}`);
+        toastError(I18n.t('messages.upload_failed', { file: item.file.name, err: errMsg }));
       }
 
       try {
@@ -366,7 +369,7 @@ export function startUploads(pane, destPath, files, resolvedConflictChoice = nul
     xhr.onerror = async () => {
       if (item.status === 'aborted') return;
       item.status = 'failed';
-      toastError(`Upload failed for ${item.file.name}: Network error`);
+      toastError(I18n.t('messages.upload_failed_network', { file: item.file.name }));
 
       try {
         await loadActivity();

@@ -2,6 +2,7 @@ import { el } from '../utils.js';
 import { api, toastSuccess, toastError } from '../api.js';
 import { loadActivity } from '../activity.js';
 import { confirmStyled } from '../app.js';
+import { I18n } from '../i18n.js';
 
 let currentPath = null;
 let currentMtimeNs = null;
@@ -77,7 +78,7 @@ export async function openEditorModal(entry) {
     });
   } catch (err) {
     // If backend rejects (e.g. 413 oversized or 400 non-UTF8), fall back to Path A
-    toastError(err.message || 'Cannot open in editor, falling back to download stream...');
+    toastError(err.message || I18n.t('messages.editor_fallback'));
     try {
       const linkData = await api(`/api/download/link?path=${encodeURIComponent(entry.path)}&disposition=inline`);
       if (linkData && linkData.url) {
@@ -115,7 +116,7 @@ export async function saveEditorContent() {
 
     originalContent = textarea.value;
     currentMtimeNs = result.mtime_ns;
-    toastSuccess('File saved successfully');
+    toastSuccess(I18n.t('messages.file_saved'));
     await loadActivity();
   } catch (err) {
     // Retain user's edits in textarea buffer on error (including 409 conflict)

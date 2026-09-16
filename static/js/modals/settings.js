@@ -1,4 +1,7 @@
 import { el } from '../utils.js';
+import { I18n } from '../i18n.js';
+import { renderPane } from '../panes.js';
+import { state } from '../state.js';
 import { showToast } from '../api.js';
 
 export function initSettingsModal() {
@@ -20,7 +23,7 @@ export function initSettingsModal() {
   // Load existing settings
   const loadSettings = () => {
     if (el('settings-theme')) el('settings-theme').value = localStorage.getItem('litesync-theme') || 'system';
-    if (el('settings-language')) el('settings-language').value = localStorage.getItem('litesync-language') || 'en';
+    if (el('settings-language')) el('settings-language').value = I18n.currentLang;
   };
 
   menuSettings.addEventListener('click', () => {
@@ -37,29 +40,34 @@ export function initSettingsModal() {
 
   const saveBtn = el('settings-save');
   if (saveBtn) {
-    saveBtn.addEventListener('click', () => {
+    saveBtn.addEventListener('click', async () => {
       const theme = el('settings-theme').value;
       const language = el('settings-language').value;
+      if (language !== I18n.currentLang) {
+        await I18n.loadLanguage(language);
+        if (state.source.path) renderPane('source');
+        if (state.dest.path) renderPane('dest');
+      }
       const currPwd = el('settings-current-password').value;
       const newPwd = el('settings-new-password').value;
       const confirmPwd = el('settings-confirm-password') ? el('settings-confirm-password').value : '';
 
       localStorage.setItem('litesync-theme', theme);
-      localStorage.setItem('litesync-language', language);
+      // localStorage.setItem('litesync-language', language); handled by I18n
       
       applyTheme(theme);
       
       console.log('Settings Saved:', { theme, language });
       if (currPwd || newPwd || confirmPwd) {
         if (newPwd !== confirmPwd) {
-          showToast('New passwords do not match!', 'error');
+          showToast(I18n.t('messages.passwords_mismatch'), 'error');
           return;
         }
         console.log('Password change requested (UI only)');
       }
       
       settingsModal.classList.add('hidden');
-      showToast('Settings saved successfully (UI only)');
+      showToast(I18n.t('messages.settings_saved'));
     });
   }
 }

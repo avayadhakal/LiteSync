@@ -1,6 +1,7 @@
 import { el, formatSize, formatMtime } from '../utils.js';
 import { api, copyDownloadLink, toastError } from '../api.js';
 import { openEditorModal } from './editor.js';
+import { I18n } from '../i18n.js';
 
 export const ALLOWLISTED_TEXT_EXTENSIONS = new Set([
   '.txt', '.md', '.conf', '.cfg', '.ini', '.toml', '.yaml', '.yml',
@@ -27,7 +28,7 @@ export async function openStreamInNewTab(path) {
       window.open(data.url, '_blank', 'noopener,noreferrer');
     }
   } catch (err) {
-    toastError(err.message || 'Failed to open file');
+    toastError(err.message || I18n.t('messages.open_failed'));
   }
 }
 

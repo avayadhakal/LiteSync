@@ -12,29 +12,29 @@
   <script src="/js/theme-init.js"></script>
   <header>
     <div class="nav-left">
-      <h1><img src="/assets/icons/logo.svg" alt="" class="app-logo" /><span class="brand-text">LiteSync</span></h1>
+      <h1><img src="/assets/icons/logo.svg" alt="" class="app-logo" /><span class="brand-text" data-i18n="nav.brand">LiteSync</span></h1>
     </div>
     <div class="nav-center">
       <div class="segmented-control" id="layout-toggle">
         <button id="btn-single-pane">
           <div class="ui-icon" style="background-color: currentColor; -webkit-mask: url('/assets/icons/single-pane.svg') no-repeat center / contain; mask: url('/assets/icons/single-pane.svg') no-repeat center / contain;"></div>
-          <span class="toggle-label">Single</span>
+          <span class="toggle-label" data-i18n="nav.single">Single</span>
         </button>
         <button id="btn-dual-pane">
           <div class="ui-icon" style="background-color: currentColor; -webkit-mask: url('/assets/icons/dual-pane.svg') no-repeat center / contain; mask: url('/assets/icons/dual-pane.svg') no-repeat center / contain;"></div>
-          <span class="toggle-label">Dual</span>
+          <span class="toggle-label" data-i18n="nav.dual">Dual</span>
         </button>
       </div>
     </div>
     <div class="nav-right" style="position: relative;">
-      <button id="gear-btn" class="icon-btn" aria-label="Settings and more" aria-haspopup="true">
+      <button id="gear-btn" class="icon-btn" aria-label="Settings and more" data-i18n-title="nav.settings" aria-haspopup="true">
         <div class="ui-icon" style="width: 20px; height: 20px; background-color: currentColor; -webkit-mask: url('/assets/icons/gear.svg') no-repeat center / contain; mask: url('/assets/icons/gear.svg') no-repeat center / contain;"></div>
       </button>
       <div id="gear-menu" class="dropdown-menu hidden">
         <div class="dropdown-header" id="menu-user-banner">Logged in as ...</div>
         <div class="dropdown-divider"></div>
-        <button class="dropdown-item" id="menu-settings">Settings</button>
-        <button class="dropdown-item danger" id="menu-logout">Log out</button>
+        <button class="dropdown-item" id="menu-settings" data-i18n="nav.settings">Settings</button>
+        <button class="dropdown-item danger" id="menu-logout" data-i18n="nav.logout">Log out</button>
       </div>
     </div>
   </header>
@@ -42,21 +42,21 @@
   <div class="panes">
     <section class="pane" id="source-pane">
       <div class="pane-header">
-        <span class="pane-label">Source</span>
+        <span class="pane-label" data-i18n="panes.source">Source</span>
         <span class="pane-path" id="source-path"></span>
         <div class="pane-actions">
-          <button class="icon-btn" data-pane-action="upload" data-pane="source" title="Upload Files"><img src="/assets/icons/upload.svg" class="ui-icon" alt="Upload" /></button>
-          <button class="icon-btn" data-pane-action="mkdir" data-pane="source" title="New Folder"><img src="/assets/icons/folder.svg" class="ui-icon" alt="New Folder" /><span class="btn-plus-badge">+</span></button>
-          <button class="icon-btn" data-pane-action="rename" data-pane="source" title="Rename"><img src="/assets/icons/pencil.svg" class="ui-icon" alt="Rename" /></button>
-          <button class="icon-btn danger" data-pane-action="delete" data-pane="source" title="Delete"><img src="/assets/icons/bin.svg" class="ui-icon" alt="Delete" /></button>
+          <button class="icon-btn" data-pane-action="upload" data-pane="source" title="Upload Files" data-i18n-title="panes.upload_files"><img src="/assets/icons/upload.svg" class="ui-icon" alt="Upload" /></button>
+          <button class="icon-btn" data-pane-action="mkdir" data-pane="source" title="New Folder" data-i18n-title="panes.new_folder"><img src="/assets/icons/folder.svg" class="ui-icon" alt="New Folder" /><span class="btn-plus-badge">+</span></button>
+          <button class="icon-btn" data-pane-action="rename" data-pane="source" title="Rename" data-i18n-title="panes.rename"><img src="/assets/icons/pencil.svg" class="ui-icon" alt="Rename" /></button>
+          <button class="icon-btn danger" data-pane-action="delete" data-pane="source" title="Delete" data-i18n-title="panes.delete"><img src="/assets/icons/bin.svg" class="ui-icon" alt="Delete" /></button>
         </div>
       </div>
       <div class="pane-column-header">
-        <input type="checkbox" class="pane-master-cb" id="source-master-cb" data-pane="source" title="Select All" aria-label="Select All" />
+        <input type="checkbox" class="pane-master-cb" id="source-master-cb" data-pane="source" title="Select All" aria-label="Select All" data-i18n-title="panes.select_all" />
         <span class="col-icon-spacer" aria-hidden="true"></span>
-        <button class="col-name sortable" data-sort="name" data-pane="source">Name <span class="sort-icon"></span></button>
-        <button class="col-mtime sortable" data-sort="mtime" data-pane="source">Modified <span class="sort-icon"></span></button>
-        <button class="col-size sortable" data-sort="size" data-pane="source">Size <span class="sort-icon"></span></button>
+        <button class="col-name sortable" data-sort="name" data-pane="source"><span data-i18n="panes.name">Name</span> <span class="sort-icon"></span></button>
+        <button class="col-mtime sortable" data-sort="mtime" data-pane="source"><span data-i18n="panes.modified">Modified</span> <span class="sort-icon"></span></button>
+        <button class="col-size sortable" data-sort="size" data-pane="source"><span data-i18n="panes.size">Size</span> <span class="sort-icon"></span></button>
         <button class="icon-btn btn-copy-path invisible-spacer" disabled style="visibility: hidden;" tabindex="-1" aria-hidden="true">📋</button>
       </div>
       <div class="pane-body" id="source-body"></div>
@@ -64,21 +64,21 @@
     <div id="vertical-splitter" class="splitter-v"></div>
     <section class="pane" id="dest-pane">
       <div class="pane-header">
-        <span class="pane-label">Destination</span>
+        <span class="pane-label" data-i18n="panes.destination">Destination</span>
         <span class="pane-path" id="dest-path"></span>
         <div class="pane-actions">
-          <button class="icon-btn" data-pane-action="upload" data-pane="dest" title="Upload Files"><img src="/assets/icons/upload.svg" class="ui-icon" alt="Upload" /></button>
-          <button class="icon-btn" data-pane-action="mkdir" data-pane="dest" title="New Folder"><img src="/assets/icons/folder.svg" class="ui-icon" alt="New Folder" /><span class="btn-plus-badge">+</span></button>
-          <button class="icon-btn" data-pane-action="rename" data-pane="dest" title="Rename"><img src="/assets/icons/pencil.svg" class="ui-icon" alt="Rename" /></button>
-          <button class="icon-btn danger" data-pane-action="delete" data-pane="dest" title="Delete"><img src="/assets/icons/bin.svg" class="ui-icon" alt="Delete" /></button>
+          <button class="icon-btn" data-pane-action="upload" data-pane="dest" title="Upload Files" data-i18n-title="panes.upload_files"><img src="/assets/icons/upload.svg" class="ui-icon" alt="Upload" /></button>
+          <button class="icon-btn" data-pane-action="mkdir" data-pane="dest" title="New Folder" data-i18n-title="panes.new_folder"><img src="/assets/icons/folder.svg" class="ui-icon" alt="New Folder" /><span class="btn-plus-badge">+</span></button>
+          <button class="icon-btn" data-pane-action="rename" data-pane="dest" title="Rename" data-i18n-title="panes.rename"><img src="/assets/icons/pencil.svg" class="ui-icon" alt="Rename" /></button>
+          <button class="icon-btn danger" data-pane-action="delete" data-pane="dest" title="Delete" data-i18n-title="panes.delete"><img src="/assets/icons/bin.svg" class="ui-icon" alt="Delete" /></button>
         </div>
       </div>
       <div class="pane-column-header">
-        <input type="checkbox" class="pane-master-cb" id="dest-master-cb" data-pane="dest" title="Select All" aria-label="Select All" />
+        <input type="checkbox" class="pane-master-cb" id="dest-master-cb" data-pane="dest" title="Select All" aria-label="Select All" data-i18n-title="panes.select_all" />
         <span class="col-icon-spacer" aria-hidden="true"></span>
-        <button class="col-name sortable" data-sort="name" data-pane="dest">Name <span class="sort-icon"></span></button>
-        <button class="col-mtime sortable" data-sort="mtime" data-pane="dest">Modified <span class="sort-icon"></span></button>
-        <button class="col-size sortable" data-sort="size" data-pane="dest">Size <span class="sort-icon"></span></button>
+        <button class="col-name sortable" data-sort="name" data-pane="dest"><span data-i18n="panes.name">Name</span> <span class="sort-icon"></span></button>
+        <button class="col-mtime sortable" data-sort="mtime" data-pane="dest"><span data-i18n="panes.modified">Modified</span> <span class="sort-icon"></span></button>
+        <button class="col-size sortable" data-sort="size" data-pane="dest"><span data-i18n="panes.size">Size</span> <span class="sort-icon"></span></button>
         <button class="icon-btn btn-copy-path invisible-spacer" disabled style="visibility: hidden;" tabindex="-1" aria-hidden="true">📋</button>
       </div>
       <div class="pane-body" id="dest-body"></div>
@@ -88,14 +88,14 @@
   <div id="horizontal-splitter" class="splitter-h"></div>
   <div class="history">
     <div class="tabs-bar">
-      <button class="tab-btn active" id="tab-active-btn" data-tab="active">Active Operations</button>
-      <button class="tab-btn" id="tab-activity-btn" data-tab="activity">Activity Log</button>
+      <button class="tab-btn active" id="tab-active-btn" data-tab="active" data-i18n="history.active_operations">Active Operations</button>
+      <button class="tab-btn" id="tab-activity-btn" data-tab="activity" data-i18n="history.activity_log">Activity Log</button>
       <span class="spacer" style="flex: 1;"></span>
       <div class="selection-inline hidden" id="selection-inline">
         <span id="selection-inline-count" class="selection-inline-count hidden"></span>
-        <button id="selection-view-btn" class="btn-sm selection-view-btn hidden" title="View selected items">View</button>
-        <button id="selection-clear-btn" class="btn-sm btn-ghost-danger hidden">Clear</button>
-        <button id="transfer-btn" class="primary" disabled>Transfer</button>
+        <button id="selection-view-btn" class="btn-sm selection-view-btn hidden" title="View selected items" data-i18n-title="history.view" data-i18n="history.view">View</button>
+        <button id="selection-clear-btn" class="btn-sm btn-ghost-danger hidden" data-i18n="history.clear">Clear</button>
+        <button id="transfer-btn" class="primary" disabled data-i18n="history.transfer">Transfer</button>
 
         <div id="selection-preview" class="selection-preview hidden" role="dialog" aria-label="Selected items">
           <div class="selection-preview-header">
@@ -107,8 +107,8 @@
       </div>
     </div>
     <div class="activity-utils hidden" id="activity-utils">
-      <input type="search" id="activity-search" class="activity-search-input" placeholder="Filter logs...">
-      <button class="btn-sm btn-ghost-danger hidden" id="clear-activity-btn">Clear Log</button>
+      <input type="search" id="activity-search" class="activity-search-input" placeholder="Filter logs..." data-i18n-placeholder="history.filter_logs">
+      <button class="btn-sm btn-ghost-danger hidden" id="clear-activity-btn" data-i18n="history.clear_log">Clear Log</button>
     </div>
     <div id="active-transfers-container" class="cards-container"></div>
     <div id="activity-container" class="activity-list hidden"></div>
@@ -119,19 +119,19 @@
 
   <div class="modal-backdrop hidden" id="confirm-modal">
     <div class="modal">
-      <h2>Transfer items</h2>
+      <h2 data-i18n="modals.transfer.title">Transfer items</h2>
       <ul id="confirm-list"></ul>
       <div id="transfer-static-dest-view" style="margin-bottom: 14px;">
-        <div class="modal-hint">Destination: <span id="confirm-dest" style="color: var(--text-dim);"></span></div>
-        <button id="transfer-change-dest-btn" class="btn-sm hidden" style="margin-top: 8px;">Change destination</button>
+        <div class="modal-hint"><span data-i18n="modals.transfer.destination">Destination:</span> <span id="confirm-dest" style="color: var(--text-dim);"></span></div>
+        <button id="transfer-change-dest-btn" class="btn-sm hidden" style="margin-top: 8px;" data-i18n="modals.transfer.change_dest">Change destination</button>
       </div>
 
       <div id="transfer-picker-container" class="hidden" style="margin-top: 14px; margin-bottom: 14px;">
-        <label class="modal-label" style="margin-bottom: 8px;">Destination</label>
+        <label class="modal-label" style="margin-bottom: 8px;" data-i18n="modals.transfer.destination">Destination</label>
         <div class="pane-header" style="padding: 4px 8px; font-size: 0.9em; background: var(--panel-alt); border: 1px solid var(--border);">
             <span class="pane-path" id="transfer-picker-path"></span>
             <div class="pane-actions">
-              <button class="icon-btn" id="transfer-picker-mkdir" data-pane-action="mkdir" data-pane="pickerDest" title="New Folder"><img src="/assets/icons/folder.svg" class="ui-icon" alt="New Folder" /><span class="btn-plus-badge">+</span></button>
+              <button class="icon-btn" id="transfer-picker-mkdir" data-pane-action="mkdir" data-pane="pickerDest" title="New Folder" data-i18n-title="panes.new_folder"><img src="/assets/icons/folder.svg" class="ui-icon" alt="New Folder" /><span class="btn-plus-badge">+</span></button>
             </div>
         </div>
         <div class="pane-body" id="transfer-picker-body" style="height: 200px; border: 1px solid var(--border); border-top: none; overflow-y: auto; padding-bottom: 8px;"></div>
@@ -141,15 +141,15 @@
         <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;">
           
           <div style="flex: 1;">
-            <label class="modal-label" style="margin-bottom: 8px;">Operation</label>
+            <label class="modal-label" style="margin-bottom: 8px;" data-i18n="modals.transfer.operation">Operation</label>
             <div class="modal-radio-group" style="margin-top: 0;">
               <label class="modal-radio">
                 <input type="radio" name="transfer-op" value="copy" checked />
-                <span>Copy</span>
+                <span data-i18n="modals.transfer.copy">Copy</span>
               </label>
               <label class="modal-radio">
                 <input type="radio" name="transfer-op" value="move" />
-                <span>Move</span>
+                <span data-i18n="modals.transfer.move">Move</span>
               </label>
             </div>
           </div>
@@ -159,8 +159,8 @@
             <label id="transfer-rsync-label" style="display: flex; align-items: flex-start; justify-content: flex-start; gap: 8px; font-size: 13px; cursor: pointer; color: var(--text);">
               <input type="checkbox" id="transfer-rsync-toggle" checked style="margin: 0;" />
               <div style="display: flex; flex-direction: column;">
-                <span style="position: relative; top: -3px;">Enable rsync engine</span>
-                <span id="transfer-rsync-hint" class="modal-hint" style="margin-top: 4px;">Resumes on restart.</span>
+                <span style="position: relative; top: -3px;" data-i18n="modals.transfer.enable_rsync">Enable rsync engine</span>
+                <span id="transfer-rsync-hint" class="modal-hint" style="margin-top: 4px;" data-i18n="modals.transfer.resumes_hint">Resumes on restart.</span>
               </div>
             </label>
           </div>
@@ -169,8 +169,8 @@
       </div>
 
       <div class="actions">
-        <button id="confirm-cancel">Cancel</button>
-        <button id="confirm-ok" class="primary">Transfer</button>
+        <button id="confirm-cancel" data-i18n="modals.transfer.cancel">Cancel</button>
+        <button id="confirm-ok" class="primary" data-i18n="modals.transfer.confirm">Transfer</button>
       </div>
     </div>
   </div>
@@ -178,16 +178,16 @@
   <!-- New Folder popup (transfer-modal style) -->
   <div class="modal-backdrop hidden" id="mkdir-modal">
     <div class="modal">
-      <h2>New Folder</h2>
+      <h2 data-i18n="modals.mkdir.title">New Folder</h2>
       <div class="modal-field">
-        <label class="modal-label" for="mkdir-input">Folder name</label>
-        <input type="text" id="mkdir-input" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="e.g. Photos" />
+        <label class="modal-label" for="mkdir-input" data-i18n="modals.mkdir.folder_name">Folder name</label>
+        <input type="text" id="mkdir-input" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="e.g. Photos" data-i18n-placeholder="modals.mkdir.placeholder" />
         <div class="modal-error hidden" id="mkdir-error"></div>
       </div>
-      <div class="modal-hint">Location: <span id="mkdir-location" style="color: var(--text-dim);"></span></div>
+      <div class="modal-hint"><span data-i18n="modals.mkdir.location">Location:</span> <span id="mkdir-location" style="color: var(--text-dim);"></span></div>
       <div class="actions">
-        <button id="mkdir-cancel">Cancel</button>
-        <button id="mkdir-ok" class="primary">Create</button>
+        <button id="mkdir-cancel" data-i18n="modals.mkdir.cancel">Cancel</button>
+        <button id="mkdir-ok" class="primary" data-i18n="modals.mkdir.create">Create</button>
       </div>
     </div>
   </div>
@@ -195,16 +195,16 @@
   <!-- Rename popup (transfer-modal style) -->
   <div class="modal-backdrop hidden" id="rename-modal">
     <div class="modal">
-      <h2>Rename</h2>
+      <h2 data-i18n="modals.rename.title">Rename</h2>
       <div class="modal-field">
-        <label class="modal-label" for="rename-input">New name</label>
+        <label class="modal-label" for="rename-input" data-i18n="modals.rename.new_name">New name</label>
         <input type="text" id="rename-input" autocomplete="off" autocapitalize="off" spellcheck="false" />
         <div class="modal-error hidden" id="rename-error"></div>
       </div>
-      <div class="modal-hint">Item: <span id="rename-target" style="color: var(--text-dim);"></span></div>
+      <div class="modal-hint"><span data-i18n="modals.rename.item">Item:</span> <span id="rename-target" style="color: var(--text-dim);"></span></div>
       <div class="actions">
-        <button id="rename-cancel">Cancel</button>
-        <button id="rename-ok" class="primary">Rename</button>
+        <button id="rename-cancel" data-i18n="modals.rename.cancel">Cancel</button>
+        <button id="rename-ok" class="primary" data-i18n="modals.rename.confirm">Rename</button>
       </div>
     </div>
   </div>
@@ -212,14 +212,14 @@
   <!-- Conflict resolution popup -->
   <div class="modal-backdrop hidden" id="conflict-modal" style="z-index: 2000;">
     <div class="modal">
-      <h2>File Conflict</h2>
-      <div class="modal-hint">The following items already exist in the destination:</div>
+      <h2 data-i18n="modals.conflict.title">File Conflict</h2>
+      <div class="modal-hint" data-i18n="modals.conflict.hint">The following items already exist in the destination:</div>
       <ul id="conflict-list" style="max-height: 140px; margin-top: 8px; margin-bottom: 14px; overflow-y: auto;"></ul>
       
       <div class="actions">
-        <button id="conflict-cancel">Cancel</button>
-        <button id="conflict-rename">Keep Both</button>
-        <button id="conflict-overwrite" class="btn-danger-solid">Replace</button>
+        <button id="conflict-cancel" data-i18n="modals.conflict.cancel">Cancel</button>
+        <button id="conflict-rename" data-i18n="modals.conflict.keep_both">Keep Both</button>
+        <button id="conflict-overwrite" class="btn-danger-solid" data-i18n="modals.conflict.replace">Replace</button>
       </div>
     </div>
   </div>
@@ -230,8 +230,8 @@
       <h2 id="action-confirm-title">Are you sure?</h2>
       <div class="modal-hint" id="action-confirm-message"></div>
       <div class="actions">
-        <button id="action-confirm-cancel">Cancel</button>
-        <button id="action-confirm-ok" class="primary">Confirm</button>
+        <button id="action-confirm-cancel" data-i18n="modals.confirm.cancel">Cancel</button>
+        <button id="action-confirm-ok" class="primary" data-i18n="modals.confirm.confirm">Confirm</button>
       </div>
     </div>
   </div>
@@ -243,8 +243,8 @@
       <ul id="delete-list" style="max-height: 140px;"></ul>
       <div class="modal-hint" style="color: var(--danger);">This permanently removes the selected file(s)/folder(s). This cannot be undone.</div>
       <div class="actions">
-        <button id="delete-cancel">Cancel</button>
-        <button id="delete-ok" class="btn-danger-solid">Delete</button>
+        <button id="delete-cancel" data-i18n="modals.delete.cancel">Cancel</button>
+        <button id="delete-ok" class="btn-danger-solid" data-i18n="modals.delete.confirm">Delete</button>
       </div>
     </div>
   </div>
@@ -252,10 +252,10 @@
   <!-- Activity Details popup (transfer-modal style) -->
   <div class="modal-backdrop hidden" id="activity-details-modal">
     <div class="modal modal-wide">
-      <h2 id="activity-details-title">Activity Details</h2>
+      <h2 id="activity-details-title" data-i18n="modals.activity.title">Activity Details</h2>
       <div id="activity-details-body" class="activity-details-body"></div>
       <div class="actions">
-        <button id="activity-details-close" class="primary">Close</button>
+        <button id="activity-details-close" class="primary" data-i18n="modals.activity.close">Close</button>
       </div>
     </div>
   </div>
@@ -264,31 +264,31 @@
   <div class="modal-backdrop hidden" id="item-details-modal">
     <div class="modal">
       <div class="modal-header-row">
-        <h2 id="item-details-title">Item Details</h2>
+        <h2 id="item-details-title" data-i18n="modals.item.title">Item Details</h2>
         <button id="item-details-dismiss" class="modal-close-btn" title="Close" aria-label="Close">✕</button>
       </div>
       <div id="item-details-body" class="item-details-body">
         <div class="item-details-field">
-          <label class="item-details-label">Name</label>
+          <label class="item-details-label" data-i18n="modals.item.name">Name</label>
           <div id="item-details-name" class="item-details-value scrollable-name"></div>
         </div>
         <div class="item-details-field">
-          <label class="item-details-label">Full Path</label>
+          <label class="item-details-label" data-i18n="modals.item.path">Full Path</label>
           <div id="item-details-path" class="item-details-value path-wrap"></div>
         </div>
         <div class="item-details-field">
-          <label class="item-details-label">Modified</label>
+          <label class="item-details-label" data-i18n="modals.item.modified">Modified</label>
           <div id="item-details-modified" class="item-details-value"></div>
         </div>
         <div class="item-details-field">
-          <label class="item-details-label">Size</label>
+          <label class="item-details-label" data-i18n="modals.item.size">Size</label>
           <div id="item-details-size" class="item-details-value"></div>
         </div>
       </div>
       <div class="actions item-details-actions">
-        <button id="item-details-close">Close</button>
-        <button id="item-details-copy" class="hidden">Copy Link</button>
-        <button id="item-details-open" class="primary hidden">Open</button>
+        <button id="item-details-close" data-i18n="modals.item.close">Close</button>
+        <button id="item-details-copy" class="hidden" data-i18n="modals.item.copy_link">Copy Link</button>
+        <button id="item-details-open" class="primary hidden" data-i18n="modals.item.open">Open</button>
       </div>
     </div>
   </div>
@@ -297,7 +297,7 @@
   <div class="modal-backdrop hidden" id="editor-modal">
     <div class="modal modal-editor">
       <div class="modal-header-row">
-        <h2 id="editor-title" class="truncate">Edit File</h2>
+        <h2 id="editor-title" class="truncate" data-i18n="modals.editor.title">Edit File</h2>
         <div class="modal-header-actions">
           <button id="editor-maximize" class="modal-header-btn" title="Maximize" aria-label="Maximize"><img src="/assets/icons/maximize.svg" class="ui-icon" alt="Maximize" /></button>
           <button id="editor-dismiss" class="modal-close-btn" title="Close" aria-label="Close">✕</button>
@@ -309,8 +309,8 @@
         <textarea id="editor-textarea" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"></textarea>
       </div>
       <div class="actions editor-actions">
-        <button id="editor-cancel">Close</button>
-        <button id="editor-save" class="primary">Save</button>
+        <button id="editor-cancel" data-i18n="modals.editor.close">Close</button>
+        <button id="editor-save" class="primary" data-i18n="modals.editor.save">Save</button>
       </div>
     </div>
   </div>
@@ -319,64 +319,64 @@
   <div class="modal-backdrop hidden" id="upload-modal">
     <div class="modal" style="width: 480px;">
       <div class="modal-header-row">
-        <h2>Upload</h2>
+        <h2 data-i18n="modals.upload.title">Upload</h2>
         <button id="upload-modal-dismiss" class="modal-close-btn" title="Close" aria-label="Close">✕</button>
       </div>
 
       <div class="modal-hint" style="margin-top: -4px; margin-bottom: 14px;">
-        Destination: <span id="upload-modal-dest" style="color: var(--text); font-family: ui-monospace, monospace;"></span>
+        <span data-i18n="modals.upload.dest">Destination:</span> <span id="upload-modal-dest" style="color: var(--text); font-family: ui-monospace, monospace;"></span>
       </div>
 
       <!-- Segmented switch / Tabs for From Device vs From URL -->
       <div class="segmented-control" id="upload-type-toggle" style="width: 100%; display: flex; margin-bottom: 16px;">
-        <button id="btn-upload-device" class="active" style="flex: 1; justify-content: center;">From Device</button>
-        <button id="btn-upload-url" style="flex: 1; justify-content: center;">From URL</button>
+        <button id="btn-upload-device" class="active" style="flex: 1; justify-content: center;" data-i18n="modals.upload.from_device">From Device</button>
+        <button id="btn-upload-url" style="flex: 1; justify-content: center;" data-i18n="modals.upload.from_url">From URL</button>
       </div>
 
       <!-- Section: From Device -->
       <div id="upload-device-section">
         <div id="upload-dropzone" class="upload-dropzone" style="border: 2px dashed var(--border); border-radius: 8px; padding: 28px 16px; text-align: center; cursor: pointer; transition: border-color 0.15s, background 0.15s;">
           <img src="/assets/icons/folder.svg" alt="" style="width: 44px; height: 44px; margin-bottom: 8px;" />
-          <div style="font-weight: 500; color: var(--text); margin-bottom: 4px;">Choose files or drag & drop here</div>
-          <div class="modal-hint" style="font-size: 11px;">Files will upload directly to destination</div>
+          <div style="font-weight: 500; color: var(--text); margin-bottom: 4px;" data-i18n="modals.upload.dropzone_title">Choose files or drag & drop here</div>
+          <div class="modal-hint" style="font-size: 11px;" data-i18n="modals.upload.dropzone_hint">Files will upload directly to destination</div>
         </div>
       </div>
 
       <!-- Section: From URL -->
       <div id="upload-url-section" class="hidden">
         <div class="modal-field">
-          <label class="modal-label" for="upload-url-input">URL (HTTP / HTTPS)</label>
-          <input type="text" id="upload-url-input" placeholder="https://example.com/file.zip" autocomplete="off" autocapitalize="off" spellcheck="false" style="width: 100%;" />
+          <label class="modal-label" for="upload-url-input" data-i18n="modals.upload.url_label">URL (HTTP / HTTPS)</label>
+          <input type="text" id="upload-url-input" placeholder="https://example.com/file.zip" data-i18n-placeholder="modals.upload.url_placeholder" autocomplete="off" autocapitalize="off" spellcheck="false" style="width: 100%;" />
           <div class="modal-error hidden" id="upload-url-error"></div>
         </div>
 
         <div class="modal-field" style="margin-top: 10px;">
-          <label class="modal-label" for="upload-url-filename">Filename override (optional)</label>
-          <input type="text" id="upload-url-filename" placeholder="Inferred from URL if left empty" autocomplete="off" autocapitalize="off" spellcheck="false" style="width: 100%;" />
+          <label class="modal-label" for="upload-url-filename" data-i18n="modals.upload.filename_label">Filename override (optional)</label>
+          <input type="text" id="upload-url-filename" placeholder="Inferred from URL if left empty" data-i18n-placeholder="modals.upload.filename_placeholder" autocomplete="off" autocapitalize="off" spellcheck="false" style="width: 100%;" />
         </div>
 
         <div class="modal-field" style="margin-top: 10px;">
-          <label class="modal-label" style="margin-bottom: 6px;">If file exists</label>
+          <label class="modal-label" style="margin-bottom: 6px;" data-i18n="modals.upload.if_exists">If file exists</label>
           <div class="modal-radio-group" style="margin-top: 0;">
             <label class="modal-radio">
               <input type="radio" name="upload-url-conflict" value="skip" checked />
-              <span>Skip</span>
+              <span data-i18n="modals.upload.skip">Skip</span>
             </label>
             <label class="modal-radio">
               <input type="radio" name="upload-url-conflict" value="rename" />
-              <span>Keep Both</span>
+              <span data-i18n="modals.upload.keep_both">Keep Both</span>
             </label>
             <label class="modal-radio">
               <input type="radio" name="upload-url-conflict" value="overwrite" />
-              <span>Replace</span>
+              <span data-i18n="modals.upload.replace">Replace</span>
             </label>
           </div>
         </div>
       </div>
 
       <div class="actions" style="margin-top: 18px;">
-        <button id="upload-modal-cancel">Cancel</button>
-        <button id="upload-url-download-btn" class="primary hidden">Download</button>
+        <button id="upload-modal-cancel" data-i18n="modals.upload.cancel">Cancel</button>
+        <button id="upload-url-download-btn" class="primary hidden" data-i18n="modals.upload.download">Download</button>
       </div>
     </div>
   </div>
@@ -385,7 +385,7 @@
   <div class="modal-backdrop hidden" id="task-details-modal">
     <div class="modal modal-extra-wide">
       <div class="modal-header-row">
-        <h2 id="task-details-title" class="truncate">Transfer Details</h2>
+        <h2 id="task-details-title" class="truncate" data-i18n="modals.task_details.title">Transfer Details</h2>
         <button id="task-details-dismiss" class="modal-close-btn" title="Close" aria-label="Close">✕</button>
       </div>
 
@@ -411,7 +411,7 @@
       <div id="task-details-file-list" style="max-height: 280px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px;"></div>
 
       <div class="actions" style="margin-top: 14px;">
-        <button id="task-details-close" class="primary">Close</button>
+        <button id="task-details-close" class="primary" data-i18n="modals.task_details.close">Close</button>
       </div>
     </div>
   </div>
@@ -420,49 +420,52 @@
   <div class="modal-backdrop hidden" id="settings-modal">
     <div class="modal">
       <div class="modal-header-row">
-        <h2>Settings</h2>
+        <h2 data-i18n="modals.settings.title">Settings</h2>
         <button id="settings-modal-dismiss" class="modal-close-btn" title="Close" aria-label="Close">✕</button>
       </div>
 
       <!-- General Section -->
-      <h3 class="modal-section-title" style="margin-top: 24px;">General</h3>
+      <h3 class="modal-section-title" style="margin-top: 24px;" data-i18n="modals.settings.general">General</h3>
 
       <input type="checkbox" id="settings-show-hidden" style="display: none;" />
 
       <div class="modal-field">
-        <label class="modal-label" for="settings-theme">Theme</label>
+        <label class="modal-label" for="settings-theme" data-i18n="modals.settings.theme">Theme</label>
         <select id="settings-theme" class="modal-select">
-          <option value="system">System Preference</option>
-          <option value="light">Light</option>
-          <option value="dark">Dark</option>
+          <option value="system" data-i18n="modals.settings.theme_system">System Preference</option>
+          <option value="light" data-i18n="modals.settings.theme_light">Light</option>
+          <option value="dark" data-i18n="modals.settings.theme_dark">Dark</option>
         </select>
       </div>
 
       <div class="modal-field">
-        <label class="modal-label" for="settings-language">Language</label>
+        <label class="modal-label" for="settings-language" data-i18n="modals.settings.language">Language</label>
         <select id="settings-language" class="modal-select">
-          <option value="en">English</option>
-          <option value="es">Español</option>
-          <option value="fr">Français</option>
+          <option value="en" data-i18n="modals.settings.lang_en">English</option>
+          <option value="es" data-i18n="modals.settings.lang_es">Español</option>
+          <option value="fr" data-i18n="modals.settings.lang_fr">Français</option>
+          <option value="de" data-i18n="modals.settings.lang_de">Deutsch</option>
+          <option value="pt" data-i18n="modals.settings.lang_pt">Português</option>
+          <option value="zh" data-i18n="modals.settings.lang_zh">中文</option>
         </select>
       </div>
 
       <!-- Security Section -->
-      <h3 class="modal-section-title">Security</h3>
+      <h3 class="modal-section-title" data-i18n="modals.settings.security">Security</h3>
       <div class="modal-field">
         <details class="settings-accordion">
-          <summary>Change Password</summary>
+          <summary data-i18n="modals.settings.change_pwd">Change Password</summary>
           <div class="settings-accordion-content">
-            <input type="password" id="settings-current-password" placeholder="Current password" style="margin-bottom: 8px;" />
-            <input type="password" id="settings-new-password" placeholder="New password" style="margin-bottom: 8px;" />
-            <input type="password" id="settings-confirm-password" placeholder="Confirm new password" />
+            <input type="password" id="settings-current-password" placeholder="Current password" data-i18n-placeholder="modals.settings.cur_pwd" style="margin-bottom: 8px;" />
+            <input type="password" id="settings-new-password" placeholder="New password" data-i18n-placeholder="modals.settings.new_pwd" style="margin-bottom: 8px;" />
+            <input type="password" id="settings-confirm-password" placeholder="Confirm new password" data-i18n-placeholder="modals.settings.conf_pwd" />
           </div>
         </details>
       </div>
 
       <div class="actions">
-        <button id="settings-cancel" class="btn-ghost">Cancel</button>
-        <button id="settings-save" class="primary">Save Changes</button>
+        <button id="settings-cancel" class="btn-ghost" data-i18n="modals.settings.cancel">Cancel</button>
+        <button id="settings-save" class="primary" data-i18n="modals.settings.save">Save Changes</button>
       </div>
     </div>
   </div>

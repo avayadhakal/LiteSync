@@ -1,6 +1,7 @@
 import { api, toastSuccess, toastError, copyToClipboard } from './api.js';
 import { el, escapeHtml, normalizePath, formatSize } from './utils.js';
 import { state } from './state.js';
+import { I18n } from './i18n.js';
 
 export async function loadActivity() {
   try {
@@ -17,9 +18,9 @@ export async function clearActivity() {
     await api('/api/activity', { method: 'DELETE' });
     state.activity = [];
     renderActivity();
-    toastSuccess('Activity log cleared.');
+    toastSuccess(I18n.t('messages.log_cleared'));
   } catch (err) {
-    toastError(`Failed to clear activity log: ${err.message}`);
+    toastError(I18n.t('messages.clear_log_failed', { err: err.message }));
   }
 }
 
@@ -295,9 +296,9 @@ export function renderActivity() {
           await api(`/api/activity/${entry.id}`, { method: 'DELETE' });
           state.activity = state.activity.filter((a) => a.id !== entry.id);
           renderActivity();
-          toastSuccess('Activity log entry deleted.');
+          toastSuccess(I18n.t('messages.log_entry_deleted'));
         } catch (err) {
-          toastError(`Failed to delete activity log entry: ${err.message}`);
+          toastError(I18n.t('messages.delete_log_failed', { err: err.message }));
         }
       });
     }
@@ -395,7 +396,7 @@ export function openActivityDetails(entry, info) {
           await copyToClipboard(r.value);
           copyBtn.innerHTML = '✓';
           copyBtn.style.color = 'var(--success)';
-          toastSuccess('Copied to clipboard');
+          toastSuccess(I18n.t('messages.copied'));
           setTimeout(() => {
             copyBtn.innerHTML = '📋';
             copyBtn.style.color = '';

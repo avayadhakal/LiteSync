@@ -20,7 +20,6 @@ export function initSettingsModal() {
   // Load existing settings
   const loadSettings = () => {
     if (el('settings-theme')) el('settings-theme').value = localStorage.getItem('litesync-theme') || 'system';
-    if (el('settings-show-hidden')) el('settings-show-hidden').checked = localStorage.getItem('litesync-show-hidden') === 'true';
     if (el('settings-language')) el('settings-language').value = localStorage.getItem('litesync-language') || 'en';
   };
 
@@ -40,19 +39,17 @@ export function initSettingsModal() {
   if (saveBtn) {
     saveBtn.addEventListener('click', () => {
       const theme = el('settings-theme').value;
-      const showHidden = el('settings-show-hidden').checked;
       const language = el('settings-language').value;
       const currPwd = el('settings-current-password').value;
       const newPwd = el('settings-new-password').value;
       const confirmPwd = el('settings-confirm-password') ? el('settings-confirm-password').value : '';
 
       localStorage.setItem('litesync-theme', theme);
-      localStorage.setItem('litesync-show-hidden', showHidden);
       localStorage.setItem('litesync-language', language);
       
       applyTheme(theme);
       
-      console.log('Settings Saved:', { theme, showHidden, language });
+      console.log('Settings Saved:', { theme, language });
       if (currPwd || newPwd || confirmPwd) {
         if (newPwd !== confirmPwd) {
           showToast('New passwords do not match!', 'error');

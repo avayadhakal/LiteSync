@@ -80,12 +80,12 @@ function getActivityDisplayInfo(entry) {
       icon = '⊘';
       badgeText = 'Interrupted — Move';
       statusClass = 'status-interrupted';
-      secondaryHtml = escapeHtml(data.summary || data.error || 'cancelled by user');
+      secondaryHtml = '';
     } else {
       icon = '✗';
       badgeText = 'Failed — Move';
       statusClass = 'status-failed';
-      secondaryHtml = escapeHtml(data.summary || data.error || 'rsync exited with error');
+      secondaryHtml = '';
     }
   } else if (op === 'copy' || op === 'transfer') {
     badgeText = 'Copied';
@@ -98,12 +98,12 @@ function getActivityDisplayInfo(entry) {
       icon = '⊘';
       badgeText = 'Interrupted — Copy';
       statusClass = 'status-interrupted';
-      secondaryHtml = escapeHtml(data.summary || data.error || 'cancelled by user');
+      secondaryHtml = '';
     } else {
       icon = '✗';
       badgeText = 'Failed — Copy';
       statusClass = 'status-failed';
-      secondaryHtml = escapeHtml(data.summary || data.error || 'rsync exited with error');
+      secondaryHtml = '';
     }
   } else if (op === 'mkdir') {
     icon = '+';
@@ -113,7 +113,7 @@ function getActivityDisplayInfo(entry) {
     if (status === 'failed') {
       icon = '✗';
       badgeText = 'Failed — New Folder';
-      secondaryHtml = escapeHtml(data.error || 'Failed to create directory');
+      secondaryHtml = '';
     }
   } else if (op === 'rename') {
     icon = '→';
@@ -123,7 +123,7 @@ function getActivityDisplayInfo(entry) {
     if (status === 'failed') {
       icon = '✗';
       badgeText = 'Failed — Rename';
-      secondaryHtml = escapeHtml(data.error || 'Failed to rename');
+      secondaryHtml = '';
     }
   } else if (op === 'delete') {
     icon = '🗑';
@@ -133,7 +133,7 @@ function getActivityDisplayInfo(entry) {
     if (status === 'failed') {
       icon = '✗';
       badgeText = 'Failed — Delete';
-      secondaryHtml = escapeHtml(data.error || 'Failed to delete');
+      secondaryHtml = '';
     }
   } else if (op === 'url_download') {
     const dst = data.destination ? normalizePath(data.destination) : '';
@@ -157,14 +157,13 @@ function getActivityDisplayInfo(entry) {
       badgeText = 'Interrupted — Download';
       statusClass = 'status-interrupted';
       primaryText = data.name || 'file';
-      secondaryHtml = escapeHtml(data.summary || data.error || 'cancelled by user');
+      secondaryHtml = '';
     } else {
       icon = '✗';
       badgeText = 'Download Failed';
       statusClass = 'status-failed';
       primaryText = data.name || 'file';
-      const reason = data.error || data.summary || 'Download failed';
-      secondaryHtml = dst ? `→ <span style="font-family: ui-monospace, monospace;">${escapeHtml(dst)}</span><br><span style="color: var(--danger); font-size: 11px;">${escapeHtml(reason)}</span>` : `<span style="color: var(--danger); font-size: 11px;">${escapeHtml(reason)}</span>`;
+      secondaryHtml = dst ? `→ <span style="font-family: ui-monospace, monospace;">${escapeHtml(dst)}</span>` : '';
     }
   } else if (op === 'upload') {
     const dst = data.destination ? normalizePath(data.destination) : '';
@@ -179,8 +178,7 @@ function getActivityDisplayInfo(entry) {
       badgeText = 'Upload Failed';
       statusClass = 'status-failed';
       primaryText = data.name || 'file';
-      const reason = data.error || data.summary || 'Upload failed';
-      secondaryHtml = dst ? `→ <span style="font-family: ui-monospace, monospace;">${escapeHtml(dst)}</span><br><span style="color: var(--danger); font-size: 11px;">${escapeHtml(reason)}</span>` : `<span style="color: var(--danger); font-size: 11px;">${escapeHtml(reason)}</span>`;
+      secondaryHtml = dst ? `→ <span style="font-family: ui-monospace, monospace;">${escapeHtml(dst)}</span>` : '';
     }
   } else if (op === 'edit' || op === 'edited') {
     const dst = data.destination ? normalizePath(data.destination) : '';
@@ -192,7 +190,7 @@ function getActivityDisplayInfo(entry) {
     if (status === 'failed') {
       icon = '✗';
       badgeText = 'Failed — Edit';
-      secondaryHtml = escapeHtml(data.error || 'Failed to edit file');
+      secondaryHtml = '';
     }
   } else {
     badgeText = (entry.kind || 'Info').charAt(0).toUpperCase() + (entry.kind || 'Info').slice(1).toLowerCase();
@@ -265,8 +263,10 @@ export function renderActivity() {
       </div>
       <div class="log-meta">
         <span class="activity-time">${escapeHtml(formatActivityTime(entry.created_at || entry.ts))}</span>
-        <button class="activity-details-btn" title="View Details">Details</button>
-        <button class="activity-delete-btn" title="Delete Log Entry">Delete</button>
+        <div class="log-actions">
+          <button class="activity-details-btn" title="View Details">Details</button>
+          <button class="activity-delete-btn" title="Delete Log Entry">Delete</button>
+        </div>
       </div>
     `;
 

@@ -1291,6 +1291,12 @@ tr.task-row:hover { background: rgba(255, 255, 255, 0.05); }
   min-width: 250px;
 }
 
+.log-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .badge-danger {
   background-color: rgba(255, 107, 107, 0.15);
   color: #ff8787;
@@ -1830,8 +1836,13 @@ body.single-pane #source-pane {
 
   .log-meta {
     width: 100%;
-    justify-content: flex-end;
+    justify-content: space-between;
     margin-top: 8px;
+  }
+
+  .activity-time {
+    text-align: left;
+    min-width: auto;
   }
 }.text-danger { color: var(--danger); }
 .mt-1 { margin-top: 4px; }

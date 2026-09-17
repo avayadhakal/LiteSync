@@ -34,6 +34,7 @@ Minimal-overhead Linux web app for dual-pane local directory browsing and backgr
 │       ├── routes.py              # /api/transfer, /api/transfer/url, /api/tasks, /api/activity endpoints
 │       └── scheduler.py      # Asyncio FIFO task queue and process lifecycle
 ├── static/                   # Vanilla HTML/JS/CSS frontend
+│   ├── locales/              # i18n JSON dictionaries (en, es, fr, de, pt, zh)
 │   ├── login.html
 │   ├── index.html            # Main SPA shell
 │   ├── favicon.ico
@@ -42,6 +43,7 @@ Minimal-overhead Linux web app for dual-pane local directory browsing and backgr
 │       ├── api.js            # Fetch wrapper and HTTP utilities
 │       ├── app.js            # Application entrypoint and event binding
 │       ├── activity.js       # Activity log UI and polling
+│       ├── i18n.js           # Lightweight client-side i18n engine
 │       ├── panes.js          # Dual-pane UI state management
 │       ├── selection.js      # Hierarchical selection logic
 │       ├── state.js          # Shared frontend application state
@@ -179,6 +181,13 @@ CREATE INDEX idx_activity_created ON activity(created_at DESC);
    - Resuming a task natively bypasses all initial pre-flight overwrite checks, seamlessly reattaching to the process so data transmission continues exactly where it left off.
 
 ## 5. Frontend Architecture (Vanilla HTML/CSS/JS)
+
+### Client-Side Internationalization (i18n)
+
+* **Zero-Dependency Engine**: Built-in lightweight `i18n.js` fetches flat JSON language dictionaries from `/locales` asynchronously.
+* **DOM Updates**: Replaces `[data-i18n]`, `[data-i18n-title]`, and `[data-i18n-placeholder]` attributes on the fly.
+* **Variable Interpolation**: `I18n.t(key, params)` supports runtime parameter injection (e.g. `{count} selected`).
+* **Persistence**: Synchronized seamlessly via the Settings modal and persisted to `localStorage` without requiring a page reload.
 
 ### Layout & Responsiveness (`app.css` / `app.js`)
 

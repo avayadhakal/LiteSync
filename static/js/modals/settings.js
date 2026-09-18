@@ -2,7 +2,7 @@ import { el } from '../utils.js';
 import { I18n } from '../i18n.js';
 import { renderPane } from '../panes.js';
 import { state } from '../state.js';
-import { showToast } from '../api.js';
+import { api, showToast } from '../api.js';
 
 export function initSettingsModal() {
   const settingsModal = el('settings-modal');
@@ -53,21 +53,40 @@ export function initSettingsModal() {
       const confirmPwd = el('settings-confirm-password') ? el('settings-confirm-password').value : '';
 
       localStorage.setItem('litesync-theme', theme);
-      // localStorage.setItem('litesync-language', language); handled by I18n
       
       applyTheme(theme);
       
-      console.log('Settings Saved:', { theme, language });
+      let passwordChanged = false;
       if (currPwd || newPwd || confirmPwd) {
         if (newPwd !== confirmPwd) {
-          showToast(I18n.t('messages.passwords_mismatch'), 'error');
+          showToast(I18n.t('messages.passwords_mismatch') || 'Passwords do not match', 'error');
           return;
         }
-        console.log('Password change requested (UI only)');
+        if (newPwd.length < 8) {
+          showToast('New password must be at least 8 characters', 'error');
+          return;
+        }
+        try {
+          await api('/api/change-password', {
+            method: 'POST',
+            body: JSON.stringify({ current_password: currPwd, new_password: newPwd })
+          });
+          passwordChanged = true;
+          if (el('settings-current-password')) el('settings-current-password').value = '';
+          if (el('settings-new-password')) el('settings-new-password').value = '';
+          if (el('settings-confirm-password')) el('settings-confirm-password').value = '';
+        } catch (err) {
+          showToast(err.message, 'error');
+          return;
+        }
       }
       
       settingsModal.classList.add('hidden');
-      showToast(I18n.t('messages.settings_saved'));
+      if (passwordChanged) {
+        showToast('Password updated successfully. Other devices will need to log in again.');
+      } else {
+        showToast(I18n.t('messages.settings_saved') || 'Settings saved');
+      }
     });
   }
 }

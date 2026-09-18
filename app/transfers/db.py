@@ -35,6 +35,10 @@ CREATE TABLE IF NOT EXISTS activity (
     created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_activity_created ON activity(created_at DESC);
+CREATE TABLE IF NOT EXISTS users (
+    username TEXT PRIMARY KEY,
+    password_hash TEXT NOT NULL
+);
 """
 
 
@@ -222,6 +226,43 @@ def init_db(data_dir: Path) -> None:
     with _lock, _connect() as conn:
         _migrate_if_needed(conn)
         conn.executescript(SCHEMA)
+
+        # Bootstrap users if table is empty
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM users")
+        if cursor.fetchone()[0] == 0:
+            from app.config import get_settings
+            settings = get_settings()
+            for u in settings.users:
+                cursor.execute(
+                    "INSERT INTO users (username, password_hash) VALUES (?, ?)",
+                    (u.username, u.password_hash)
+                )
+
+        # Always load users back into Settings.users from DB
+        cursor.execute("SELECT username, password_hash FROM users")
+        from app.config import get_settings, User
+        settings = get_settings()
+        db_users = [User(username=row["username"], password_hash=row["password_hash"]) for row in cursor.fetchall()]
+        object.__setattr__(settings, "users", db_users)
+
+def update_user_password(username: str, password_hash: str) -> None:
+    """Updates the user's password in the database and in-memory settings."""
+    with _lock, _connect() as conn:
+        conn.execute(
+            "UPDATE users SET password_hash = ? WHERE username = ?",
+            (password_hash, username)
+        )
+    
+    from app.config import get_settings, User
+    settings = get_settings()
+    new_users = []
+    for u in settings.users:
+        if u.username == username:
+            new_users.append(User(username=username, password_hash=password_hash))
+        else:
+            new_users.append(u)
+    object.__setattr__(settings, "users", new_users)
 
 
 def insert_task(

@@ -35,17 +35,22 @@ def _serializer() -> URLSafeTimedSerializer:
     return URLSafeTimedSerializer(settings.secret_key, salt="litesync-session")
 
 
-def create_session_cookie(username: str) -> str:
-    return _serializer().dumps({"username": username})
+def create_session_cookie(username: str, password_hash: str) -> str:
+    return _serializer().dumps({
+        "username": username,
+        "hash_suffix": password_hash[-12:]
+    })
 
 
-def read_session_cookie(cookie: str) -> str | None:
+def read_session_cookie(cookie: str) -> dict | None:
     settings = get_settings()
     try:
         data = _serializer().loads(cookie, max_age=settings.session_max_age)
     except (BadSignature, SignatureExpired):
         return None
-    return data.get("username")
+    if isinstance(data, dict):
+        return data
+    return None
 
 
 def is_locked_out(username: str) -> bool:
@@ -71,17 +76,25 @@ async def get_current_user(
 ) -> str:
     # 1. Cookie authentication (standard web browser session)
     if litesync_session:
-        username = read_session_cookie(litesync_session)
-        if username:
-            return username
+        data = read_session_cookie(litesync_session)
+        if data and "username" in data:
+            username = data["username"]
+            settings = get_settings()
+            u = settings.find_user(username)
+            if u and data.get("hash_suffix") == u.password_hash[-12:]:
+                return username
 
     # 2. Authorization header authentication (Bearer token or Basic auth)
     if authorization:
         if authorization.startswith("Bearer "):
             bearer_token = authorization[7:].strip()
-            username = read_session_cookie(bearer_token)
-            if username:
-                return username
+            data = read_session_cookie(bearer_token)
+            if data and "username" in data:
+                username = data["username"]
+                settings = get_settings()
+                u = settings.find_user(username)
+                if u and data.get("hash_suffix") == u.password_hash[-12:]:
+                    return username
         elif authorization.startswith("Basic "):
             try:
                 decoded = base64.b64decode(authorization[6:].strip()).decode("utf-8")
@@ -123,7 +136,45 @@ async def login(body: LoginRequest, response: Response):
         raise HTTPException(status_code=401, detail="Invalid username or password")
 
     clear_failed_attempts(body.username)
-    cookie_value = create_session_cookie(body.username)
+    cookie_value = create_session_cookie(body.username, user.password_hash)
+    response.set_cookie(
+        key=COOKIE_NAME,
+        value=cookie_value,
+        max_age=settings.session_max_age,
+        httponly=True,
+        samesite="lax",
+        secure=settings.secure_cookie,
+    )
+    return {"ok": True}
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+@router.post("/change-password")
+async def change_password(body: ChangePasswordRequest, request: Request, response: Response, username: str = Depends(get_current_user)):
+    settings = get_settings()
+
+    if is_locked_out(username):
+        raise HTTPException(status_code=429, detail="Too many failed attempts, try again later")
+
+    user = settings.find_user(username)
+    if user is None or not verify_password(body.current_password, user.password_hash):
+        record_failed_attempt(username)
+        raise HTTPException(status_code=401, detail="Invalid current password")
+
+    clear_failed_attempts(username)
+    
+    if len(body.new_password) < 8:
+        raise HTTPException(status_code=400, detail="New password must be at least 8 characters")
+
+    new_hash = hash_password(body.new_password)
+    from app.transfers.db import update_user_password
+    update_user_password(username, new_hash)
+
+    cookie_value = create_session_cookie(username, new_hash)
     response.set_cookie(
         key=COOKIE_NAME,
         value=cookie_value,

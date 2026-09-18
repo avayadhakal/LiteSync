@@ -3,7 +3,7 @@
 ## 1. System Context & Core Principles
 Minimal-overhead Linux web app for dual-pane local directory browsing and background `rsync` / zero-copy kernel transfers (supporting `x86_64`, `arm64`, Raspberry Pi, NAS, and homelab environments).
 * **Stack**: Python + FastAPI (async, SSE-friendly) on `uvicorn` (`--workers 1`). Vanilla HTML/JS/CSS frontend.
-* **Auth**: Built-in lightweight auth (TOML hashed passwords, signed session cookies).
+* **Auth**: Built-in lightweight auth. Credentials securely migrated from TOML and stored in SQLite. Session cookies embed a `hash_suffix` for stateless, instant cross-device invalidation on password change.
 * **Security**: Filesystem constrained to admin-configured "allowed roots". `fsops.resolve_safe_path()` strictly validates all paths against traversal/symlink escapes. CSRF protection on state-changing endpoints via Origin/Referer validation. Global middleware enforces strict Content-Security-Policy (CSP) and standard security headers.
 * **Transfer Engine**: Background asyncio subprocess worker. Survives browser closures. Logs pipe directly to per-task files, streamed to UI via SSE.
 * **Browser Uploads**: Direct browser-to-filesystem multipart streaming straight to destination directory. Fully decoupled from `tasks` table and background runner.
@@ -115,6 +115,11 @@ CREATE TABLE activity (
   created_at TEXT NOT NULL
 );
 CREATE INDEX idx_activity_created ON activity(created_at DESC);
+
+CREATE TABLE users (
+  username      TEXT PRIMARY KEY,
+  password_hash TEXT NOT NULL
+);
 ```
 
 ## 4. Backend Engine & API Endpoints
@@ -124,6 +129,7 @@ CREATE INDEX idx_activity_created ON activity(created_at DESC);
 | Method | Path | Purpose |
 | --- | --- | --- |
 | POST | `/api/login` | Authenticates credentials and sets secure session cookie. |
+| POST | `/api/change-password` | Updates user password in SQLite/memory and invalidates old sessions across devices. |
 | POST | `/api/logout` | Clears user session cookie. |
 | GET | `/api/whoami`, `/api/roots` | Session context & configured root validation. |
 | GET | `/api/browse?path=<abs>` | Returns `{path, parent, entries}`. Filters out-of-root symlinks. |

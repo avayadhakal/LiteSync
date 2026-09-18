@@ -62,6 +62,7 @@ Moves within the same filesystem use `os.rename()` directly instead of copying t
 
 * Multilingual UI support (English, Spanish, French, German, Portuguese, Mandarin)
 * Browse directories from the browser
+* Change user password natively from the web interface
 * Download files from URL directly to the destination directory
 * Unified upload modal for device uploads and URL downloads
 * Single-pane and dual-pane layouts

@@ -339,19 +339,19 @@ export function openActivityDetails(entry, info) {
   rows.push({ label: 'Status', value: (data.status || 'succeeded').toUpperCase() });
 
   if (data.source) {
-    rows.push({ label: 'Source Path', value: data.source, copyable: true });
+    rows.push({ label: 'Source Path', value: data.source, isPath: true });
   }
   if (data.destination) {
-    rows.push({ label: 'Destination', value: data.destination, copyable: true });
+    rows.push({ label: 'Destination', value: data.destination, isPath: true });
   }
   if (data.old_path) {
-    rows.push({ label: 'Original Path', value: data.old_path, copyable: true });
+    rows.push({ label: 'Original Path', value: data.old_path, isPath: true });
   }
   if (data.new_path) {
-    rows.push({ label: 'New Path', value: data.new_path, copyable: true });
+    rows.push({ label: 'New Path', value: data.new_path, isPath: true });
   }
   if (data.path && !data.source && !data.destination && !data.old_path) {
-    rows.push({ label: 'Path', value: data.path, copyable: true });
+    rows.push({ label: 'Path', value: data.path, isPath: true });
   }
   const sizeVal = (data.size !== undefined && data.size !== null && data.size !== '')
     ? formatSize(Number(data.size))
@@ -370,41 +370,13 @@ export function openActivityDetails(entry, info) {
     const valEl = document.createElement('div');
     valEl.className = 'activity-details-value';
 
-    if (r.copyable) {
-      valEl.className += ' activity-details-copyable';
+    if (r.isPath) {
       const textSpan = document.createElement('span');
-      if (r.value.includes('/')) {
-        const lastSlash = r.value.lastIndexOf('/');
-        const dir = r.value.substring(0, lastSlash + 1);
-        const file = r.value.substring(lastSlash + 1);
-        textSpan.style.display = 'inline-flex';
-        textSpan.style.maxWidth = '100%';
-        textSpan.style.minWidth = '0';
-        textSpan.title = r.value;
-        textSpan.innerHTML = `<span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left;">&lrm;${escapeHtml(dir)}</span><span style="white-space: nowrap; flex-shrink: 0;">${escapeHtml(file)}</span>`;
-      } else {
-        textSpan.textContent = r.value;
-        textSpan.style.wordBreak = 'break-all';
-      }
-      const copyBtn = document.createElement('button');
-      copyBtn.className = 'icon-btn';
-      copyBtn.innerHTML = '📋';
-      copyBtn.title = 'Copy path';
-      copyBtn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        try {
-          await copyToClipboard(r.value);
-          copyBtn.innerHTML = '✓';
-          copyBtn.style.color = 'var(--success)';
-          toastSuccess(I18n.t('messages.copied'));
-          setTimeout(() => {
-            copyBtn.innerHTML = '📋';
-            copyBtn.style.color = '';
-          }, 1500);
-        } catch (_err) {}
-      });
+      textSpan.className = 'item-details-value scrollable-name';
+      textSpan.style.display = 'block';
+      textSpan.textContent = r.value;
+      
       valEl.appendChild(textSpan);
-      valEl.appendChild(copyBtn);
     } else {
       valEl.textContent = r.value;
     }

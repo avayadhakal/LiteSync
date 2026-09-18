@@ -1487,12 +1487,12 @@ tr.task-row:hover { background: rgba(255, 255, 255, 0.05); }
 }
 
 .activity-details-row {
-  display: grid;
-  grid-template-columns: 110px 1fr;
-  gap: 8px;
-  align-items: baseline;
-  padding: 5px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0;
+  border-bottom: none;
+  margin-bottom: 8px;
 }
 
 .activity-details-label {
@@ -1510,12 +1510,7 @@ tr.task-row:hover { background: rgba(255, 255, 255, 0.05); }
   font-size: 12px;
 }
 
-.activity-details-copyable {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-}
+
 
 .activity-details-error {
   background: #2a1515;
@@ -1624,19 +1619,7 @@ tr.task-row:hover { background: rgba(255, 255, 255, 0.05); }
   box-sizing: border-box;
 }
 
-.item-details-value.path-wrap {
-  word-break: break-all;
-  white-space: pre-wrap;
-  background: var(--panel-alt);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 8px 10px;
-  max-height: 120px;
-  overflow-y: auto;
-  font-family: ui-monospace, monospace;
-  color: #ffffff;
-  opacity: 0.85;
-}
+
 
 .item-details-actions {
   display: flex;
@@ -2032,7 +2015,6 @@ body.single-pane #source-pane {
 [data-theme="light"] .toast-host,
 [data-theme="light"] .activity-search-input,
 [data-theme="light"] .activity-primary-line,
-[data-theme="light"] .item-details-value.path-wrap,
 [data-theme="light"] .task-details-file-name {
   color: var(--text); /* Overrides hardcoded #ffffff */
 }

@@ -2,6 +2,7 @@ import { api, toastError } from '../api.js';
 import { el, normalizePath } from '../utils.js';
 import { state } from '../state.js';
 import { paneSelection } from '../panes.js';
+import { I18n } from '../i18n.js';
 
 export function showConflictModal(conflicts, onResolve) {
   const modal = el('conflict-modal');
@@ -63,8 +64,63 @@ export function updateTransferMethodUI() {
   }
 }
 
+export function updateTransferScheduleUI() {
+  const timingRadio = document.querySelector('input[name="transfer-timing"]:checked');
+  const isScheduled = timingRadio && timingRadio.value === 'later';
+  const pickerWrap = el('transfer-schedule-picker-wrap');
+  const okBtn = el('confirm-ok');
+  const errEl = el('transfer-schedule-error');
+  const datetimeInput = el('transfer-schedule-datetime');
+
+  if (errEl) {
+    errEl.classList.add('hidden');
+    errEl.textContent = '';
+  }
+
+  if (isScheduled) {
+    if (pickerWrap) pickerWrap.classList.remove('hidden');
+    if (okBtn) {
+      okBtn.textContent = I18n.t('modals.transfer.confirm_schedule');
+    }
+    if (datetimeInput) {
+      const now = new Date();
+      now.setMinutes(now.getMinutes() + 1);
+      const pad = (n) => String(n).padStart(2, '0');
+      const minStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+      datetimeInput.min = minStr;
+      if (!datetimeInput.value || datetimeInput.value < minStr) {
+        datetimeInput.value = minStr;
+      }
+    }
+  } else {
+    if (pickerWrap) pickerWrap.classList.add('hidden');
+    if (okBtn) {
+      okBtn.textContent = I18n.t('modals.transfer.confirm');
+    }
+  }
+}
+
+export function resetTransferScheduleUI() {
+  const nowRadio = document.querySelector('input[name="transfer-timing"][value="now"]');
+  if (nowRadio) nowRadio.checked = true;
+  const pickerWrap = el('transfer-schedule-picker-wrap');
+  if (pickerWrap) pickerWrap.classList.add('hidden');
+  const errEl = el('transfer-schedule-error');
+  if (errEl) {
+    errEl.classList.add('hidden');
+    errEl.textContent = '';
+  }
+  const datetimeInput = el('transfer-schedule-datetime');
+  if (datetimeInput) datetimeInput.value = '';
+  const okBtn = el('confirm-ok');
+  if (okBtn) {
+    okBtn.textContent = I18n.t('modals.transfer.confirm');
+  }
+}
+
 export function closeConfirmModal() {
   el('confirm-modal').classList.add('hidden');
+  resetTransferScheduleUI();
   const btnSingle = el('btn-single-pane');
   const btnDual = el('btn-dual-pane');
   if (btnSingle) btnSingle.disabled = false;

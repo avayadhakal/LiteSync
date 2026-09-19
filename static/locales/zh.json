@@ -3,6 +3,7 @@
     "single": "单窗格",
     "dual": "双窗格",
     "logged_in_as": "当前用户 {username}",
+    "scheduled_transfers": "已计划",
     "settings": "设置",
     "logout": "退出",
     "brand": "LiteSync"
@@ -42,8 +43,22 @@
       "move": "移动",
       "enable_rsync": "启用 rsync 引擎",
       "resumes_hint": "重启后可恢复。",
+      "timing": "执行时间",
+      "run_immediately": "现在运行",
+      "schedule_for_later": "定时执行",
+      "schedule_time": "计划日期和时间",
       "cancel": "取消",
-      "confirm": "传输"
+      "confirm": "传输",
+      "confirm_schedule": "定时传输"
+    },
+    "scheduled": {
+      "title": "定时传输",
+      "empty": "暂无定时传输任务。",
+      "close": "关闭",
+      "cancel": "取消",
+      "scheduled_for": "计划时间: {time}",
+      "confirm_cancel_title": "取消定时传输",
+      "confirm_cancel_msg": "确定要取消此定时传输任务吗？"
     },
     "mkdir": {
       "title": "新建文件夹",
@@ -188,8 +203,11 @@
     "file_saved": "File saved successfully",
     "log_cleared": "Activity log cleared.",
     "log_entry_deleted": "Activity log entry deleted.",
-    "copied": "Copied to clipboard",
-    "uploaded": "Uploaded {file}",
-    "queued_download": "Queued download: {file} → {dest}"
+    "copied": "已复制到剪贴板",
+    "uploaded": "已上传 {file}",
+    "queued_download": "排队下载：{file} → {dest}",
+    "scheduled_items": "已安排在 {time} 进行 {count} 个项目的{op}传输",
+    "schedule_time_required": "请选择将来的日期和时间。",
+    "task_cancelled": "定时传输已取消。"
   }
 }

@@ -33,6 +33,7 @@
       <div id="gear-menu" class="dropdown-menu hidden">
         <div class="dropdown-header" id="menu-user-banner">Logged in as ...</div>
         <div class="dropdown-divider"></div>
+        <button class="dropdown-item" id="menu-scheduled" data-i18n="nav.scheduled_transfers">Scheduled</button>
         <button class="dropdown-item" id="menu-settings" data-i18n="nav.settings">Settings</button>
         <button class="dropdown-item danger" id="menu-logout" data-i18n="nav.logout">Log out</button>
       </div>
@@ -165,6 +166,25 @@
             </label>
           </div>
 
+        </div>
+      </div>
+
+      <div class="modal-field" id="transfer-schedule-field" style="margin-top: 14px; margin-bottom: 16px;">
+        <label class="modal-label" style="margin-bottom: 8px;" data-i18n="modals.transfer.timing">Timing</label>
+        <div class="modal-radio-group" style="margin-top: 0;">
+          <label class="modal-radio">
+            <input type="radio" name="transfer-timing" value="now" checked />
+            <span data-i18n="modals.transfer.run_immediately">Run now</span>
+          </label>
+          <label class="modal-radio">
+            <input type="radio" name="transfer-timing" value="later" />
+            <span data-i18n="modals.transfer.schedule_for_later">Schedule for later</span>
+          </label>
+        </div>
+        <div id="transfer-schedule-picker-wrap" class="hidden" style="margin-top: 10px;">
+          <label class="modal-label" for="transfer-schedule-datetime" style="margin-bottom: 4px; font-size: 12px;" data-i18n="modals.transfer.schedule_time">Scheduled Date &amp; Time</label>
+          <input type="datetime-local" id="transfer-schedule-datetime" class="modal-input" style="width: 100%; padding: 6px 10px; background: var(--panel-alt); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm);" />
+          <div id="transfer-schedule-error" class="modal-error hidden" style="margin-top: 4px;"></div>
         </div>
       </div>
 
@@ -467,6 +487,24 @@
       <div class="actions">
         <button id="settings-cancel" class="btn-ghost" data-i18n="modals.settings.cancel">Cancel</button>
         <button id="settings-save" class="primary" data-i18n="modals.settings.save">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scheduled Transfers Modal -->
+  <div class="modal-backdrop hidden" id="scheduled-modal">
+    <div class="modal modal-extra-wide">
+      <div class="modal-header-row">
+        <h2 id="scheduled-modal-title" class="truncate" data-i18n="modals.scheduled.title">Scheduled Transfers</h2>
+        <button id="scheduled-modal-dismiss" class="modal-close-btn" title="Close" aria-label="Close">✕</button>
+      </div>
+
+      <div id="scheduled-transfers-container" class="scheduled-transfers-container">
+        <!-- Scheduled transfer cards rendered dynamically -->
+      </div>
+
+      <div class="actions" style="margin-top: 14px;">
+        <button id="scheduled-modal-close" class="primary" data-i18n="modals.scheduled.close">Close</button>
       </div>
     </div>
   </div>

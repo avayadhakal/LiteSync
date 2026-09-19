@@ -55,6 +55,7 @@ Minimal-overhead Linux web app for dual-pane local directory browsing and backgr
 │           ├── editor.js
 │           ├── item-details.js
 │           ├── mkdir-rename-delete.js
+│           ├── scheduled.js      # Scheduled transfers dialog controller
 │           ├── settings.js       # Settings and theme modal
 │           ├── task-details.js
 │           └── transfer.js
@@ -95,7 +96,7 @@ CREATE TABLE tasks (
   source        TEXT NOT NULL,             -- single source path
   destination   TEXT NOT NULL,
   operation     TEXT NOT NULL,             -- 'copy' | 'move' | 'url_download'
-  status        TEXT NOT NULL,             -- 'queued' | 'running' | 'succeeded' | 'failed' | 'interrupted'
+  status        TEXT NOT NULL,             -- 'scheduled' | 'queued' | 'running' | 'succeeded' | 'failed' | 'interrupted'
   created_at    TEXT NOT NULL,             -- ISO8601
   started_at    TEXT,
   ended_at      TEXT,
@@ -103,10 +104,12 @@ CREATE TABLE tasks (
   error_message TEXT,
   excludes      TEXT DEFAULT '[]',
   use_rsync     INTEGER DEFAULT 0,
-  on_conflict   TEXT DEFAULT 'skip'        -- 'skip' | 'overwrite' | 'rename'
+  on_conflict   TEXT DEFAULT 'skip',       -- 'skip' | 'overwrite' | 'rename'
+  scheduled_for TEXT                       -- ISO8601 UTC timestamp or NULL
 );
 CREATE INDEX idx_tasks_status ON tasks(status);
 CREATE INDEX idx_tasks_created_at ON tasks(created_at DESC);
+CREATE INDEX idx_tasks_scheduled ON tasks(status, scheduled_for);
 
 CREATE TABLE activity (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -142,12 +145,13 @@ CREATE TABLE users (
 | POST | `/api/delete` | `{path}` → `shutil.rmtree()` / `unlink()`. Refuses deleting roots. |
 | POST | `/api/upload` | `{path, on_conflict, files}` → Streamed multipart write straight to disk (`.litesync-upload-<hex>.tmp` → `os.rename`). |
 | POST | `/api/transfer/url` | `{url, destination, filename, on_conflict}` → Enforces upfront SSRF check and queues background `url_download` task. |
-| POST | `/api/transfer` | `{sources: [{path, excludes}], destination, operation, use_rsync, on_conflict}` → Queues 1 task **per source**. |
+| POST | `/api/transfer` | `{sources: [{path, excludes}], destination, operation, use_rsync, on_conflict, scheduled_for}` → Queues 1 task **per source** (immediate execution or scheduled if future ISO-8601 UTC timestamp provided). |
+| GET | `/api/tasks/scheduled` | Retrieves pending scheduled transfers sorted chronologically ascending by `scheduled_for`. |
 | GET | `/api/tasks`, `/{id}` | Task history pagination and detail retrieval. |
 | GET | `/api/tasks/{id}/stream` | SSE: yields live log tail, closes with `status` event. |
 | POST | `/api/tasks/{id}/pause` | Pauses active running `rsync` transfer via `SIGSTOP`. |
 | POST | `/api/tasks/{id}/resume` | Resumes paused `rsync` transfer via `SIGCONT`. |
-| POST | `/api/tasks/{id}/cancel` | Cancels active transfer or unqueues pending task. |
+| POST | `/api/tasks/{id}/cancel` | Cancels active transfer or unqueues pending task (scheduled or queued). |
 | DELETE | `/api/tasks/{id}`, `/tasks` | Deletes task history records and log files. |
 | GET | `/api/activity` | Retrieves authoritative activity log entries newest first. |
 | DELETE | `/api/activity` | Clears activity log table. |
@@ -186,6 +190,37 @@ CREATE TABLE users (
    - A deterministic concurrency token (`_current_run_token`) securely isolates the rapid resume lifecycle (via `SIGCONT`), preventing asynchronous race conditions.
    - Resuming a task natively bypasses all initial pre-flight overwrite checks, seamlessly reattaching to the process so data transmission continues exactly where it left off.
 
+### Scheduled Transfers Subsystem (One-Time Execution Engine)
+
+1. **One-Time Scheduling Model:**
+   - LiteSync supports one-time delayed transfers scheduled for a specific future date and time (recurring/cron schedules are intentionally omitted to maintain simplicity and determinism).
+   - Scheduled tasks enter the `tasks` table with initial `status = 'scheduled'`.
+   - While in `scheduled` status, tasks are strictly excluded from Active Operations, do not acquire execution slots, and emit no premature Activity Log entries until they are promoted to `queued`.
+
+2. **Schema & Indexing:**
+   - The `tasks` table includes a `scheduled_for TEXT` column storing the ISO-8601 UTC timestamp (`datetime.now(timezone.utc).isoformat()`).
+   - The composite index `idx_tasks_scheduled ON tasks(status, scheduled_for)` accelerates lookups and promotions of due scheduled transfers.
+   - Idempotent schema migrations add the column and index to existing SQLite databases upon startup without data loss.
+
+3. **Wake-Cycle Promotion via Existing Scheduler Loop:**
+   - Rather than introducing secondary background timers, cron daemons, or separate polling threads, scheduled transfers fully reuse the existing `run_scheduler` 1.0-second wake cycle.
+   - At the beginning of each 1.0s wake cycle, `promote_due_scheduled_tasks()` executes a single atomic SQLite query promoting all tasks where `status = 'scheduled'` AND `scheduled_for <= now_utc` to `status = 'queued'`.
+   - Promoted tasks transition seamlessly into LiteSync's standard single-task FIFO queue, automatically waking the worker loop if idle.
+
+4. **Startup Reconciliation for Offline/Missed Schedules:**
+   - If LiteSync is offline when a scheduled time arrives, `reconcile_on_startup()` checks for any pending scheduled tasks where `scheduled_for <= now_utc`.
+   - Missed tasks are immediately promoted to `queued` so they execute as soon as the service recovers. Future scheduled transfers remain untouched in `scheduled` status until their target time is reached.
+
+5. **API Endpoints & Lifecycle Protection:**
+   - `POST /api/transfer`: Accepts an optional `scheduled_for` ISO-8601 string. When present, the server validates that it represents a valid future timestamp, canonicalizes it to UTC ISO-8601, and inserts the task with `status = 'scheduled'`. If absent or null, tasks are queued immediately (`status = 'queued'`).
+   - `GET /api/tasks/scheduled`: Returns all pending scheduled transfers ordered chronologically ascending by `scheduled_for`.
+   - **Delete Protection:** Pending scheduled tasks cannot be deleted via `DELETE /api/tasks/{id}` or `DELETE /api/tasks` until they complete, fail, or are cancelled.
+
+6. **Cancellation Path Isolation:**
+   - Cancelling a task in `scheduled` status (`POST /api/tasks/{id}/cancel`) marks the task as `interrupted` immediately in SQLite and emits an Activity Log cancellation notice.
+   - Because no OS subprocess or worker thread has been allocated, the cancel handler strictly bypasses process signaling (`terminate_task` and `terminate_paused_task`), preventing errors or false signals against nonexistent PIDs.
+   - SQLite lock serialization ensures race-free behavior even if a cancellation request arrives simultaneously with wake-cycle promotion.
+
 ## 5. Frontend Architecture (Vanilla HTML/CSS/JS)
 
 ### Client-Side Internationalization (i18n)
@@ -218,7 +253,8 @@ CREATE TABLE users (
 * **Unbatched Transfer Cards:** Multi-item transfers spawn individual `.transfer-card` elements (one per item). Queued items show `Queued...` and can be canceled before execution.
 * **Task Details Modal:** Dedicated `modal-extra-wide` view launched from transfer cards displaying a scrollable list of completed files and the currently active processing file with live progress stats.
 * **Selection Action Bar:** Hidden when count is 0; contains Summary, View, Clear, and Transfer controls.
-* **Transfer Confirmation Modal:** Contains operation options (`copy` vs `move`) directly under destination path.
+* **Transfer Confirmation Modal (`#confirm-modal`):** Contains operation options (`copy` vs `move`) directly under destination path and a Timing selector (Run now vs Schedule for later with `datetime-local` picker).
+* **Scheduled Transfers Modal (`#scheduled-modal`):** Accessible via the Settings gear dropdown menu (`#menu-scheduled`). Shares the identical `modal-extra-wide` dimensions, responsive layout, and visual styling of the Transfer Details modal (`width: 720px; max-width: 95vw; min-height: 440px`). Lists all pending scheduled transfers sorted chronologically, displaying operation badge, destination, source paths, local scheduled time, and individual cancellation buttons (`[Cancel]`).
 * **Contextual View Popover:** Displays full paths of selected items and exclusions with overflow scrolling.
 
 ### File Browser UX & Inspection

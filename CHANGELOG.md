@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 ### Added
+- **Scheduled Transfers:** Added one-time scheduled transfers allowing users to set a future date and time for file transfers directly within the Transfer confirmation modal. Reuses the existing scheduler's 1.0-second wake loop and startup reconciliation without secondary timers or polling loops. Includes a dedicated Scheduled Transfers management modal reachable from the Settings gear menu to inspect upcoming tasks and cancel them before execution.
 - **Activity Log Transfer Retry:** Added a "Retry" action to the Activity Log detail view for failed or interrupted transfer entries.
 - **Change Password & SQLite Credentials:** Implemented in-app password changes via a new Settings modal integration and `POST /api/change-password` endpoint. Securely migrated credentials from `config.toml` to a dedicated `users` table in SQLite (`litesync.db`). Sessions now embed a hash suffix to guarantee stateless, instant cross-device invalidation on password change, while keeping the current device seamlessly logged in.
 - **Internationalization (i18n):** Implemented a lightweight, zero-dependency client-side i18n engine supporting dynamic language switching (English, Spanish, French, German, Portuguese, Mandarin) with fallback handling and real-time DOM updates.

@@ -45,8 +45,9 @@ class TestDatabaseSchemaAndTasks(unittest.TestCase):
                 "exit_code": "INTEGER",
                 "error_message": "TEXT",
                 "excludes": "TEXT",
-            "use_rsync": "INTEGER",
-            "on_conflict": "TEXT",
+                "use_rsync": "INTEGER",
+                "on_conflict": "TEXT",
+                "scheduled_for": "TEXT",
             }
             self.assertEqual(task_cols, expected_task_cols)
 
@@ -237,6 +238,50 @@ class TestDatabaseSchemaAndTasks(unittest.TestCase):
         self.assertIsNotNone(db.get_task("del_me"))
         db.delete_task("del_me")
         self.assertIsNone(db.get_task("del_me"))
+
+    def test_scheduled_task_round_trip_and_promotion(self):
+        # Insert a scheduled task with scheduled_for timestamp
+        target_time = "2026-10-15T10:00:00+00:00"
+        db.insert_task(
+            id="sched_1",
+            source="/src/file.txt",
+            destination="/dst",
+            operation="copy",
+            status="scheduled",
+            scheduled_for=target_time,
+        )
+
+        task = db.get_task("sched_1")
+        self.assertIsNotNone(task)
+        self.assertEqual(task["status"], "scheduled")
+        self.assertEqual(task["scheduled_for"], target_time)
+
+        # list_scheduled_tasks retrieves it
+        sched_list = db.list_scheduled_tasks()
+        self.assertEqual(len(sched_list), 1)
+        self.assertEqual(sched_list[0]["id"], "sched_1")
+
+        # Queued queries do NOT return it
+        self.assertEqual(len(db.list_queued_tasks()), 0)
+        self.assertIsNone(db.next_queued_task())
+
+        # Running tasks does NOT return it
+        self.assertEqual(len(db.list_running_tasks()), 0)
+
+        # Future task is NOT promoted
+        promoted = db.promote_due_scheduled_tasks()
+        self.assertEqual(len(promoted), 0)
+        self.assertEqual(db.get_task("sched_1")["status"], "scheduled")
+
+        # Directly update scheduled_for to the past to test promotion
+        with db._lock, db._connect() as conn:
+            conn.execute("UPDATE tasks SET scheduled_for='2020-01-01T00:00:00+00:00' WHERE id='sched_1'")
+
+        promoted = db.promote_due_scheduled_tasks()
+        self.assertEqual(promoted, ["sched_1"])
+        self.assertEqual(db.get_task("sched_1")["status"], "queued")
+        self.assertEqual(len(db.list_queued_tasks()), 1)
+        self.assertEqual(db.next_queued_task()["id"], "sched_1")
 
 
 class TestActivityLog(unittest.TestCase):

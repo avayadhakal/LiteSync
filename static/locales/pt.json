@@ -3,6 +3,7 @@
     "single": "Único",
     "dual": "Duplo",
     "logged_in_as": "Conectado como {username}",
+    "scheduled_transfers": "Agendado",
     "settings": "Configurações",
     "logout": "Sair",
     "brand": "LiteSync"
@@ -42,8 +43,22 @@
       "move": "Mover",
       "enable_rsync": "Motor rsync",
       "resumes_hint": "Retoma ao reiniciar.",
+      "timing": "Agendamento",
+      "run_immediately": "Executar agora",
+      "schedule_for_later": "Agendar para mais tarde",
+      "schedule_time": "Data e hora agendadas",
       "cancel": "Cancelar",
-      "confirm": "Transferir"
+      "confirm": "Transferir",
+      "confirm_schedule": "Agendar Transferência"
+    },
+    "scheduled": {
+      "title": "Transferências Agendadas",
+      "empty": "Nenhuma transferência agendada.",
+      "close": "Fechar",
+      "cancel": "Cancelar",
+      "scheduled_for": "Agendada para: {time}",
+      "confirm_cancel_title": "Cancelar Transferência Agendada",
+      "confirm_cancel_msg": "Tem certeza de que deseja cancelar esta transferência agendada?"
     },
     "mkdir": {
       "title": "Nova Pasta",
@@ -188,8 +203,11 @@
     "file_saved": "File saved successfully",
     "log_cleared": "Activity log cleared.",
     "log_entry_deleted": "Activity log entry deleted.",
-    "copied": "Copied to clipboard",
-    "uploaded": "Uploaded {file}",
-    "queued_download": "Queued download: {file} → {dest}"
+    "copied": "Copiado para a área de transferência",
+    "uploaded": "{file} enviado",
+    "queued_download": "Download na fila: {file} → {dest}",
+    "scheduled_items": "{count} transferência(s) de {op} agendada(s) para {time}",
+    "schedule_time_required": "Por favor, escolha uma data e hora no futuro.",
+    "task_cancelled": "Transferência agendada cancelada."
   }
 }

@@ -46,18 +46,23 @@ def queue_task(
     excludes: list[str] | None = None,
     use_rsync: bool = False,
     on_conflict: str = "skip",
+    scheduled_for: str | None = None,
+    status: str | None = None,
 ) -> str:
-    """Persist a single-source task as 'queued'. Nothing is launched here —
-    the background scheduler independently picks queued rows up."""
+    """Persist a single-source task as 'queued' (or 'scheduled' if scheduled_for is provided).
+    Nothing is launched here — the background scheduler independently picks queued rows up."""
     task_id = uuid.uuid4().hex
+    task_status = status or ("scheduled" if scheduled_for else "queued")
     db.insert_task(
         id=task_id,
         source=source,
         destination=destination,
         operation=operation,
+        status=task_status,
         excludes=excludes or [],
         use_rsync=use_rsync,
         on_conflict=on_conflict,
+        scheduled_for=scheduled_for,
     )
     return task_id
 
@@ -399,6 +404,7 @@ async def run_scheduler(settings: Settings) -> None:
     transfer at a time, forever."""
     while True:
         try:
+            db.promote_due_scheduled_tasks()
             if _current_task_id is None:
                 nxt = db.next_queued_task()
                 if nxt is not None:
@@ -419,6 +425,8 @@ async def run_scheduler(settings: Settings) -> None:
 
 def reconcile_on_startup(settings: Settings) -> None:
     """Startup reconciliation: mark any leftover 'running' or 'paused' tasks as 'interrupted'.
+    Promote any past scheduled tasks whose scheduled time arrived while server was down to 'queued'.
+    Future scheduled tasks remain untouched.
     Queued tasks remain queued and will resume."""
     for task in db.list_running_tasks():
         if task["status"] in ("running", "paused"):
@@ -428,6 +436,7 @@ def reconcile_on_startup(settings: Settings) -> None:
                 None,
                 "Server restarted during transfer",
             )
+    db.promote_due_scheduled_tasks()
 
 
 async def shutdown_runner() -> None:

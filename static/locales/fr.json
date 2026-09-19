@@ -3,6 +3,7 @@
     "single": "Unique",
     "dual": "Double",
     "logged_in_as": "Connecté en tant que {username}",
+    "scheduled_transfers": "Planifié",
     "settings": "Paramètres",
     "logout": "Déconnexion",
     "brand": "LiteSync"
@@ -42,8 +43,22 @@
       "move": "Déplacer",
       "enable_rsync": "Activer le moteur rsync",
       "resumes_hint": "Reprend au redémarrage.",
+      "timing": "Planification",
+      "run_immediately": "Exécuter maintenant",
+      "schedule_for_later": "Planifier pour plus tard",
+      "schedule_time": "Date et heure programmées",
       "cancel": "Annuler",
-      "confirm": "Transférer"
+      "confirm": "Transférer",
+      "confirm_schedule": "Programmer le transfert"
+    },
+    "scheduled": {
+      "title": "Transferts programmés",
+      "empty": "Aucun transfert programmé.",
+      "close": "Fermer",
+      "cancel": "Annuler",
+      "scheduled_for": "Programmé pour : {time}",
+      "confirm_cancel_title": "Annuler le transfert programmé",
+      "confirm_cancel_msg": "Êtes-vous sûr de vouloir annuler ce transfert programmé ?"
     },
     "mkdir": {
       "title": "Nouveau dossier",
@@ -188,8 +203,11 @@
     "file_saved": "File saved successfully",
     "log_cleared": "Activity log cleared.",
     "log_entry_deleted": "Activity log entry deleted.",
-    "copied": "Copied to clipboard",
-    "uploaded": "Uploaded {file}",
-    "queued_download": "Queued download: {file} → {dest}"
+    "copied": "Copié dans le presse-papier",
+    "uploaded": "{file} téléversé",
+    "queued_download": "Téléchargement en file d'attente : {file} → {dest}",
+    "scheduled_items": "{count} transfert(s) {op} programmé(s) pour {time}",
+    "schedule_time_required": "Veuillez choisir une date et une heure futures.",
+    "task_cancelled": "Transfert programmé annulé."
   }
 }

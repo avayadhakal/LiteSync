@@ -95,6 +95,7 @@ class TransferRequest(BaseModel):
     operation: str = "copy"
     use_rsync: bool = False
     on_conflict: str = "skip"
+    scheduled_for: str | None = None
 
 
 @router.post("/transfer")
@@ -113,6 +114,24 @@ async def create_transfer(body: TransferRequest, user: str = Depends(get_current
     resolved_destination = resolve_safe_path(body.destination, settings.allowed_roots)
     if not resolved_destination.is_dir():
         raise HTTPException(status_code=400, detail="Destination must be an existing directory")
+
+    sched_utc_str = None
+    if body.scheduled_for:
+        raw_sched = body.scheduled_for.strip() if isinstance(body.scheduled_for, str) else ""
+        if raw_sched:
+            try:
+                from datetime import datetime, timezone
+                sched_dt = datetime.fromisoformat(raw_sched.replace("Z", "+00:00"))
+                if sched_dt.tzinfo is None:
+                    sched_dt = sched_dt.replace(tzinfo=timezone.utc)
+                now_dt = datetime.now(timezone.utc)
+                if sched_dt <= now_dt:
+                    raise HTTPException(status_code=400, detail="scheduled_for must be in the future")
+                sched_utc_str = sched_dt.astimezone(timezone.utc).isoformat()
+            except HTTPException:
+                raise
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"Invalid scheduled_for timestamp: {e}")
 
     items_to_queue: list[tuple[str, list[str]]] = []
     for item in body.sources:
@@ -159,13 +178,14 @@ async def create_transfer(body: TransferRequest, user: str = Depends(get_current
             excludes=excludes,
             use_rsync=body.use_rsync or bool(excludes),
             on_conflict=body.on_conflict,
+            scheduled_for=sched_utc_str,
         )
         for source, excludes in items_to_queue
     ]
 
-    # Nudge the scheduler so the queue starts immediately (it polls the DB
-    # on its own regardless).
-    wake_scheduler()
+    # Nudge the scheduler so immediate work starts without delay.
+    if not sched_utc_str:
+        wake_scheduler()
 
     return {"task_ids": task_ids}
 
@@ -173,6 +193,11 @@ async def create_transfer(body: TransferRequest, user: str = Depends(get_current
 @router.get("/tasks")
 async def get_tasks(limit: int = 50, offset: int = 0, _user: str = Depends(get_current_user)):
     return {"tasks": db.list_tasks(limit=limit, offset=offset)}
+
+
+@router.get("/tasks/scheduled")
+async def get_scheduled_tasks(_user: str = Depends(get_current_user)):
+    return {"tasks": db.list_scheduled_tasks()}
 
 
 @router.get("/tasks/{task_id}")
@@ -233,8 +258,8 @@ async def delete_task(task_id: str, _user: str = Depends(get_current_user)):
     task = db.get_task(task_id)
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
-    if task["status"] in ("queued", "running", "paused"):
-        raise HTTPException(status_code=400, detail="Cannot delete an active task")
+    if task["status"] in ("scheduled", "queued", "running", "paused"):
+        raise HTTPException(status_code=400, detail="Cannot delete an active or scheduled task")
 
     db.delete_task(task_id)
 
@@ -250,7 +275,7 @@ async def delete_all_completed_tasks(_user: str = Depends(get_current_user)):
     settings = get_settings()
     tasks = db.list_tasks(limit=1000)
     for task in tasks:
-        if task["status"] not in ("queued", "running", "paused"):
+        if task["status"] not in ("scheduled", "queued", "running", "paused"):
             t_id = task["id"]
             db.delete_task(t_id)
             flat_log = settings.data_dir / "tasks" / f"{t_id}.log"
@@ -264,10 +289,10 @@ async def cancel_task(task_id: str, _user: str = Depends(get_current_user)):
     task = db.get_task(task_id)
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
-    if task["status"] not in ("queued", "running", "paused"):
+    if task["status"] not in ("scheduled", "queued", "running", "paused"):
         raise HTTPException(status_code=400, detail="Task is not active")
 
-    if task["status"] == "queued":
+    if task["status"] in ("scheduled", "queued"):
         db.mark_finished(task_id, "interrupted", None, "Transfer cancelled by user")
         return {"success": True}
 

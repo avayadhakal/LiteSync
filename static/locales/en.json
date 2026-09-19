@@ -3,6 +3,7 @@
     "single": "Single",
     "dual": "Dual",
     "logged_in_as": "Logged in as {username}",
+    "scheduled_transfers": "Scheduled",
     "settings": "Settings",
     "logout": "Log out",
     "brand": "LiteSync"
@@ -42,8 +43,22 @@
       "move": "Move",
       "enable_rsync": "Enable rsync engine",
       "resumes_hint": "Resumes on restart.",
+      "timing": "Timing",
+      "run_immediately": "Run now",
+      "schedule_for_later": "Schedule for later",
+      "schedule_time": "Scheduled Date & Time",
       "cancel": "Cancel",
-      "confirm": "Transfer"
+      "confirm": "Transfer",
+      "confirm_schedule": "Schedule Transfer"
+    },
+    "scheduled": {
+      "title": "Scheduled Transfers",
+      "empty": "No scheduled transfers.",
+      "close": "Close",
+      "cancel": "Cancel",
+      "scheduled_for": "Scheduled for: {time}",
+      "confirm_cancel_title": "Cancel Scheduled Transfer",
+      "confirm_cancel_msg": "Are you sure you want to cancel this scheduled transfer?"
     },
     "mkdir": {
       "title": "New Folder",
@@ -190,6 +205,9 @@
     "log_entry_deleted": "Activity log entry deleted.",
     "copied": "Copied to clipboard",
     "uploaded": "Uploaded {file}",
-    "queued_download": "Queued download: {file} → {dest}"
+    "queued_download": "Queued download: {file} → {dest}",
+    "scheduled_items": "Scheduled {count} {op} transfer(s) for {time}",
+    "schedule_time_required": "Please choose a future date and time.",
+    "task_cancelled": "Scheduled transfer cancelled."
   }
 }

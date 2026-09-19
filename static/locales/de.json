@@ -3,6 +3,7 @@
     "single": "Einzel",
     "dual": "Doppel",
     "logged_in_as": "Angemeldet als {username}",
+    "scheduled_transfers": "Geplant",
     "settings": "Einstellungen",
     "logout": "Abmelden",
     "brand": "LiteSync"
@@ -42,8 +43,22 @@
       "move": "Verschieben",
       "enable_rsync": "rsync-Engine aktivieren",
       "resumes_hint": "Wird beim Neustart fortgesetzt.",
+      "timing": "Zeitpunkt",
+      "run_immediately": "Jetzt ausführen",
+      "schedule_for_later": "Für später planen",
+      "schedule_time": "Geplantes Datum und Uhrzeit",
       "cancel": "Abbrechen",
-      "confirm": "Übertragen"
+      "confirm": "Übertragen",
+      "confirm_schedule": "Übertragung planen"
+    },
+    "scheduled": {
+      "title": "Geplante Übertragungen",
+      "empty": "Keine geplanten Übertragungen.",
+      "close": "Schließen",
+      "cancel": "Abbrechen",
+      "scheduled_for": "Geplant für: {time}",
+      "confirm_cancel_title": "Geplante Übertragung abbrechen",
+      "confirm_cancel_msg": "Sind Sie sicher, dass Sie diese geplante Übertragung abbrechen möchten?"
     },
     "mkdir": {
       "title": "Neuer Ordner",
@@ -188,8 +203,11 @@
     "file_saved": "File saved successfully",
     "log_cleared": "Activity log cleared.",
     "log_entry_deleted": "Activity log entry deleted.",
-    "copied": "Copied to clipboard",
-    "uploaded": "Uploaded {file}",
-    "queued_download": "Queued download: {file} → {dest}"
+    "copied": "In die Zwischenablage kopiert",
+    "uploaded": "{file} hochgeladen",
+    "queued_download": "Download in Warteschlange: {file} → {dest}",
+    "scheduled_items": "{count} {op}-Übertragung(en) für {time} geplant",
+    "schedule_time_required": "Bitte wählen Sie ein zukünftiges Datum und eine Uhrzeit.",
+    "task_cancelled": "Geplante Übertragung abgebrochen."
   }
 }

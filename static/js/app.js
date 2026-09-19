@@ -6,11 +6,12 @@ import { loadActivity, clearActivity, filterActivity, closeActivityDetails, rend
 import { renderActiveTransfers, TERMINAL_STATUSES, ACTIVE_STATUSES, pruneCompletedSelection } from './tasks-ui.js';
 import { openMkdirModal, openRenameModal, openDeleteModal, setModalError } from './modals/mkdir-rename-delete.js';
 import { openUploadPicker, startUploads } from './uploads.js';
-import { updateTransferMethodUI, getPrimaryTitle, closeConfirmModal, showConflictModal } from './modals/transfer.js';
+import { updateTransferMethodUI, updateTransferScheduleUI, resetTransferScheduleUI, getPrimaryTitle, closeConfirmModal, showConflictModal } from './modals/transfer.js';
 import { closeTaskDetailsModal, isTaskDetailsOpen } from './modals/task-details.js';
 import { closeItemDetailsModal } from './modals/item-details.js';
 import { isEditorOpen, saveEditorContent, closeEditorModal, toggleEditorMaximize } from './modals/editor.js';
 import { initSettingsModal } from './modals/settings.js';
+import { initScheduledModal } from './modals/scheduled.js';
 import { I18n } from './i18n.js';
 
 
@@ -218,6 +219,7 @@ export async function openConfirmModal() {
   
   el('transfer-rsync-toggle').checked = true;
   updateTransferMethodUI();
+  resetTransferScheduleUI();
 
   el('confirm-modal').classList.remove('hidden');
   const btnSingle = el('btn-single-pane');
@@ -227,16 +229,40 @@ export async function openConfirmModal() {
 }
 
 
-
-
-
-
-async function submitTransfer(resolvedConflictChoice = null) {
+async function submitTransfer(resolvedConflictChoice = null, scheduledForChoice = null) {
   if (resolvedConflictChoice === null && arguments.length === 0) {
     resolvedConflictChoice = null; // explicit
   } else if (resolvedConflictChoice instanceof Event) {
     resolvedConflictChoice = null; // event object from click
   }
+
+  let scheduled_for = typeof scheduledForChoice === 'string' ? scheduledForChoice : null;
+  if (!scheduled_for) {
+    const timingRadio = document.querySelector('input[name="transfer-timing"]:checked');
+    const isScheduled = timingRadio && timingRadio.value === 'later';
+    if (isScheduled) {
+      const datetimeInput = el('transfer-schedule-datetime');
+      const errEl = el('transfer-schedule-error');
+      const val = datetimeInput ? datetimeInput.value : '';
+      if (!val) {
+        if (errEl) {
+          errEl.textContent = I18n.t('messages.schedule_time_required');
+          errEl.classList.remove('hidden');
+        }
+        return;
+      }
+      const d = new Date(val);
+      if (isNaN(d.getTime()) || d.getTime() <= Date.now()) {
+        if (errEl) {
+          errEl.textContent = I18n.t('messages.schedule_time_required');
+          errEl.classList.remove('hidden');
+        }
+        return;
+      }
+      scheduled_for = d.toISOString();
+    }
+  }
+
   closeConfirmModal();
   const opRadio = document.querySelector('input[name="transfer-op"]:checked');
   const operation = opRadio ? opRadio.value : 'copy';
@@ -263,7 +289,7 @@ async function submitTransfer(resolvedConflictChoice = null) {
         if (conflicts.length > 0) {
           showConflictModal(conflicts, (choice) => {
             if (choice) {
-              submitTransfer(choice);
+              submitTransfer(choice, scheduled_for);
             }
           });
           return;
@@ -284,6 +310,9 @@ async function submitTransfer(resolvedConflictChoice = null) {
     use_rsync: use_rsync,
     on_conflict: resolvedConflictChoice || 'skip'
   };
+  if (scheduled_for) {
+    body.scheduled_for = scheduled_for;
+  }
 
   let result;
   try {
@@ -294,7 +323,21 @@ async function submitTransfer(resolvedConflictChoice = null) {
   }
   const itemCount = Array.isArray(result.task_ids) ? result.task_ids.length : body.sources.length;
   const opLabel = operation === 'move' ? 'move' : 'copy';
-  toastSuccess(I18n.t('messages.queued_items', { count: itemCount, op: opLabel }) + ` → ${body.destination}`);
+  if (scheduled_for) {
+    let formattedLocal = scheduled_for;
+    try {
+      formattedLocal = new Date(scheduled_for).toLocaleString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      });
+    } catch (_e) {}
+    toastSuccess(I18n.t('messages.scheduled_items', { count: itemCount, op: opLabel, time: formattedLocal }) + ` → ${body.destination}`);
+  } else {
+    toastSuccess(I18n.t('messages.queued_items', { count: itemCount, op: opLabel }) + ` → ${body.destination}`);
+  }
   // Reset the form to defaults after a successful queue (matches the
   // selection Clear button flow): empty the selection, redraw the source
   // pane so checkbox ticks clear, and restore the operation selection.
@@ -802,6 +845,12 @@ async function init() {
   el('transfer-btn').addEventListener('click', openConfirmModal);
   el('confirm-cancel').addEventListener('click', closeConfirmModal);
   el('confirm-ok').addEventListener('click', submitTransfer);
+
+  const timingRadios = document.querySelectorAll('input[name="transfer-timing"]');
+  timingRadios.forEach((radio) => {
+    radio.addEventListener('change', updateTransferScheduleUI);
+  });
+  initScheduledModal();
 
   // Inline Clear button: wipe the source selection and refresh checks.
   el('selection-clear-btn').addEventListener('click', () => {

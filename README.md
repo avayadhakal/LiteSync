@@ -87,6 +87,9 @@ Moves within the same filesystem use `os.rename()` directly instead of copying t
 * Show transfer progress in the web interface
 * Resolve destination conflicts before starting a transfer
 * Exclude selected directories from rsync transfers
+* Schedule one-time transfers for a future date and time with automatic execution when due
+* Inspect and cancel pending scheduled transfers from the Settings gear menu dialog
+* Reconcile missed scheduled transfers automatically on startup if the system was offline
 * Retry failed or interrupted transfers directly from the Activity Log detail view
 
 ### Uploads and URL Downloads

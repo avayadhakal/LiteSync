@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     source        TEXT NOT NULL,
     destination   TEXT NOT NULL,
     operation     TEXT NOT NULL,
-    status        TEXT NOT NULL, -- queued, running, paused, succeeded, failed, interrupted
+    status        TEXT NOT NULL, -- queued, running, paused, succeeded, failed, interrupted, scheduled
     created_at    TEXT NOT NULL,
     started_at    TEXT,
     ended_at      TEXT,
@@ -23,10 +23,12 @@ CREATE TABLE IF NOT EXISTS tasks (
     error_message TEXT,
     excludes      TEXT DEFAULT '[]',
     use_rsync     INTEGER DEFAULT 0,
-    on_conflict   TEXT DEFAULT 'skip'
+    on_conflict   TEXT DEFAULT 'skip',
+    scheduled_for TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_created_at ON tasks(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_tasks_scheduled ON tasks(scheduled_for);
 
 CREATE TABLE IF NOT EXISTS activity (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -111,6 +113,9 @@ def _migrate_if_needed(conn: sqlite3.Connection) -> None:
             cursor.execute("ALTER TABLE tasks ADD COLUMN use_rsync INTEGER DEFAULT 0")
         if "on_conflict" not in columns:
             cursor.execute("ALTER TABLE tasks ADD COLUMN on_conflict TEXT DEFAULT 'skip'")
+        if "scheduled_for" not in columns:
+            cursor.execute("ALTER TABLE tasks ADD COLUMN scheduled_for TEXT DEFAULT NULL")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_tasks_scheduled ON tasks(scheduled_for)")
         return
 
     # Old schema detected, perform migration
@@ -190,7 +195,8 @@ def _migrate_if_needed(conn: sqlite3.Connection) -> None:
             error_message TEXT,
             excludes      TEXT DEFAULT '[]',
             use_rsync     INTEGER DEFAULT 0,
-            on_conflict   TEXT DEFAULT 'skip'
+            on_conflict   TEXT DEFAULT 'skip',
+            scheduled_for TEXT
         );
     """)
 
@@ -199,8 +205,8 @@ def _migrate_if_needed(conn: sqlite3.Connection) -> None:
             """
             INSERT INTO tasks
                 (id, source, destination, operation, status,
-                 created_at, started_at, ended_at, exit_code, error_message, excludes, use_rsync, on_conflict)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', 0, 'skip')
+                 created_at, started_at, ended_at, exit_code, error_message, excludes, use_rsync, on_conflict, scheduled_for)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', 0, 'skip', NULL)
             """,
             (
                 t["id"],
@@ -279,6 +285,7 @@ def insert_task(
     excludes: list[str] | None = None,
     use_rsync: bool = False,
     on_conflict: str = "skip",
+    scheduled_for: str | None = None,
     **kwargs,
 ) -> None:
     """Insert a single task into the database."""
@@ -292,14 +299,15 @@ def insert_task(
     exc_list = excludes if excludes is not None else kwargs.get("excludes", [])
     exc_json = json.dumps(exc_list) if isinstance(exc_list, list) else (str(exc_list) if exc_list else "[]")
 
+    sched_for = scheduled_for or kwargs.get("scheduled_for")
     ts = created_at or now_iso()
     with _lock, _connect() as conn:
         conn.execute(
             """
             INSERT INTO tasks
                 (id, source, destination, operation, status,
-                 created_at, started_at, ended_at, exit_code, error_message, excludes, use_rsync, on_conflict)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 created_at, started_at, ended_at, exit_code, error_message, excludes, use_rsync, on_conflict, scheduled_for)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 task_id,
@@ -315,6 +323,7 @@ def insert_task(
                 exc_json,
                 1 if use_rsync else 0,
                 on_conflict,
+                sched_for,
             ),
         )
 
@@ -475,6 +484,44 @@ def list_running_tasks() -> list[dict]:
     with _connect() as conn:
         rows = conn.execute("SELECT * FROM tasks WHERE status IN ('queued', 'running', 'paused')").fetchall()
     return [_row_to_dict(r) for r in rows if r is not None]
+
+
+def list_scheduled_tasks() -> list[dict]:
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT * FROM tasks WHERE status='scheduled' ORDER BY scheduled_for ASC"
+        ).fetchall()
+    return [_row_to_dict(r) for r in rows if r is not None]
+
+
+def promote_due_scheduled_tasks() -> list[str]:
+    """Flip status of any scheduled tasks whose scheduled_for time <= now to queued.
+    Returns list of promoted task IDs."""
+    now_dt = datetime.now(timezone.utc)
+    with _lock, _connect() as conn:
+        rows = conn.execute(
+            "SELECT id, scheduled_for FROM tasks WHERE status='scheduled' AND scheduled_for IS NOT NULL"
+        ).fetchall()
+        promoted_ids: list[str] = []
+        for r in rows:
+            raw_ts = r["scheduled_for"]
+            try:
+                sched_dt = datetime.fromisoformat(raw_ts.replace("Z", "+00:00"))
+                if sched_dt.tzinfo is None:
+                    sched_dt = sched_dt.replace(tzinfo=timezone.utc)
+                if sched_dt <= now_dt:
+                    promoted_ids.append(r["id"])
+            except Exception:
+                if raw_ts <= now_dt.isoformat():
+                    promoted_ids.append(r["id"])
+
+        if promoted_ids:
+            placeholders = ",".join("?" for _ in promoted_ids)
+            conn.execute(
+                f"UPDATE tasks SET status='queued' WHERE id IN ({placeholders}) AND status='scheduled'",
+                promoted_ids,
+            )
+        return promoted_ids
 
 
 def delete_task(task_id: str) -> None:

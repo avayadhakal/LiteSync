@@ -1476,6 +1476,97 @@ tr.task-row:hover { background: rgba(255, 255, 255, 0.05); }
   color: var(--accent);
 }
 
+/* Scheduled Transfers Modal — matches task-details-modal geometry & responsiveness */
+#scheduled-modal .modal.modal-extra-wide {
+  min-height: 440px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.scheduled-transfers-container {
+  flex: 1;
+  min-height: 280px;
+  max-height: 350px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+  margin-bottom: 8px;
+}
+
+.scheduled-task-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--panel-alt);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.scheduled-task-row:hover {
+  border-color: var(--accent);
+}
+
+.scheduled-task-main {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.scheduled-task-title-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.scheduled-task-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scheduled-task-path {
+  font-size: 11px;
+  font-family: ui-monospace, monospace;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scheduled-task-time {
+  font-size: 11px;
+  color: var(--accent);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 2px;
+}
+
+.scheduled-task-actions {
+  flex: none;
+}
+
+.scheduled-empty {
+  color: var(--text-dim);
+  font-size: 13px;
+  text-align: center;
+  margin: auto;
+  padding: 32px 16px;
+  font-style: italic;
+}
+
 .activity-details-body {
   display: flex;
   flex-direction: column;
@@ -1971,6 +2062,18 @@ body.single-pane #source-pane {
   #settings-modal select {
     font-size: 16px; /* Prevents auto-zoom */
   }
+  #scheduled-modal .modal.modal-extra-wide {
+    min-height: 380px;
+    padding: 16px;
+  }
+  .scheduled-task-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .scheduled-task-actions {
+    align-self: flex-end;
+  }
 }
 
 /* Light Theme Overrides */
@@ -2103,6 +2206,14 @@ body.single-pane #source-pane {
   background: #ffffff;
   border-color: rgba(0, 0, 0, 0.08);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+[data-theme="light"] .scheduled-task-row {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+[data-theme="light"] .scheduled-task-row:hover {
+  border-color: var(--accent);
 }
 [data-theme="light"] .splitter-v::before,
 [data-theme="light"] .splitter-h::before {

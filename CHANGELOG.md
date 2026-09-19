@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 ### Added
+- **Activity Log Transfer Retry:** Added a "Retry" action to the Activity Log detail view for failed or interrupted transfer entries.
 - **Change Password & SQLite Credentials:** Implemented in-app password changes via a new Settings modal integration and `POST /api/change-password` endpoint. Securely migrated credentials from `config.toml` to a dedicated `users` table in SQLite (`litesync.db`). Sessions now embed a hash suffix to guarantee stateless, instant cross-device invalidation on password change, while keeping the current device seamlessly logged in.
 - **Internationalization (i18n):** Implemented a lightweight, zero-dependency client-side i18n engine supporting dynamic language switching (English, Spanish, French, German, Portuguese, Mandarin) with fallback handling and real-time DOM updates.
 - **Docker Support:** Added comprehensive Docker and Docker Compose deployment support with environment variable configuration (`DATA_DIR`, `STATIC_DIR`) and full deployment docs.

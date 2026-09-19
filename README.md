@@ -87,6 +87,7 @@ Moves within the same filesystem use `os.rename()` directly instead of copying t
 * Show transfer progress in the web interface
 * Resolve destination conflicts before starting a transfer
 * Exclude selected directories from rsync transfers
+* Retry failed or interrupted transfers directly from the Activity Log detail view
 
 ### Uploads and URL Downloads
 

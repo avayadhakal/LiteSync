@@ -2,6 +2,9 @@ import { api, toastSuccess, toastError, copyToClipboard } from './api.js';
 import { el, escapeHtml, normalizePath, formatSize } from './utils.js';
 import { state } from './state.js';
 import { I18n } from './i18n.js';
+import { loadPane, updateSelectionUI } from './panes.js';
+import { openConfirmModal } from './app.js';
+import { updateTransferMethodUI } from './modals/transfer.js';
 
 export async function loadActivity() {
   try {
@@ -391,6 +394,55 @@ export function openActivityDetails(entry, info) {
     errBox.className = 'activity-details-error';
     errBox.textContent = `Error: ${data.error}`;
     body.appendChild(errBox);
+  }
+
+  const retryBtn = el('activity-details-retry');
+  if (retryBtn) {
+    const status = (data.status || 'succeeded').toLowerCase();
+    const op = (data.operation || entry.kind || 'info').toLowerCase();
+    const isTransferOp = ['copy', 'move', 'transfer'].includes(op);
+    
+    if (isTransferOp && (status === 'failed' || status === 'interrupted')) {
+      retryBtn.classList.remove('hidden');
+      retryBtn.onclick = async () => {
+        closeActivityDetails();
+        
+        state.selection.clear();
+        if (data.source) {
+            state.selection.select(data.source);
+        } else if (data.sources && data.sources.length) {
+            for (const s of data.sources) state.selection.select(s);
+        }
+        
+        if (state.singlePane) {
+            const dest = data.destination || '/';
+            state.pickerDest.path = dest;
+            localStorage.setItem('litesync-last-destination', dest);
+        } else {
+            state.dest.path = data.destination || '/';
+        }
+        
+        if (data.source) {
+            const srcDir = data.source.substring(0, data.source.lastIndexOf('/')) || '/';
+            await loadPane('source', srcDir);
+        }
+        if (!state.singlePane) {
+            await loadPane('dest', state.dest.path);
+        }
+        
+        updateSelectionUI();
+        await openConfirmModal();
+        
+        if (op === 'move' || op === 'copy') {
+            const opRadio = document.querySelector(`input[name="transfer-op"][value="${op}"]`);
+            if (opRadio) opRadio.checked = true;
+            updateTransferMethodUI();
+        }
+      };
+    } else {
+      retryBtn.classList.add('hidden');
+      retryBtn.onclick = null;
+    }
   }
 
   modal.classList.remove('hidden');

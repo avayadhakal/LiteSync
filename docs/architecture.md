@@ -207,7 +207,7 @@ CREATE TABLE users (
 
 * **Modals:** Reusable styling (`.modal-backdrop`, `.modal`). Dedicated popups for Mkdir, Rename, Delete, Item Details, and Confirmations.
 * **Toasts (`.toast-stack`):** Top-right fixed position. Auto-dismiss (4s) or click-to-dismiss. Slide-in animations.
-* **Activity Log (SQLite):** Persistent across browsers and reloads. Color-coded by severity.
+* **Activity Log (SQLite):** Persistent across browsers and reloads. Color-coded by severity. Failed and interrupted transfer entries feature a "Retry" action that closes the log view, reconstructs the original selection and destination states, and pre-fills the standard Transfer confirmation modal for manual review and submission.
 
 ### Uploads & Active Transfers UI
 

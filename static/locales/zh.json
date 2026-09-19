@@ -80,6 +80,7 @@
     },
     "activity": {
       "title": "活动详细信息",
+      "retry": "重试",
       "close": "关闭"
     },
     "item": {

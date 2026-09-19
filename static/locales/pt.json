@@ -80,6 +80,7 @@
     },
     "activity": {
       "title": "Detalhes",
+      "retry": "Repetir",
       "close": "Fechar"
     },
     "item": {

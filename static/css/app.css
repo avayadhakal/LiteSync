@@ -934,7 +934,13 @@ tr.task-row:hover { background: rgba(255, 255, 255, 0.05); }
 .modal-header-btn .ui-icon {
   width: 15px;
   height: 15px;
+  transition: opacity 0.15s ease, filter 0.15s ease;
 }
+
+.modal-header-btn:hover .ui-icon {
+  filter: brightness(1.3);
+}
+
 
 .icon-btn .btn-plus-badge {
   font-size: 12px;
@@ -2194,6 +2200,24 @@ body.single-pane #source-pane {
 [data-theme="light"] .app-logo {
   content: url('/assets/icons/logo_light.svg');
 }
+
+/* Modal header icons for light mode */
+[data-theme="light"] .modal-header-btn .ui-icon {
+  filter: brightness(0.48) contrast(1.2);
+}
+
+[data-theme="light"] .modal-header-btn:hover .ui-icon {
+  filter: brightness(0.2) contrast(1.2);
+}
+
+[data-theme="light"] #editor-maximize img[src*="maximize.svg"] {
+  content: url('/assets/icons/maximize_light.svg');
+}
+
+[data-theme="light"] #editor-maximize img[src*="minimize.svg"] {
+  content: url('/assets/icons/minimize_light.svg');
+}
+
 
 /* Light Theme UI Refinements */
 [data-theme="light"] .card-action-btn {

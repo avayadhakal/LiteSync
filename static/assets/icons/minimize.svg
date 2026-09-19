@@ -1,15 +1,9 @@
-<?xml version="1.0" encoding="iso-8859-1"?>
-<!-- Uploaded to: SVG Repo, www.svgrepo.com, Generator: SVG Repo Mixer Tools -->
-<svg fill="#000000" height="800px" width="800px" version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" 
-	 viewBox="0 0 512 512" xml:space="preserve">
-<g>
-	<g>
-		<path d="M350.165,192H448c11.797,0,21.333,9.557,21.333,21.333s-9.536,21.333-21.333,21.333H298.667
-			c-2.773,0-5.547-0.576-8.149-1.643c-5.227-2.155-9.387-6.315-11.541-11.541c-1.088-2.603-1.643-5.376-1.643-8.149V64
-			c0-11.776,9.536-21.333,21.333-21.333S320,52.224,320,64v97.835L481.835,0H0v481.835L161.835,320H64
-			c-11.797,0-21.333-9.557-21.333-21.333S52.203,277.333,64,277.333h149.333c2.773,0,5.547,0.576,8.149,1.643
-			c5.227,2.155,9.387,6.315,11.541,11.541c1.067,2.603,1.643,5.376,1.643,8.149V448c0,11.776-9.536,21.333-21.333,21.333
-			S192,459.776,192,448v-97.835L30.165,512H512V30.165L350.165,192z"/>
-	</g>
-</g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <style>
+    :root { color: #9aa1ac; }
+    @media (prefers-color-scheme: light) {
+      :root { color: #495057; }
+    }
+  </style>
+  <path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/>
 </svg>

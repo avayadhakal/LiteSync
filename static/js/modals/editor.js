@@ -71,11 +71,38 @@ export async function openEditorModal(entry) {
     if (titleEl) titleEl.textContent = entry.name;
     if (pathEl) pathEl.textContent = currentPath;
     textarea.value = originalContent;
+    if (typeof textarea.setSelectionRange === 'function') {
+      textarea.setSelectionRange(0, 0);
+    }
+    textarea.scrollTop = 0;
+    textarea.scrollLeft = 0;
+    if (typeof textarea.scrollTo === 'function') {
+      textarea.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    }
+
+    const editorBody = modal.querySelector('.editor-body');
+    if (editorBody) editorBody.scrollTop = 0;
+    if (modalDialog) modalDialog.scrollTop = 0;
+    modal.scrollTop = 0;
 
     modal.classList.remove('hidden');
     requestAnimationFrame(() => {
-      textarea.focus();
+      if (typeof textarea.focus === 'function') {
+        textarea.focus({ preventScroll: true });
+      }
+      if (typeof textarea.setSelectionRange === 'function') {
+        textarea.setSelectionRange(0, 0);
+      }
+      textarea.scrollTop = 0;
+      textarea.scrollLeft = 0;
+      if (typeof textarea.scrollTo === 'function') {
+        textarea.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      }
+      if (editorBody) editorBody.scrollTop = 0;
+      if (modalDialog) modalDialog.scrollTop = 0;
+      modal.scrollTop = 0;
     });
+
   } catch (err) {
     // If backend rejects (e.g. 413 oversized or 400 non-UTF8), fall back to Path A
     toastError(err.message || I18n.t('messages.editor_fallback'));
@@ -162,7 +189,15 @@ export async function closeEditorModal() {
   currentPath = null;
   currentMtimeNs = null;
   originalContent = '';
-  if (textarea) textarea.value = '';
+  if (textarea) {
+    textarea.value = '';
+    if (typeof textarea.setSelectionRange === 'function') {
+      textarea.setSelectionRange(0, 0);
+    }
+    textarea.scrollTop = 0;
+    textarea.scrollLeft = 0;
+  }
+
   if (errorEl) {
     errorEl.textContent = '';
     errorEl.classList.add('hidden');

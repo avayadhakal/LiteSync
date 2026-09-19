@@ -1,9 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
   <style>
-    :root { color: #9aa1ac; }
-    @media (prefers-color-scheme: light) {
-      :root { color: #495057; }
-    }
+    :root { color: #495057; }
   </style>
-  <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+  <path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/>
 </svg>

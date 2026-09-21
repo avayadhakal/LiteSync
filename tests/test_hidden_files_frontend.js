@@ -53,6 +53,10 @@ class MockElement {
     return Array.from(this.classList.classes).join(' ');
   }
 
+  get firstChild() {
+    return this.children.length > 0 ? this.children[0] : null;
+  }
+
   set innerHTML(val) {
     this._innerHTML = val;
     if (val === '') {
@@ -332,50 +336,81 @@ global.fetch = async (url, opts) => {
     assert.strictEqual(names.includes('notes.txt'), true, 'notes.txt should be shown');
   });
 
-  // Test 2: Toggling the setting ON reveals dot-files immediately without a new network request
-  await runAsyncTest('Test 2: Toggling ON reveals dot-files immediately without new /api/browse call', async () => {
+  // Test 2: Filter only takes effect upon saving; clicking Save reveals dot-files without network request
+  await runAsyncTest('Test 2: Toggling ON only takes effect after clicking Save, without new /api/browse call', async () => {
     initSettingsModal();
     const browseCallsBefore = browseApiCalls.length;
 
+    // User opens Settings modal
+    domElements['menu-settings'].click();
+
+    // Toggle switch ON, but do NOT save yet
     const toggle = domElements['settings-show-hidden'];
     toggle.checked = true;
-    toggle.dispatchEvent({ type: 'change', target: toggle });
+
+    // Verify pane has NOT changed before saving
+    let body = domElements['source-body'];
+    let names = body.children.map(row => {
+      const nameEl = row.children.find(c => c.classList.contains('name'));
+      return nameEl ? nameEl.textContent : '';
+    });
+    assert.strictEqual(names.includes('.bashrc'), false, '.bashrc must not appear before clicking save');
+    assert.strictEqual(mockLocalStorage.getItem('litesync-show-hidden'), null, 'localStorage must not update before save');
+
+    // Click Save Changes
+    domElements['settings-save'].click();
+    await new Promise(r => setTimeout(r, 10));
 
     const browseCallsAfter = browseApiCalls.length;
-    assert.strictEqual(browseCallsAfter, browseCallsBefore, 'Zero new /api/browse network calls should be made on toggle');
+    assert.strictEqual(browseCallsAfter, browseCallsBefore, 'Zero new /api/browse network calls should be made on save');
 
-    const body = domElements['source-body'];
-    const names = body.children.map(row => {
+    body = domElements['source-body'];
+    names = body.children.map(row => {
       const nameEl = row.children.find(c => c.classList.contains('name'));
       return nameEl ? nameEl.textContent : '';
     });
 
-    assert.strictEqual(names.includes('.bashrc'), true, '.bashrc must appear when toggle is ON');
-    assert.strictEqual(names.includes('.config'), true, '.config must appear when toggle is ON');
+    assert.strictEqual(names.includes('.bashrc'), true, '.bashrc must appear after saving');
+    assert.strictEqual(names.includes('.config'), true, '.config must appear after saving');
     assert.strictEqual(names.includes('documents'), true);
     assert.strictEqual(names.includes('notes.txt'), true);
     assert.strictEqual(mockLocalStorage.getItem('litesync-show-hidden'), 'true');
   });
 
-  // Test 3: Toggling OFF hides them again immediately without new network request
-  await runAsyncTest('Test 3: Toggling OFF hides dot-files immediately without new /api/browse call', async () => {
+  // Test 3: Toggling OFF only takes effect after clicking Save
+  await runAsyncTest('Test 3: Toggling OFF only takes effect after clicking Save, without new /api/browse call', async () => {
     const browseCallsBefore = browseApiCalls.length;
 
+    // User opens Settings modal
+    domElements['menu-settings'].click();
+
+    // Toggle switch OFF, but do NOT save yet
     const toggle = domElements['settings-show-hidden'];
     toggle.checked = false;
-    toggle.dispatchEvent({ type: 'change', target: toggle });
+
+    // Verify hidden files are still shown before save
+    let body = domElements['source-body'];
+    let names = body.children.map(row => {
+      const nameEl = row.children.find(c => c.classList.contains('name'));
+      return nameEl ? nameEl.textContent : '';
+    });
+    assert.strictEqual(names.includes('.bashrc'), true, '.bashrc must remain visible before clicking save');
+
+    // Click Save Changes
+    domElements['settings-save'].click();
+    await new Promise(r => setTimeout(r, 10));
 
     const browseCallsAfter = browseApiCalls.length;
-    assert.strictEqual(browseCallsAfter, browseCallsBefore, 'Zero new /api/browse network calls on toggle OFF');
+    assert.strictEqual(browseCallsAfter, browseCallsBefore, 'Zero new /api/browse network calls on save');
 
-    const body = domElements['source-body'];
-    const names = body.children.map(row => {
+    body = domElements['source-body'];
+    names = body.children.map(row => {
       const nameEl = row.children.find(c => c.classList.contains('name'));
       return nameEl ? nameEl.textContent : '';
     });
 
-    assert.strictEqual(names.includes('.bashrc'), false, '.bashrc must disappear when toggle is OFF');
-    assert.strictEqual(names.includes('.config'), false, '.config must disappear when toggle is OFF');
+    assert.strictEqual(names.includes('.bashrc'), false, '.bashrc must disappear after saving');
+    assert.strictEqual(names.includes('.config'), false, '.config must disappear after saving');
     assert.strictEqual(names.includes('documents'), true);
     assert.strictEqual(names.includes('notes.txt'), true);
     assert.strictEqual(mockLocalStorage.getItem('litesync-show-hidden'), 'false');

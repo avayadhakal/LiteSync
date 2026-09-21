@@ -39,11 +39,6 @@ export function initSettingsModal() {
   };
 
   const showHiddenEl = el('settings-show-hidden');
-  if (showHiddenEl) {
-    showHiddenEl.addEventListener('change', () => {
-      applyShowHidden(showHiddenEl.checked);
-    });
-  }
 
   menuSettings.addEventListener('click', () => {
     loadSettings();

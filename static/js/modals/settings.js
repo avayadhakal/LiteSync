@@ -20,11 +20,30 @@ export function initSettingsModal() {
     }
   }
 
+  function applyShowHidden(showHidden) {
+    localStorage.setItem('litesync-show-hidden', showHidden ? 'true' : 'false');
+    renderPane('source');
+    if (!state.singlePane || (state.dest && state.dest.path)) {
+      renderPane('dest');
+    }
+    if (el('confirm-modal') && !el('confirm-modal').classList.contains('hidden')) {
+      renderPane('pickerDest');
+    }
+  }
+
   // Load existing settings
   const loadSettings = () => {
     if (el('settings-theme')) el('settings-theme').value = localStorage.getItem('litesync-theme') || 'system';
+    if (el('settings-show-hidden')) el('settings-show-hidden').checked = localStorage.getItem('litesync-show-hidden') === 'true';
     if (el('settings-language')) el('settings-language').value = I18n.currentLang;
   };
+
+  const showHiddenEl = el('settings-show-hidden');
+  if (showHiddenEl) {
+    showHiddenEl.addEventListener('change', () => {
+      applyShowHidden(showHiddenEl.checked);
+    });
+  }
 
   menuSettings.addEventListener('click', () => {
     loadSettings();
@@ -43,6 +62,7 @@ export function initSettingsModal() {
     saveBtn.addEventListener('click', async () => {
       const theme = el('settings-theme').value;
       const language = el('settings-language').value;
+      const showHidden = showHiddenEl ? showHiddenEl.checked : false;
       if (language !== I18n.currentLang) {
         await I18n.loadLanguage(language);
         if (state.source.path) renderPane('source');
@@ -53,8 +73,8 @@ export function initSettingsModal() {
       const confirmPwd = el('settings-confirm-password') ? el('settings-confirm-password').value : '';
 
       localStorage.setItem('litesync-theme', theme);
-      
       applyTheme(theme);
+      applyShowHidden(showHidden);
       
       let passwordChanged = false;
       if (currPwd || newPwd || confirmPwd) {

@@ -149,6 +149,7 @@
       "lang_de": "Deutsch",
       "lang_pt": "Português",
       "lang_zh": "中文",
+      "show_hidden": "Show hidden files and folders",
       "security": "Security",
       "change_pwd": "Change Password",
       "cur_pwd": "Current password",

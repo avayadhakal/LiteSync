@@ -448,8 +448,6 @@
       <!-- General Section -->
       <h3 class="modal-section-title" style="margin-top: 24px;" data-i18n="modals.settings.general">General</h3>
 
-      <input type="checkbox" id="settings-show-hidden" style="display: none;" />
-
       <div class="modal-field">
         <label class="modal-label" for="settings-theme" data-i18n="modals.settings.theme">Theme</label>
         <select id="settings-theme" class="modal-select">
@@ -469,6 +467,16 @@
           <option value="pt" data-i18n="modals.settings.lang_pt">Português</option>
           <option value="zh" data-i18n="modals.settings.lang_zh">中文</option>
         </select>
+      </div>
+
+      <div class="modal-field" style="margin-top: 14px;">
+        <label class="settings-toggle-row" for="settings-show-hidden">
+          <span class="modal-label" data-i18n="modals.settings.show_hidden">Show hidden files and folders</span>
+          <span class="toggle-switch">
+            <input type="checkbox" id="settings-show-hidden" />
+            <span class="toggle-slider"></span>
+          </span>
+        </label>
       </div>
 
       <!-- Security Section -->

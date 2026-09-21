@@ -235,6 +235,7 @@ CREATE TABLE users (
 * **CSS Variables:** Layout dimensions (`--left-width`, `--top-height`, `--bottom-height`) applied to `:root`. JS `initResizers()` updates CSS vars on drag.
 * **Mobile View (`max-width: 768px`):** Panes stack vertically. Pane headers wrap dynamically.
 * **Theming:** Full Light and Dark mode support configured via the Settings dropdown, persisted in `localStorage`, and initialized synchronously by `theme-init.js` to prevent FOUS (Flash of Unstyled Content) during startup.
+* **Hidden Files & Folders Toggle:** Configured in the Settings modal ("Show hidden files and folders") under GENERAL, persisted in `localStorage` under key `litesync-show-hidden` (defaults to OFF). Filtering is strictly client-side display-only within `renderPane()`; the backend `/api/browse` endpoint continues returning complete directory listings, and direct access/operations targeting dot-files remain unrestricted.
 * **Layout Toggle:** Persistent single-pane or dual-pane layout mode. Single-pane hides the destination pane for simpler workflows and merges destination picking into the Transfer modal.
 * **Dual-Pane Logic:** Both Source and Dest panes share identical toolbars (`⬆️`, `📁+`, `✏️`, `🗑️`). Selections are isolated.
 

@@ -122,8 +122,13 @@ export function renderPane(which) {
     fragment.appendChild(up);
   }
 
+  const showHidden = typeof localStorage !== 'undefined' && localStorage.getItem('litesync-show-hidden') === 'true';
+
   for (let i = 0; i < pane.entries.length; i++) {
     const entry = pane.entries[i];
+    if (!showHidden && entry.name && entry.name.startsWith('.')) {
+      continue;
+    }
     const row = document.createElement('div');
     const isSelected = sel.isPathSelected(entry.path);
     row.className = `entry ${entry.is_dir ? 'dir' : 'file'}${isSelected && !entry.is_dir ? ' selected' : ''}`;
@@ -243,17 +248,26 @@ export function updateMasterCheckboxState(which) {
   const paneState = state[paneKey];
   const sel = paneSelection(which);
   if (paneState && paneState.entries && paneState.entries.length > 0) {
-    let allSelected = true;
-    let someSelected = false;
-    for (const entry of paneState.entries) {
-      if (sel.isPathSelected(entry.path)) {
-        someSelected = true;
-      } else {
-        allSelected = false;
+    const showHidden = typeof localStorage !== 'undefined' && localStorage.getItem('litesync-show-hidden') === 'true';
+    const visibleEntries = showHidden
+      ? paneState.entries
+      : paneState.entries.filter(e => !(e.name && e.name.startsWith('.')));
+    if (visibleEntries.length > 0) {
+      let allSelected = true;
+      let someSelected = false;
+      for (const entry of visibleEntries) {
+        if (sel.isPathSelected(entry.path)) {
+          someSelected = true;
+        } else {
+          allSelected = false;
+        }
       }
+      masterCb.checked = allSelected;
+      masterCb.indeterminate = someSelected && !allSelected;
+    } else {
+      masterCb.checked = false;
+      masterCb.indeterminate = false;
     }
-    masterCb.checked = allSelected;
-    masterCb.indeterminate = someSelected && !allSelected;
   } else {
     masterCb.checked = false;
     masterCb.indeterminate = false;
@@ -346,9 +360,11 @@ export function bindPaneDelegation(paneId, which) {
         const to = Math.max(anchorIndex, rowIndex);
         // Use the current checkbox state (post-browser-toggle) to determine intent
         const doSelect = cb.checked;
+        const showHidden = typeof localStorage !== 'undefined' && localStorage.getItem('litesync-show-hidden') === 'true';
         for (let i = from; i <= to; i++) {
           const entry = paneState.entries[i];
           if (!entry) continue;
+          if (!showHidden && entry.name && entry.name.startsWith('.')) continue;
           if (doSelect) sel.select(entry.path);
           else sel.unselect(entry.path);
         }

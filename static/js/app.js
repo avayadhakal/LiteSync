@@ -694,7 +694,11 @@ async function init() {
       if (!paneState || !paneState.entries) return;
 
       if (isChecked) {
-        paneState.entries.forEach(entry => sel.select(entry.path));
+        const showHidden = typeof localStorage !== 'undefined' && localStorage.getItem('litesync-show-hidden') === 'true';
+        const entriesToSelect = showHidden
+          ? paneState.entries
+          : paneState.entries.filter(e => !(e.name && e.name.startsWith('.')));
+        entriesToSelect.forEach(entry => sel.select(entry.path));
       } else {
         paneState.entries.forEach(entry => sel.unselect(entry.path));
         // Also unselect the folder itself so it doesn't remain in `include` 

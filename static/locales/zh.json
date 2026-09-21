@@ -149,6 +149,7 @@
       "lang_de": "Deutsch",
       "lang_pt": "Português",
       "lang_zh": "中文",
+      "show_hidden": "显示隐藏文件和文件夹",
       "security": "安全",
       "change_pwd": "更改密码",
       "cur_pwd": "当前密码",

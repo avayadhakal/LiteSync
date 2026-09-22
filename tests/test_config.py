@@ -265,14 +265,47 @@ password_hash = "hash"
             self.assertEqual(settings.allowed_origins, ["http://remote1.com", "https://remote2.com"])
 
             # Test empty falls back to config.toml
-            os.environ["LITESYNC_ALLOWED_ORIGINS"] = ""
-            settings_empty = load_settings(config_path)
-            self.assertEqual(settings_empty.allowed_origins, ["http://origin1.local"])
+            del os.environ["LITESYNC_ALLOWED_ORIGINS"]
+            settings_absent = load_settings(config_path)
+            self.assertEqual(settings_absent.allowed_origins, ["http://origin1.local"])
         finally:
             if old_env is not None:
                 os.environ["LITESYNC_ALLOWED_ORIGINS"] = old_env
             else:
                 os.environ.pop("LITESYNC_ALLOWED_ORIGINS", None)
+
+    def test_env_var_max_upload_size_override(self):
+        config_content = """
+allowed_roots = ["/mnt/data"]
+secret_key = "secret"
+max_upload_size_mb = 2000
+[[users]]
+username = "test"
+password_hash = "hash"
+"""
+        config_path = self.config_dir / "env_upload.toml"
+        config_path.write_text(config_content)
+
+        old_env = os.environ.get("LITESYNC_MAX_UPLOAD_SIZE_MB")
+        try:
+            os.environ["LITESYNC_MAX_UPLOAD_SIZE_MB"] = "10240"
+            settings = load_settings(config_path)
+            self.assertEqual(settings.max_upload_size_mb, 10240)
+
+            # Test empty falls back to config.toml
+            os.environ["LITESYNC_MAX_UPLOAD_SIZE_MB"] = ""
+            settings_empty = load_settings(config_path)
+            self.assertEqual(settings_empty.max_upload_size_mb, 2000)
+
+            # Test absent falls back to config.toml
+            del os.environ["LITESYNC_MAX_UPLOAD_SIZE_MB"]
+            settings_absent = load_settings(config_path)
+            self.assertEqual(settings_absent.max_upload_size_mb, 2000)
+        finally:
+            if old_env is not None:
+                os.environ["LITESYNC_MAX_UPLOAD_SIZE_MB"] = old_env
+            else:
+                os.environ.pop("LITESYNC_MAX_UPLOAD_SIZE_MB", None)
 
 
 if __name__ == "__main__":

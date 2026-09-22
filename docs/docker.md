@@ -35,11 +35,13 @@ If you want to sync files from your host's `/mnt/storage/movies` and `/home/user
     environment:
       # Optional: set to match host port if different from 8000 (e.g. "9000:8000" in ports:)
       - LITESYNC_PORT=8000
+      # Optional: override the max upload size in MB (default: 5120 MB / 5 GB)
+      - LITESYNC_MAX_UPLOAD_SIZE_MB=10240
       # Tell LiteSync these paths are allowed (overrides config.toml)
       - LITESYNC_ALLOWED_ROOTS=/movies:/downloads
 ```
 
-> **Tip (Minimal `config.toml`)**: Under Docker, because `LITESYNC_ALLOWED_ROOTS` and `LITESYNC_PORT` can be managed in `docker-compose.yml`, your `config.toml` can be kept minimal containing only `secret_key` and your user credentials (`[[users]]`).
+> **Tip (Minimal `config.toml`)**: Under Docker, because `LITESYNC_ALLOWED_ROOTS`, `LITESYNC_PORT`, and `LITESYNC_MAX_UPLOAD_SIZE_MB` can be managed in `docker-compose.yml`, your `config.toml` can be kept minimal containing only `secret_key`, `data_dir = "/data"`, and your user credentials (`[[users]]`).
 
 ### 3. Start the Stack
 

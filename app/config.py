@@ -92,6 +92,12 @@ def load_settings(config_path_override: Path | str | None = None) -> Settings:
     else:
         port = int(raw.get("port", 8000))
 
+    env_max_upload = os.environ.get("LITESYNC_MAX_UPLOAD_SIZE_MB")
+    if env_max_upload and env_max_upload.strip():
+        max_upload_size_mb = int(env_max_upload.strip())
+    else:
+        max_upload_size_mb = int(raw.get("max_upload_size_mb", 5120))
+
     return Settings(
         allowed_roots=allowed_roots,
         users=users,
@@ -104,7 +110,7 @@ def load_settings(config_path_override: Path | str | None = None) -> Settings:
         allowed_origins=allowed_origins,
         download_expiry=int(raw.get("download_expiry", 86400)),
         download_secret_key=raw.get("download_secret_key"),
-        max_upload_size_mb=int(raw.get("max_upload_size_mb", 5120)),
+        max_upload_size_mb=max_upload_size_mb,
     )
 
 

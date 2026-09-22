@@ -15,7 +15,7 @@ Minimal-overhead Linux web app for dual-pane local directory browsing and backgr
 ├── app/
 │   ├── __init__.py
 │   ├── main.py               # FastAPI app, static mounts, routers, startup poller/reconciliation
-│   ├── config.py             # Loads config.toml -> Settings object via tomllib (max_upload_size_mb)
+│   ├── config.py             # Loads config.toml and overrides from environment variables (LITESYNC_PORT, LITESYNC_ALLOWED_ORIGINS, LITESYNC_MAX_UPLOAD_SIZE_MB) -> Settings object
 │   ├── auth.py               # bcrypt password hashing, signed cookies, login/lockout logic
 │   ├── fsops.py              # resolve_safe_path(), list_directory() — path validation
 │   ├── browse/               # Browser and upload subsystem

@@ -30,6 +30,8 @@ services:
       # Optional: set the web port (default: 8000). If you change the host-side port in "ports:" above
       # (e.g. "9000:8000"), set LITESYNC_PORT to match your host port (9000) for CSRF validation.
       - LITESYNC_PORT=8000
+      # Optional: override the max upload size in MB (default: 5120 MB / 5 GB).
+      # - LITESYNC_MAX_UPLOAD_SIZE_MB=10240
       # The container-side paths from the volumes section MUST be listed here,
       # separated by colons (:). This overrides any allowed_roots in config.toml.
       #

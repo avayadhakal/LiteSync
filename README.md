@@ -347,6 +347,15 @@ At minimum, the configuration needs:
 * a `secret_key`
 * at least one user
 
+### Environment Variables
+For containerized deployments (Docker), you can override configuration keys using environment variables:
+* `LITESYNC_ALLOWED_ROOTS` (Colon-separated list of allowed directories)
+* `LITESYNC_PORT` (The external port, useful for CSRF validation when using Docker port mapping)
+* `LITESYNC_ALLOWED_ORIGINS` (Comma-separated list of allowed origins)
+* `LITESYNC_MAX_UPLOAD_SIZE_MB` (Max file upload size in MB)
+
+> **Docker tip**: If using these variables via Docker Compose, your `config.toml` only needs your `secret_key`, `data_dir = "/data"`, and your `[[users]]` credentials.
+
 ### Allowed Roots
 
 LiteSync does not expose the entire filesystem to the web application.

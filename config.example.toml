@@ -28,7 +28,7 @@ download_expiry = 86400
 # NOTE: The server spools large uploads to a temporary directory inside data_dir 
 # (e.g. data/tmp) before moving them to their final destination. Ensure the disk 
 # hosting data_dir has sufficient free space to hold max_upload_size_mb.
-# max_upload_size_mb = 5120
+max_upload_size_mb = 5120
 
 # Set true only if the app is served over HTTPS.
 secure_cookie = false

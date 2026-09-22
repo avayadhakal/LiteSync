@@ -213,6 +213,67 @@ password_hash = "hash"
             else:
                 os.environ.pop("LITESYNC_ALLOWED_ROOTS", None)
 
+    def test_env_var_port_override(self):
+        config_content = """
+allowed_roots = ["/mnt/data"]
+secret_key = "secret"
+port = 8000
+[[users]]
+username = "test"
+password_hash = "hash"
+"""
+        config_path = self.config_dir / "env_port.toml"
+        config_path.write_text(config_content)
+
+        old_env = os.environ.get("LITESYNC_PORT")
+        try:
+            os.environ["LITESYNC_PORT"] = "9090"
+            settings = load_settings(config_path)
+            self.assertEqual(settings.port, 9090)
+
+            # Test empty falls back to config.toml
+            os.environ["LITESYNC_PORT"] = ""
+            settings_empty = load_settings(config_path)
+            self.assertEqual(settings_empty.port, 8000)
+
+            # Test absent falls back to config.toml
+            del os.environ["LITESYNC_PORT"]
+            settings_absent = load_settings(config_path)
+            self.assertEqual(settings_absent.port, 8000)
+        finally:
+            if old_env is not None:
+                os.environ["LITESYNC_PORT"] = old_env
+            else:
+                os.environ.pop("LITESYNC_PORT", None)
+
+    def test_env_var_allowed_origins_override(self):
+        config_content = """
+allowed_roots = ["/mnt/data"]
+secret_key = "secret"
+allowed_origins = ["http://origin1.local"]
+[[users]]
+username = "test"
+password_hash = "hash"
+"""
+        config_path = self.config_dir / "env_origins.toml"
+        config_path.write_text(config_content)
+
+        old_env = os.environ.get("LITESYNC_ALLOWED_ORIGINS")
+        try:
+            os.environ["LITESYNC_ALLOWED_ORIGINS"] = "http://remote1.com, https://remote2.com/"
+            settings = load_settings(config_path)
+            self.assertEqual(settings.allowed_origins, ["http://remote1.com", "https://remote2.com"])
+
+            # Test empty falls back to config.toml
+            os.environ["LITESYNC_ALLOWED_ORIGINS"] = ""
+            settings_empty = load_settings(config_path)
+            self.assertEqual(settings_empty.allowed_origins, ["http://origin1.local"])
+        finally:
+            if old_env is not None:
+                os.environ["LITESYNC_ALLOWED_ORIGINS"] = old_env
+            else:
+                os.environ.pop("LITESYNC_ALLOWED_ORIGINS", None)
+
 
 if __name__ == "__main__":
     unittest.main()

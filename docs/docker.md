@@ -33,9 +33,13 @@ If you want to sync files from your host's `/mnt/storage/movies` and `/home/user
       - /mnt/storage/movies:/movies
       - /home/user/downloads:/downloads
     environment:
+      # Optional: set to match host port if different from 8000 (e.g. "9000:8000" in ports:)
+      - LITESYNC_PORT=8000
       # Tell LiteSync these paths are allowed (overrides config.toml)
       - LITESYNC_ALLOWED_ROOTS=/movies:/downloads
 ```
+
+> **Tip (Minimal `config.toml`)**: Under Docker, because `LITESYNC_ALLOWED_ROOTS` and `LITESYNC_PORT` can be managed in `docker-compose.yml`, your `config.toml` can be kept minimal containing only `secret_key` and your user credentials (`[[users]]`).
 
 ### 3. Start the Stack
 

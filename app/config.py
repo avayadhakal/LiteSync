@@ -77,10 +77,20 @@ def load_settings(config_path_override: Path | str | None = None) -> Settings:
     users = [User(username=u["username"], password_hash=u["password_hash"]) for u in raw.get("users", [])]
     data_dir = Path(raw.get("data_dir", "./data")).resolve()
 
-    allowed_origins_raw = raw.get("allowed_origins")
-    allowed_origins = []
-    if allowed_origins_raw is not None:
-        allowed_origins = [str(o).rstrip("/") for o in allowed_origins_raw]
+    env_origins_str = os.environ.get("LITESYNC_ALLOWED_ORIGINS")
+    if env_origins_str:
+        allowed_origins = [str(o).strip().rstrip("/") for o in env_origins_str.split(",") if o.strip()]
+    else:
+        allowed_origins_raw = raw.get("allowed_origins")
+        allowed_origins = []
+        if allowed_origins_raw is not None:
+            allowed_origins = [str(o).rstrip("/") for o in allowed_origins_raw]
+
+    env_port = os.environ.get("LITESYNC_PORT")
+    if env_port and env_port.strip():
+        port = int(env_port.strip())
+    else:
+        port = int(raw.get("port", 8000))
 
     return Settings(
         allowed_roots=allowed_roots,
@@ -90,7 +100,7 @@ def load_settings(config_path_override: Path | str | None = None) -> Settings:
         secure_cookie=bool(raw.get("secure_cookie", False)),
         data_dir=data_dir,
         host=raw.get("host", "0.0.0.0"),
-        port=int(raw.get("port", 8000)),
+        port=port,
         allowed_origins=allowed_origins,
         download_expiry=int(raw.get("download_expiry", 86400)),
         download_secret_key=raw.get("download_secret_key"),

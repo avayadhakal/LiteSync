@@ -27,6 +27,9 @@ services:
       #
       # - /path/to/host/dir:/container/path
     environment:
+      # Optional: set the web port (default: 8000). If you change the host-side port in "ports:" above
+      # (e.g. "9000:8000"), set LITESYNC_PORT to match your host port (9000) for CSRF validation.
+      - LITESYNC_PORT=8000
       # The container-side paths from the volumes section MUST be listed here,
       # separated by colons (:). This overrides any allowed_roots in config.toml.
       #

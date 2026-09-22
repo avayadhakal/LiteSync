@@ -24,6 +24,39 @@
   --radius-md: 8px;
   --radius-lg: 12px;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+  /* Scheduled Transfers Modal Theme Tokens (Dark Mode Default) */
+  --scheduled-modal-bg: var(--bg, #0f1115);
+  --scheduled-modal-border: var(--border, #2a2f3a);
+  --scheduled-card-bg: var(--panel, #171a21);
+  --scheduled-card-border: var(--border, #2a2f3a);
+  --scheduled-card-hover-border: #3e4554;
+  --scheduled-card-hover-bg: #1c2029;
+  --scheduled-card-shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --scheduled-title: var(--text, #e6e8eb);
+  --scheduled-label: var(--text-dim, #9aa1ac);
+  --scheduled-path: #c0c0c0;
+  --scheduled-time: var(--text-dim, #9aa1ac);
+  --scheduled-badge-bg: rgba(59, 130, 246, 0.15);
+  --scheduled-badge-text: #60a5fa;
+  --scheduled-badge-border: rgba(59, 130, 246, 0.3);
+  --scheduled-badge-copy-bg: rgba(59, 130, 246, 0.15);
+  --scheduled-badge-copy-text: #60a5fa;
+  --scheduled-badge-copy-border: rgba(59, 130, 246, 0.3);
+  --scheduled-badge-move-bg: rgba(139, 92, 246, 0.15);
+  --scheduled-badge-move-text: #a78bfa;
+  --scheduled-badge-move-border: rgba(139, 92, 246, 0.3);
+  --scheduled-cancel-bg: var(--panel-alt, #1e222b);
+  --scheduled-cancel-border: transparent;
+  --scheduled-cancel-text: var(--text, #e6e8eb);
+  --scheduled-cancel-hover-bg: rgba(225, 86, 86, 0.15);
+  --scheduled-cancel-hover-border: rgba(225, 86, 86, 0.3);
+  --scheduled-cancel-hover-text: var(--danger, #e15656);
+  --scheduled-scrollbar-thumb: var(--border, #2a2f3a);
+  --scheduled-scrollbar-hover: #3e4554;
+  --scheduled-btn-bg: var(--panel-alt, #1e222b);
+  --scheduled-btn-text: var(--text, #e6e8eb);
+  --scheduled-btn-border: var(--border, #2a2f3a);
 }
 
 * { box-sizing: border-box; }
@@ -1482,94 +1515,284 @@ tr.task-row:hover { background: rgba(255, 255, 255, 0.05); }
   color: var(--accent);
 }
 
-/* Scheduled Transfers Modal — matches task-details-modal geometry & responsiveness */
-#scheduled-modal .modal.modal-extra-wide {
-  min-height: 440px;
+/* Scheduled Transfers Modal */
+#scheduled-modal .modal,
+#scheduled-modal .modal.modal-extra-wide,
+.scheduled-modal-dialog {
+  width: 92%;
+  max-width: 580px;
+  margin: 0 auto;
+  height: 520px;
   max-height: 85vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+  background-color: var(--scheduled-modal-bg, var(--bg, #0f1115));
+  border: 1px solid var(--scheduled-modal-border, var(--border, #2a2f3a));
 }
 
-.scheduled-transfers-container {
-  flex: 1;
-  min-height: 280px;
-  max-height: 350px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 12px;
-  margin-bottom: 8px;
-}
-
-.scheduled-task-row {
+#scheduled-modal .modal-header-row,
+.scheduled-modal-header {
+  flex: 0 0 auto;
+  position: sticky;
+  top: 0;
+  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.scheduled-transfers-container,
+.scheduled-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 4px 4px 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scheduled-scrollbar-thumb, var(--border, #2a2f3a)) transparent;
+}
+
+.scheduled-transfers-container::-webkit-scrollbar,
+.scheduled-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scheduled-transfers-container::-webkit-scrollbar-track,
+.scheduled-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scheduled-transfers-container::-webkit-scrollbar-thumb,
+.scheduled-list::-webkit-scrollbar-thumb {
+  background: var(--scheduled-scrollbar-thumb, var(--border, #2a2f3a));
+  border-radius: 4px;
+}
+
+.scheduled-transfers-container::-webkit-scrollbar-thumb:hover,
+.scheduled-list::-webkit-scrollbar-thumb:hover {
+  background: var(--scheduled-scrollbar-hover, #3e4554);
+}
+
+#scheduled-modal .actions,
+.scheduled-modal-footer {
+  flex: 0 0 auto;
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+}
+
+#scheduled-modal-close {
+  background: var(--scheduled-btn-bg, var(--panel-alt, #1e222b));
+  color: var(--scheduled-btn-text, var(--text, #e6e8eb));
+  border: 1px solid var(--scheduled-btn-border, var(--border, #2a2f3a));
+  border-radius: var(--radius-md, 8px);
+  padding: 6px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  line-height: 1.4;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, filter 0.15s ease;
+}
+
+#scheduled-modal-close:hover {
+  background-color: #252a36;
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  filter: brightness(1.1);
+}
+
+/* Scheduled Transfer Card & Row Layout - Matches .transfer-card */
+.scheduled-task-row {
+  border: 1px solid var(--scheduled-card-border, var(--border, #2a2f3a));
+  background-color: var(--scheduled-card-bg, var(--panel, #171a21));
+  border-radius: var(--radius-lg, 12px);
   padding: 10px 14px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border);
-  background: var(--panel-alt);
-  transition: border-color 0.15s ease, background 0.15s ease;
+  margin-bottom: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
 }
 
 .scheduled-task-row:hover {
-  border-color: var(--accent);
+  border-color: var(--scheduled-card-hover-border, #3e4554);
+  background-color: var(--scheduled-card-hover-bg, #1c2029);
+  box-shadow: var(--scheduled-card-shadow-hover, 0 4px 12px rgba(0, 0, 0, 0.4));
 }
 
-.scheduled-task-main {
-  min-width: 0;
-  flex: 1;
+.scheduled-card-header {
   display: flex;
-  flex-direction: column;
-  gap: 3px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
 }
 
+.scheduled-card-header-left,
 .scheduled-task-title-line {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.scheduled-card-header-right,
+.scheduled-task-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+}
+
+.scheduled-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  line-height: 1.3;
+  flex-shrink: 0;
+  min-width: unset;
+  background-color: var(--scheduled-badge-bg, rgba(59, 130, 246, 0.15));
+  color: var(--scheduled-badge-text, #60a5fa);
+  border: 1px solid var(--scheduled-badge-border, rgba(59, 130, 246, 0.3));
+}
+
+.scheduled-badge-copy {
+  background-color: var(--scheduled-badge-copy-bg, rgba(59, 130, 246, 0.15));
+  color: var(--scheduled-badge-copy-text, #60a5fa);
+  border: 1px solid var(--scheduled-badge-copy-border, rgba(59, 130, 246, 0.3));
+}
+
+.scheduled-badge-move {
+  background-color: var(--scheduled-badge-move-bg, rgba(139, 92, 246, 0.15));
+  color: var(--scheduled-badge-move-text, #a78bfa);
+  border: 1px solid var(--scheduled-badge-move-border, rgba(139, 92, 246, 0.3));
 }
 
 .scheduled-task-title {
   font-weight: 600;
   font-size: 13px;
-  color: var(--text);
+  color: var(--scheduled-title, var(--text, #e6e8eb));
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.scheduled-card-body,
+.scheduled-task-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.scheduled-task-paths {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  min-width: 0;
 }
 
 .scheduled-task-path {
+  display: flex;
+  align-items: baseline;
+  width: 100%;
+  min-width: 0;
+}
+
+.scheduled-path-label {
+  color: var(--scheduled-label, var(--text-dim, #9aa1ac));
+  font-size: 10px;
+  text-transform: uppercase;
+  margin-right: 4px;
+  font-weight: 600;
+  width: 36px;
+  display: inline-block;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.scheduled-path-text {
+  color: var(--scheduled-path, #c0c0c0);
   font-size: 11px;
-  font-family: ui-monospace, monospace;
-  color: var(--text-dim);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
+  flex: 1;
 }
 
 .scheduled-task-time {
-  font-size: 11px;
-  color: var(--accent);
-  font-weight: 500;
   display: flex;
   align-items: center;
   gap: 5px;
-  margin-top: 2px;
+  color: var(--scheduled-time, var(--text-dim, #9aa1ac));
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.3;
+  margin-top: 1px;
 }
 
-.scheduled-task-actions {
-  flex: none;
+.scheduled-time-icon {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  display: inline-block;
+  vertical-align: middle;
+  color: var(--scheduled-time, var(--text-dim, #9aa1ac));
+  stroke: currentColor;
+}
+
+.scheduled-cancel-btn {
+  background: var(--scheduled-cancel-bg, var(--panel-alt, #1e222b));
+  color: var(--scheduled-cancel-text, var(--text, #e6e8eb));
+  border: 1px solid var(--scheduled-cancel-border, transparent);
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+  line-height: 1;
+  white-space: nowrap;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.scheduled-cancel-btn:hover {
+  background-color: var(--scheduled-cancel-hover-bg, rgba(225, 86, 86, 0.15));
+  border-color: var(--scheduled-cancel-hover-border, rgba(225, 86, 86, 0.3));
+  color: var(--scheduled-cancel-hover-text, var(--danger, #e15656));
 }
 
 .scheduled-empty {
-  color: var(--text-dim);
+  color: var(--text-dim, #64748b);
   font-size: 13px;
   text-align: center;
   margin: auto;
-  padding: 32px 16px;
+  padding: 36px 16px;
   font-style: italic;
 }
 
@@ -2068,17 +2291,19 @@ body.single-pane #source-pane {
   #settings-modal select {
     font-size: 16px; /* Prevents auto-zoom */
   }
-  #scheduled-modal .modal.modal-extra-wide {
-    min-height: 380px;
-    padding: 16px;
+  #scheduled-modal .modal,
+  #scheduled-modal .modal.modal-extra-wide,
+  .scheduled-modal-dialog {
+    width: 92%;
+    max-width: 580px;
+    margin: 0 auto;
+    height: 520px;
+    max-height: 85vh;
+    padding: 14px;
   }
   .scheduled-task-row {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
-  }
-  .scheduled-task-actions {
-    align-self: flex-end;
+    padding: 8px 10px;
+    margin-bottom: 6px;
   }
 }
 
@@ -2096,6 +2321,39 @@ body.single-pane #source-pane {
   --danger: #dc3545;
   --success: #198754;
   --warn: #ffc107;
+
+  /* Scheduled Transfers Modal Theme Tokens (Light Mode) */
+  --scheduled-card-bg: #ffffff;
+  --scheduled-card-border: rgba(0, 0, 0, 0.08);
+  --scheduled-card-hover-border: #cbd5e1;
+  --scheduled-card-shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --scheduled-title: #0f172a;
+  --scheduled-label: #9ca3af;
+  --scheduled-path: #334155;
+  --scheduled-time: #64748b;
+  --scheduled-badge-bg: #dbeafe;
+  --scheduled-badge-text: #1d4ed8;
+  --scheduled-badge-border: transparent;
+  --scheduled-badge-copy-bg: #dbeafe;
+  --scheduled-badge-copy-text: #1d4ed8;
+  --scheduled-badge-copy-border: transparent;
+  --scheduled-badge-move-bg: #ede9fe;
+  --scheduled-badge-move-text: #6d28d9;
+  --scheduled-badge-move-border: transparent;
+  --scheduled-cancel-bg: rgba(0, 0, 0, 0.05);
+  --scheduled-cancel-border: transparent;
+  --scheduled-cancel-text: var(--text, #212529);
+  --scheduled-cancel-hover-bg: rgba(225, 86, 86, 0.12);
+  --scheduled-cancel-hover-border: rgba(225, 86, 86, 0.3);
+  --scheduled-cancel-hover-text: #dc2626;
+  --scheduled-scrollbar-thumb: #cbd5e1;
+  --scheduled-scrollbar-hover: #94a3b8;
+  --scheduled-modal-bg: var(--panel, #f5f6f8);
+  --scheduled-modal-border: var(--border, #c1c9d2);
+  --scheduled-card-hover-bg: #f1f5f9;
+  --scheduled-btn-bg: var(--panel-alt, #eaedf1);
+  --scheduled-btn-text: var(--text, #212529);
+  --scheduled-btn-border: var(--border, #c1c9d2);
 }
 
 [data-theme="light"] .segmented-control,
@@ -2231,13 +2489,74 @@ body.single-pane #source-pane {
   border-color: rgba(0, 0, 0, 0.08);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
+[data-theme="light"] .scheduled-transfers-container,
+[data-theme="light"] .scheduled-list {
+  scrollbar-color: #cbd5e1 transparent;
+}
+[data-theme="light"] .scheduled-transfers-container::-webkit-scrollbar-thumb,
+[data-theme="light"] .scheduled-list::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+[data-theme="light"] .scheduled-transfers-container::-webkit-scrollbar-thumb:hover,
+[data-theme="light"] .scheduled-list::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
 [data-theme="light"] .scheduled-task-row {
-  background: #ffffff;
+  background-color: #ffffff;
   border-color: rgba(0, 0, 0, 0.08);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 [data-theme="light"] .scheduled-task-row:hover {
-  border-color: var(--accent);
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+[data-theme="light"] .scheduled-task-title {
+  color: #0f172a;
+}
+[data-theme="light"] .scheduled-badge-copy {
+  background-color: #dbeafe;
+  color: #1d4ed8;
+  border-color: transparent;
+}
+[data-theme="light"] .scheduled-badge-move {
+  background-color: #ede9fe;
+  color: #6d28d9;
+  border-color: transparent;
+}
+[data-theme="light"] .scheduled-path-label {
+  color: #9ca3af;
+}
+[data-theme="light"] .scheduled-path-text {
+  color: #334155;
+}
+[data-theme="light"] .scheduled-task-time,
+[data-theme="light"] .scheduled-time-icon {
+  color: #64748b;
+}
+[data-theme="light"] #scheduled-modal .modal,
+[data-theme="light"] .scheduled-modal-dialog {
+  background-color: var(--panel, #f5f6f8);
+  border-color: var(--border, #c1c9d2);
+}
+[data-theme="light"] #scheduled-modal-close {
+  background: var(--panel-alt, #eaedf1);
+  color: var(--text, #212529);
+  border: 1px solid var(--border, #c1c9d2);
+}
+[data-theme="light"] #scheduled-modal-close:hover {
+  background: #dde1e7;
+  border-color: #adb5bd;
+  color: #000000;
+}
+[data-theme="light"] .scheduled-cancel-btn {
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid transparent;
+  color: var(--text, #212529);
+}
+[data-theme="light"] .scheduled-cancel-btn:hover {
+  background-color: rgba(225, 86, 86, 0.12);
+  border-color: rgba(225, 86, 86, 0.3);
+  color: #dc2626;
 }
 [data-theme="light"] .splitter-v::before,
 [data-theme="light"] .splitter-h::before {
@@ -2390,3 +2709,150 @@ select.modal-select:focus {
   background: rgba(0, 0, 0, 0.03);
   border-color: rgba(0, 0, 0, 0.15);
 }
+
+/* Scheduled Transfers Dark Mode Tokens & Dynamic Theme Selectors */
+:root:not([data-theme="light"]),
+[data-theme="dark"],
+.dark {
+  --scheduled-modal-bg: var(--bg, #0f1115);
+  --scheduled-modal-border: var(--border, #2a2f3a);
+  --scheduled-card-bg: var(--panel-alt, #1e222b);
+  --scheduled-card-border: var(--border, #2a2f3a);
+  --scheduled-card-hover-border: #3e4554;
+  --scheduled-card-hover-bg: #242934;
+  --scheduled-card-shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --scheduled-title: var(--text, #e6e8eb);
+  --scheduled-label: var(--text-dim, #9aa1ac);
+  --scheduled-path: #d1d5db;
+  --scheduled-time: var(--text-dim, #9aa1ac);
+  --scheduled-badge-bg: rgba(59, 130, 246, 0.15);
+  --scheduled-badge-text: #60a5fa;
+  --scheduled-badge-border: rgba(59, 130, 246, 0.3);
+  --scheduled-badge-copy-bg: rgba(59, 130, 246, 0.15);
+  --scheduled-badge-copy-text: #60a5fa;
+  --scheduled-badge-copy-border: rgba(59, 130, 246, 0.3);
+  --scheduled-badge-move-bg: rgba(139, 92, 246, 0.15);
+  --scheduled-badge-move-text: #a78bfa;
+  --scheduled-badge-move-border: rgba(139, 92, 246, 0.3);
+  --scheduled-cancel-bg: transparent;
+  --scheduled-cancel-border: var(--border, #2a2f3a);
+  --scheduled-cancel-text: var(--danger, #e15656);
+  --scheduled-cancel-hover-bg: rgba(225, 86, 86, 0.12);
+  --scheduled-cancel-hover-border: rgba(225, 86, 86, 0.4);
+  --scheduled-cancel-hover-text: #fca5a5;
+  --scheduled-scrollbar-thumb: var(--border, #2a2f3a);
+  --scheduled-scrollbar-hover: #3e4554;
+  --scheduled-btn-bg: var(--panel-alt, #1e222b);
+  --scheduled-btn-text: var(--text, #e6e8eb);
+  --scheduled-btn-border: var(--border, #2a2f3a);
+}
+
+/* Explicit dark theme rules matching core application system theme */
+:root:not([data-theme="light"]) #scheduled-modal .modal,
+:root:not([data-theme="light"]) .scheduled-modal-dialog,
+[data-theme="dark"] #scheduled-modal .modal,
+[data-theme="dark"] .scheduled-modal-dialog,
+.dark #scheduled-modal .modal,
+.dark .scheduled-modal-dialog {
+  background-color: var(--bg, #0f1115);
+  border-color: var(--border, #2a2f3a);
+}
+
+:root:not([data-theme="light"]) .scheduled-task-row,
+[data-theme="dark"] .scheduled-task-row,
+.dark .scheduled-task-row {
+  background-color: var(--panel, #171a21);
+  border-color: var(--border, #2a2f3a);
+}
+
+:root:not([data-theme="light"]) .scheduled-task-row:hover,
+[data-theme="dark"] .scheduled-task-row:hover,
+.dark .scheduled-task-row:hover {
+  border-color: #3e4554;
+  background-color: #1c2029;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+:root:not([data-theme="light"]) .scheduled-task-title,
+[data-theme="dark"] .scheduled-task-title,
+.dark .scheduled-task-title {
+  color: var(--text, #e6e8eb);
+}
+
+:root:not([data-theme="light"]) .scheduled-path-label,
+[data-theme="dark"] .scheduled-path-label,
+.dark .scheduled-path-label {
+  color: var(--text-dim, #9aa1ac);
+}
+
+:root:not([data-theme="light"]) .scheduled-path-text,
+[data-theme="dark"] .scheduled-path-text,
+.dark .scheduled-path-text {
+  color: #c0c0c0;
+}
+
+:root:not([data-theme="light"]) .scheduled-task-time,
+:root:not([data-theme="light"]) .scheduled-time-icon,
+[data-theme="dark"] .scheduled-task-time,
+[data-theme="dark"] .scheduled-time-icon,
+.dark .scheduled-task-time,
+.dark .scheduled-time-icon {
+  color: var(--text-dim, #9aa1ac);
+}
+
+:root:not([data-theme="light"]) .scheduled-badge,
+[data-theme="dark"] .scheduled-badge,
+.dark .scheduled-badge {
+  background-color: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+:root:not([data-theme="light"]) .scheduled-badge-copy,
+[data-theme="dark"] .scheduled-badge-copy,
+.dark .scheduled-badge-copy {
+  background-color: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+:root:not([data-theme="light"]) .scheduled-badge-move,
+[data-theme="dark"] .scheduled-badge-move,
+.dark .scheduled-badge-move {
+  background-color: rgba(139, 92, 246, 0.15);
+  color: #a78bfa;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+:root:not([data-theme="light"]) .scheduled-cancel-btn,
+[data-theme="dark"] .scheduled-cancel-btn,
+.dark .scheduled-cancel-btn {
+  background-color: var(--panel-alt, #1e222b);
+  border: 1px solid transparent;
+  color: var(--text, #e6e8eb);
+}
+
+:root:not([data-theme="light"]) .scheduled-cancel-btn:hover,
+[data-theme="dark"] .scheduled-cancel-btn:hover,
+.dark .scheduled-cancel-btn:hover {
+  background-color: rgba(225, 86, 86, 0.15);
+  border-color: rgba(225, 86, 86, 0.3);
+  color: var(--danger, #e15656);
+}
+
+:root:not([data-theme="light"]) #scheduled-modal-close,
+[data-theme="dark"] #scheduled-modal-close,
+.dark #scheduled-modal-close {
+  background: var(--panel-alt, #1e222b);
+  color: var(--text, #e6e8eb);
+  border: 1px solid var(--border, #2a2f3a);
+}
+
+:root:not([data-theme="light"]) #scheduled-modal-close:hover,
+[data-theme="dark"] #scheduled-modal-close:hover,
+.dark #scheduled-modal-close:hover {
+  background: #252a36;
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+

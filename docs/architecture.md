@@ -34,6 +34,8 @@ Minimal-overhead Linux web app for dual-pane local directory browsing and backgr
 │       ├── routes.py              # /api/transfer, /api/transfer/url, /api/tasks, /api/activity endpoints
 │       └── scheduler.py      # Asyncio FIFO task queue and process lifecycle
 ├── static/                   # Vanilla HTML/JS/CSS frontend
+│   ├── assets/               # Static frontend assets
+│   │   └── icons/            # Standalone vector SVG icons (UI actions, indicators, modals)
 │   ├── locales/              # i18n JSON dictionaries (en, es, fr, de, pt, zh)
 │   ├── login.html
 │   ├── index.html            # Main SPA shell
@@ -237,7 +239,9 @@ CREATE TABLE users (
 * **Theming:** Full Light and Dark mode support configured via the Settings dropdown, persisted in `localStorage`, and initialized synchronously by `theme-init.js` to prevent FOUS (Flash of Unstyled Content) during startup.
 * **Hidden Files & Folders Toggle:** Configured in the Settings modal ("Show hidden files and folders") under GENERAL, persisted in `localStorage` under key `litesync-show-hidden` (defaults to OFF). Filtering is strictly client-side display-only within `renderPane()`; the backend `/api/browse` endpoint continues returning complete directory listings, and direct access/operations targeting dot-files remain unrestricted.
 * **Layout Toggle:** Persistent single-pane or dual-pane layout mode. Single-pane hides the destination pane for simpler workflows and merges destination picking into the Transfer modal.
-* **Dual-Pane Logic:** Both Source and Dest panes share identical toolbars (`⬆️`, `📁+`, `✏️`, `🗑️`). Selections are isolated.
+### Iconography & UI Assets (`static/assets/icons/`)
+
+* **Vector SVGs:** All UI controls, status indicators, and modal graphics are centralized as standalone SVG files in `static/assets/icons/` (e.g., `calendar.svg`, `clock.svg`, `gear.svg`, `upload.svg`, `folder.svg`, `bin.svg`, `pencil.svg`, `back.svg`, `single-pane.svg`, `dual-pane.svg`, `maximize.svg`, `minimize.svg`). Inline SVG bloat and emojis in modal templates are avoided in favor of consistent, cacheable vector assets referenced via standard `<img>` tags or CSS masks (`currentColor`).
 
 ### File Mutation Modals & Toasts
 
@@ -255,7 +259,11 @@ CREATE TABLE users (
 * **Task Details Modal:** Dedicated `modal-extra-wide` view launched from transfer cards displaying a scrollable list of completed files and the currently active processing file with live progress stats.
 * **Selection Action Bar:** Hidden when count is 0; contains Summary, View, Clear, and Transfer controls.
 * **Transfer Confirmation Modal (`#confirm-modal`):** Contains operation options (`copy` vs `move`) directly under destination path and a Timing selector (Run now vs Schedule for later with `datetime-local` picker).
-* **Scheduled Transfers Modal (`#scheduled-modal`):** Accessible via the Settings gear dropdown menu (`#menu-scheduled`). Shares the identical `modal-extra-wide` dimensions, responsive layout, and visual styling of the Transfer Details modal (`width: 720px; max-width: 95vw; min-height: 440px`). Lists all pending scheduled transfers sorted chronologically, displaying operation badge, destination, source paths, local scheduled time, and individual cancellation buttons (`[Cancel]`).
+* **Scheduled Transfers Modal (`#scheduled-modal`):** Accessible via the Settings gear dropdown menu (`#menu-scheduled`). Features a constant static container height and responsive width (`width: 92%; max-width: 580px; margin: 0 auto; height: 520px; max-height: 85vh; display: flex; flex-direction: column; overflow: hidden`) with a fixed/sticky header and footer that prevents the outer modal frame from growing or shrinking regardless of task count. Pending transfers render in a high-density scrollable list (`flex: 1; overflow-y: auto;` fitting 6–8 items) using the exact design language and styling tokens of the Active Operation cards (`.transfer-card`).
+  * **Active Operation Card Styling Alignment (`.transfer-card`):**
+    * **Dark Theme (Default & `[data-theme="dark"]` / `.dark`):** The modal frame directly adopts the main application's dark charcoal background (`--bg: #0f1115`) with neutral dark gray borders (`--border: #2a2f3a`). The scheduled transfer cards directly match `.transfer-card` surfaces with `background: var(--panel: #171a21)`, neutral dark borders (`#2a2f3a`), `border-radius: var(--radius-lg, 12px)`, and `padding: 10px 14px` (`8px 10px` on mobile). Cancel button matches `.card-action-btn` styling (`background: var(--panel-alt: #1e222b)`, `height: 24px`, `border-radius: var(--radius-sm, 6px)`, hovering to subtle red `rgba(225, 86, 86, 0.15)`). Item titles use bold off-white (`--text: #e6e8eb`), labels and timestamps use muted gray (`--text-dim: #9aa1ac`), and monospace paths match `.card-path` (`#c0c0c0`). Transfer type badges remain colorful just like Activity Details (`COPY`: translucent blue `rgba(59, 130, 246, 0.15)` with `#60a5fa` text; `MOVE`: translucent purple `rgba(139, 92, 246, 0.15)` with `#a78bfa` text). The bottom "Close" button uses standard dark button styling (`--panel-alt: #1e222b`, `#2a2f3a` border).
+    * **Light Theme (`[data-theme="light"]`):** Modal background `var(--panel: #f5f6f8)`, card surface `#ffffff` with subtle card shadow `0 2px 8px rgba(0, 0, 0, 0.04)` and border `rgba(0, 0, 0, 0.08)` directly matching `.transfer-card` in light mode. Cancel button matches `.card-action-btn` (`background: rgba(0, 0, 0, 0.05)`), monospace paths use `#334155`, and badges use clean solid pastel pills (`#dbeafe`/`#1d4ed8` for copy, `#ede9fe`/`#6d28d9` for move).
+  * **Card Layout:** Each card is structured into a Header row (`.card-top` with `[Badge]` + bold title on left, `[Cancel]` button on right) and a full-width Body spanning 100% width below, displaying stacked two-line paths with muted uppercase labels (`From:`, `To:`, `10px`) and readable monospace path strings (`11px` with redundant filenames stripped from the source directory and full un-truncated `title` hover tooltips) alongside the scheduled timestamp (`/assets/icons/calendar.svg`). Overlay click-to-dismiss is disabled (`data-backdrop="static"`).
 * **Contextual View Popover:** Displays full paths of selected items and exclusions with overflow scrolling.
 
 ### File Browser UX & Inspection

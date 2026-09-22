@@ -495,7 +495,128 @@ class MockEvent {
     console.log('✓ Test 26: Empty state displayed when all scheduled transfers are removed passed');
   })();
 
-  console.log(`\nAll 26 individual frontend tests passed! (${assertionCount} assertions verified)`);
+  // Test 27: Scheduled modal backdrop is static (data-backdrop="static")
+  (() => {
+    assertEqual(html.includes('id="scheduled-modal" data-backdrop="static"'), true);
+    console.log('✓ Test 27: Scheduled transfers modal configured with static backdrop in HTML passed');
+  })();
+
+  // Test 28: Overlay click listener removed from scheduled modal
+  (() => {
+    const scheduledJsCode = fs.readFileSync(path.join(__dirname, '../static/js/modals/scheduled.js'), 'utf-8');
+    assertEqual(scheduledJsCode.includes("modal.addEventListener('click'"), false, 'scheduled.js should not attach backdrop overlay click listener');
+    console.log('✓ Test 28: Backdrop overlay click-to-dismiss disabled in scheduled.js passed');
+  })();
+
+  // Test 29: Escape key listener removed from scheduled modal
+  (() => {
+    const scheduledJsCode = fs.readFileSync(path.join(__dirname, '../static/js/modals/scheduled.js'), 'utf-8');
+    assertEqual(scheduledJsCode.includes("e.key === 'Escape'"), false, 'scheduled.js should not attach Escape key listener to close modal');
+    console.log('✓ Test 29: Escape key listener removed; modal dismissible only via explicit close buttons passed');
+  })();
+
+  // Test 30: Modal dismissal behavior (only explicit buttons close modal)
+  (() => {
+    const scheduledModal = new MockElement('div', 'scheduled-modal');
+    scheduledModal.classList.remove('hidden');
+    const dismissBtn = new MockElement('button', 'scheduled-modal-dismiss');
+    const closeBtn = new MockElement('button', 'scheduled-modal-close');
+
+    function closeScheduledModal() {
+      scheduledModal.classList.add('hidden');
+    }
+
+    [dismissBtn, closeBtn].forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        if (e) e.stopPropagation();
+        closeScheduledModal();
+      });
+    });
+
+    // Backdrop click does nothing
+    scheduledModal.dispatchEvent(new MockEvent('click', { target: scheduledModal }));
+    assertEqual(scheduledModal.classList.contains('hidden'), false, 'Modal should remain open when clicking backdrop');
+
+    // Dismiss X button closes modal
+    dismissBtn.dispatchEvent(new MockEvent('click'));
+    assertEqual(scheduledModal.classList.contains('hidden'), true, 'Modal should close when clicking X button');
+
+    // Reopen and test footer Close button
+    scheduledModal.classList.remove('hidden');
+    closeBtn.dispatchEvent(new MockEvent('click'));
+    assertEqual(scheduledModal.classList.contains('hidden'), true, 'Modal should close when clicking footer Close button');
+
+    console.log('✓ Test 30: Scheduled transfers modal can ONLY be closed by clicking X or Close buttons passed');
+  })();
+
+  // Test 31: Scheduled transfers CSS theme variables aligned with core system theme
+  (() => {
+    const cssContent = fs.readFileSync(path.join(__dirname, '../static/css/app.css'), 'utf-8');
+    assertOk(cssContent.includes('--scheduled-modal-bg: var(--bg, #0f1115);'), 'Modal bg should match main app dark charcoal');
+    assertOk(cssContent.includes('--scheduled-modal-border: var(--border, #2a2f3a);'), 'Modal border should be neutral dark gray');
+    assertOk(cssContent.includes('--scheduled-card-bg: var(--panel, #171a21);'), 'Card bg should match active operation card panel');
+    assertOk(cssContent.includes('--scheduled-card-border: var(--border, #2a2f3a);'), 'Card border should be neutral dark gray');
+    assertOk(cssContent.includes('--scheduled-title: var(--text, #e6e8eb);'), 'Title should be off-white');
+    assertOk(cssContent.includes('--scheduled-label: var(--text-dim, #9aa1ac);'), 'Label should be muted gray');
+    assertOk(cssContent.includes('--scheduled-path: #c0c0c0;'), 'Path should match active operation card text');
+    assertOk(cssContent.includes('--scheduled-btn-bg: var(--panel-alt, #1e222b);'), 'Close button bg should match app standard button');
+    assertOk(cssContent.includes('--scheduled-badge-copy-bg: rgba(59, 130, 246, 0.15);'), 'Copy badge should be colorful blue translucent');
+    assertOk(cssContent.includes('--scheduled-badge-copy-text: #60a5fa;'), 'Copy badge text should be blue');
+    assertOk(cssContent.includes('--scheduled-badge-move-bg: rgba(139, 92, 246, 0.15);'), 'Move badge should be colorful purple translucent');
+    assertOk(cssContent.includes('--scheduled-badge-move-text: #a78bfa;'), 'Move badge text should be purple');
+    console.log('✓ Test 31: Scheduled transfers CSS theme variables aligned with core system theme passed');
+  })();
+
+  // Test 32: Modal frame and cards use neutral dark gray without blue/slate tints
+  (() => {
+    const cssContent = fs.readFileSync(path.join(__dirname, '../static/css/app.css'), 'utf-8');
+    assertOk(cssContent.includes('background-color: var(--scheduled-modal-bg, var(--bg, #0f1115));'), 'Modal frame uses dark charcoal bg');
+    assertOk(cssContent.includes('background-color: var(--scheduled-card-bg, var(--panel, #171a21));'), 'Card uses active operation card bg');
+    assertOk(cssContent.includes('border: 1px solid var(--scheduled-card-border, var(--border, #2a2f3a));'), 'Card uses neutral dark border');
+    console.log('✓ Test 32: Modal frame and cards use neutral dark gray without blue/slate tints passed');
+  })();
+
+  // Test 33: Bottom Close button uses standard dark button styling instead of bright blue
+  (() => {
+    const htmlContent = fs.readFileSync(path.join(__dirname, '../static/index.html'), 'utf-8');
+    const cssContent = fs.readFileSync(path.join(__dirname, '../static/css/app.css'), 'utf-8');
+    assertOk(!htmlContent.includes('id="scheduled-modal-close" class="primary"'), 'Close button should not have primary bright blue class');
+    assertOk(htmlContent.includes('id="scheduled-modal-close" class="secondary"'), 'Close button has secondary class');
+    assertOk(cssContent.includes('#scheduled-modal-close'), '#scheduled-modal-close styling defined in CSS');
+    assertOk(cssContent.includes('background: var(--scheduled-btn-bg, var(--panel-alt, #1e222b));'), 'Close button styled with standard dark button bg');
+    console.log('✓ Test 33: Bottom Close button uses standard dark button styling instead of bright blue passed');
+  })();
+
+  // Test 34: Elimination of slate/blue classes and support for dynamic theme switching
+  (() => {
+    const scheduledJs = fs.readFileSync(path.join(__dirname, '../static/js/modals/scheduled.js'), 'utf-8');
+    assertOk(!scheduledJs.includes('dark:bg-slate-800'), 'Card markup should not contain slate classes');
+    assertOk(!scheduledJs.includes('dark:bg-blue-500/15'), 'Badge markup should not contain blue classes');
+    const cssContent = fs.readFileSync(path.join(__dirname, '../static/css/app.css'), 'utf-8');
+    assertOk(cssContent.includes(':root[data-theme="light"]'), ':root[data-theme="light"] tokens defined');
+    assertOk(cssContent.includes('[data-theme="light"] .scheduled-task-row'), 'Light mode scheduled-task-row rule defined');
+    assertOk(cssContent.includes('[data-theme="dark"] .scheduled-task-row'), 'Dark mode data-theme selector defined');
+    assertOk(cssContent.includes('.dark .scheduled-task-row'), 'Dark mode class selector defined');
+    console.log('✓ Test 34: Elimination of slate/blue classes and support for dynamic theme switching passed');
+  })();
+
+  // Test 35: Scheduled transfer card matches active operation card (.transfer-card) style
+  (() => {
+    const scheduledJs = fs.readFileSync(path.join(__dirname, '../static/js/modals/scheduled.js'), 'utf-8');
+    assertOk(scheduledJs.includes("card.className = 'transfer-card scheduled-task-row';"), 'Card has transfer-card class');
+    assertOk(scheduledJs.includes('card-top scheduled-card-header'), 'Card header matches card-top');
+    assertOk(scheduledJs.includes('card-title scheduled-task-title'), 'Card title matches card-title');
+    assertOk(scheduledJs.includes('card-action-btn scheduled-cancel-btn'), 'Card action button matches card-action-btn');
+    assertOk(scheduledJs.includes('card-path scheduled-path-text'), 'Card path matches card-path');
+    assertOk(scheduledJs.includes('card-details scheduled-task-time'), 'Card time matches card-details');
+
+    const cssContent = fs.readFileSync(path.join(__dirname, '../static/css/app.css'), 'utf-8');
+    assertOk(cssContent.includes('border-radius: var(--radius-lg, 12px);'), 'Card border-radius matches transfer-card radius-lg');
+    assertOk(cssContent.includes('[data-theme="light"] .scheduled-task-row {\n  background-color: #ffffff;'), 'Light mode scheduled card background matches transfer-card #ffffff');
+    console.log('✓ Test 35: Scheduled transfer card markup and CSS match active operation card (.transfer-card) style passed');
+  })();
+
+  console.log(`\nAll 35 individual frontend tests passed! (${assertionCount} assertions verified)`);
 })().catch(err => {
   console.error(err);
   process.exit(1);

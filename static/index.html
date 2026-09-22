@@ -500,19 +500,19 @@
   </div>
 
   <!-- Scheduled Transfers Modal -->
-  <div class="modal-backdrop hidden" id="scheduled-modal">
-    <div class="modal modal-extra-wide">
-      <div class="modal-header-row">
+  <div class="modal-backdrop hidden" id="scheduled-modal" data-backdrop="static">
+    <div class="modal modal-extra-wide scheduled-modal-dialog">
+      <div class="modal-header-row scheduled-modal-header">
         <h2 id="scheduled-modal-title" class="truncate" data-i18n="modals.scheduled.title">Scheduled Transfers</h2>
         <button id="scheduled-modal-dismiss" class="modal-close-btn" title="Close" aria-label="Close">✕</button>
       </div>
 
-      <div id="scheduled-transfers-container" class="scheduled-transfers-container">
+      <div id="scheduled-transfers-container" class="scheduled-transfers-container scheduled-list">
         <!-- Scheduled transfer cards rendered dynamically -->
       </div>
 
-      <div class="actions" style="margin-top: 14px;">
-        <button id="scheduled-modal-close" class="primary" data-i18n="modals.scheduled.close">Close</button>
+      <div class="actions scheduled-modal-footer">
+        <button id="scheduled-modal-close" class="secondary" data-i18n="modals.scheduled.close">Close</button>
       </div>
     </div>
   </div>

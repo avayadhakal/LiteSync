@@ -11,6 +11,20 @@ export function closeScheduledModal() {
   }
 }
 
+function getDirectoryPath(pathStr) {
+  if (!pathStr || typeof pathStr !== 'string') return '/';
+  const trimmed = pathStr.replace(/\/+$/, '');
+  const lastSlash = trimmed.lastIndexOf('/');
+  if (lastSlash === -1) return './';
+  if (lastSlash === 0) return '/';
+  return trimmed.slice(0, lastSlash + 1);
+}
+
+function getFormattedDestination(destStr) {
+  if (!destStr || typeof destStr !== 'string') return '/';
+  return destStr.endsWith('/') ? destStr : destStr + '/';
+}
+
 export async function loadScheduledTransfers() {
   const container = el('scheduled-transfers-container');
   if (!container) return;
@@ -38,10 +52,13 @@ export async function loadScheduledTransfers() {
   container.innerHTML = '';
   for (const task of tasks) {
     const card = document.createElement('div');
-    card.className = 'scheduled-task-row';
+    card.className = 'transfer-card scheduled-task-row';
     card.id = `card-${task.task_id}`;
 
     const title = getPrimaryTitle(task.source);
+    const srcDir = getDirectoryPath(task.source);
+    const destDir = getFormattedDestination(task.destination);
+
     let formattedTime = task.scheduled_for;
     try {
       const d = new Date(task.scheduled_for);
@@ -58,28 +75,36 @@ export async function loadScheduledTransfers() {
       // fallback to raw string
     }
 
-    const opBadge = task.operation === 'move' ? 'Move' : 'Copy';
+    const opLabel = (task.operation || 'copy').toUpperCase();
+    const opBadgeClass = opLabel === 'MOVE' ? 'scheduled-badge-move' : 'scheduled-badge-copy';
 
     card.innerHTML = `
-      <div class="scheduled-task-main">
-        <div class="scheduled-task-title-line">
-          <span class="badge" style="font-size: 11px; text-transform: uppercase;">${escapeHtml(opBadge)}</span>
-          <span class="scheduled-task-title" title="${escapeHtml(title)}">${escapeHtml(title)}</span>
+      <div class="card-top scheduled-card-header">
+        <div class="scheduled-card-header-left scheduled-task-title-line">
+          <span class="scheduled-badge badge ${opBadgeClass}">${escapeHtml(opLabel)}</span>
+          <span class="card-title scheduled-task-title" title="${escapeHtml(title)}">${escapeHtml(title)}</span>
         </div>
-        <div class="scheduled-task-path" title="${escapeHtml(task.source)}">
-          ${escapeHtml(task.source)}
-        </div>
-        <div class="scheduled-task-path" title="${escapeHtml(task.destination)}">
-          → ${escapeHtml(task.destination)}
-        </div>
-        <div class="scheduled-task-time">
-          📅 ${I18n.t('modals.scheduled.scheduled_for', { time: escapeHtml(formattedTime) })}
+        <div class="scheduled-card-header-right scheduled-task-actions">
+          <button class="card-action-btn scheduled-cancel-btn" data-id="${task.task_id}" data-i18n="modals.scheduled.cancel">
+            ${I18n.t('modals.scheduled.cancel')}
+          </button>
         </div>
       </div>
-      <div class="scheduled-task-actions">
-        <button class="btn-sm btn-ghost-danger scheduled-cancel-btn" data-id="${task.task_id}" data-i18n="modals.scheduled.cancel">
-          ${I18n.t('modals.scheduled.cancel')}
-        </button>
+      <div class="scheduled-card-body scheduled-task-main">
+        <div class="scheduled-task-paths" title="From: ${escapeHtml(task.source)}&#10;To: ${escapeHtml(task.destination)}">
+          <div class="scheduled-task-path" title="${escapeHtml(task.source)}">
+            <span class="scheduled-path-label">From:</span>
+            <span class="card-path scheduled-path-text">${escapeHtml(srcDir)}</span>
+          </div>
+          <div class="scheduled-task-path" title="${escapeHtml(task.destination)}">
+            <span class="scheduled-path-label">To:</span>
+            <span class="card-path scheduled-path-text">${escapeHtml(destDir)}</span>
+          </div>
+        </div>
+        <div class="card-details scheduled-task-time">
+          <img src="/assets/icons/calendar.svg" class="scheduled-time-icon" width="12" height="12" alt="" />
+          <span>${I18n.t('modals.scheduled.scheduled_for', { time: escapeHtml(formattedTime) })}</span>
+        </div>
       </div>
     `;
 
@@ -125,19 +150,10 @@ export function initScheduledModal() {
 
   dismissBtns.forEach((btn) => {
     if (btn) {
-      btn.addEventListener('click', () => closeScheduledModal());
-    }
-  });
-
-  modal.addEventListener('click', (e) => {
-    if (e.target === modal) {
-      closeScheduledModal();
-    }
-  });
-
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
-      closeScheduledModal();
+      btn.addEventListener('click', (e) => {
+        if (e) e.stopPropagation();
+        closeScheduledModal();
+      });
     }
   });
 }

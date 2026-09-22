@@ -97,10 +97,11 @@ export function initSettingsModal() {
       }
       
       settingsModal.classList.add('hidden');
+      showToast(I18n.t('messages.settings_changed') || I18n.t('messages.settings_saved') || 'Settings changed');
       if (passwordChanged) {
-        showToast('Password updated successfully. Other devices will need to log in again.');
-      } else {
-        showToast(I18n.t('messages.settings_saved') || 'Settings saved');
+        setTimeout(() => {
+          showToast(I18n.t('messages.password_changed') || 'Password updated successfully');
+        }, 150);
       }
     });
   }

@@ -165,7 +165,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 
 cp config.example.toml config.toml
-```
+````
 
 Edit `config.toml` and configure:
 
@@ -281,12 +281,19 @@ http://<host-or-pi-ip>:8000/
 
 ### Docker Support
 
-LiteSync fully supports containerized deployment using Docker and Docker Compose. 
-You can easily map your external drives to the container and manage configurations using environment variables.
+LiteSync is also available as a Docker image and supports both `linux/amd64` and `linux/arm64`.
 
-See the [Docker Documentation](docs/docker.md) for full setup instructions and `docker-compose.yml` examples.
+The published image is:
 
-### Updating
+```text
+avayadhakal/litesync:latest
+```
+
+For Docker deployment instructions, including Docker Compose, storage mounts, configuration, permissions, and updates, see the [Docker Deployment Guide](docs/docker.md).
+
+---
+
+## Updating
 
 Download the new release archive and run the installer again.
 
@@ -299,6 +306,8 @@ config.toml
 data/litesync.db
 data/tasks/
 ```
+
+For Docker deployments, see the [Docker Deployment Guide](docs/docker.md) for update instructions.
 
 ---
 
@@ -348,7 +357,9 @@ At minimum, the configuration needs:
 * at least one user
 
 ### Environment Variables
+
 For containerized deployments (Docker), you can override configuration keys using environment variables:
+
 * `LITESYNC_ALLOWED_ROOTS` (Colon-separated list of allowed directories)
 * `LITESYNC_PORT` (The external port, useful for CSRF validation when using Docker port mapping)
 * `LITESYNC_ALLOWED_ORIGINS` (Comma-separated list of allowed origins)

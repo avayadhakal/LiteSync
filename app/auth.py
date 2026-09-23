@@ -10,6 +10,7 @@ from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from pydantic import BaseModel
 
 from app.config import get_settings
+from app.version import get_app_version
 
 COOKIE_NAME = "litesync_session"
 
@@ -194,7 +195,7 @@ async def logout(response: Response):
 
 @router.get("/whoami")
 async def whoami(user: str = Depends(get_current_user)):
-    return {"username": user}
+    return {"username": user, "version": get_app_version()}
 
 
 def main() -> None:

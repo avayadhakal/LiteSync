@@ -5,6 +5,7 @@
     "logged_in_as": "Conectado como {username}",
     "scheduled_transfers": "Programado",
     "settings": "Ajustes",
+    "about": "Acerca de",
     "logout": "Cerrar sesión",
     "brand": "LiteSync"
   },
@@ -157,6 +158,12 @@
       "conf_pwd": "Confirmar nueva contraseña",
       "cancel": "Cancelar",
       "save": "Guardar cambios"
+    },
+    "about": {
+      "title": "Acerca de LiteSync",
+      "version": "Versión",
+      "check_updates": "Buscar actualizaciones",
+      "close": "Cerrar"
     }
   },
   "messages": {

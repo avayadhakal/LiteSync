@@ -11,6 +11,7 @@ import { closeTaskDetailsModal, isTaskDetailsOpen } from './modals/task-details.
 import { closeItemDetailsModal } from './modals/item-details.js';
 import { isEditorOpen, saveEditorContent, closeEditorModal, toggleEditorMaximize } from './modals/editor.js';
 import { initSettingsModal } from './modals/settings.js';
+import { initAboutModal } from './modals/about.js';
 import { initScheduledModal } from './modals/scheduled.js';
 import { I18n } from './i18n.js';
 
@@ -671,6 +672,9 @@ async function init() {
 
   // Settings modal logic
   initSettingsModal();
+
+  // About modal logic
+  initAboutModal();
 
   // Both panes expose Upload / New Folder / Rename / Delete via [data-pane-action][data-pane]
   document.querySelectorAll('[data-pane-action]').forEach((btn) => {

@@ -5,6 +5,7 @@
     "logged_in_as": "当前用户 {username}",
     "scheduled_transfers": "已计划",
     "settings": "设置",
+    "about": "关于",
     "logout": "退出",
     "brand": "LiteSync"
   },
@@ -157,6 +158,12 @@
       "conf_pwd": "确认新密码",
       "cancel": "取消",
       "save": "保存更改"
+    },
+    "about": {
+      "title": "关于 LiteSync",
+      "version": "版本",
+      "check_updates": "检查更新",
+      "close": "关闭"
     }
   },
   "messages": {

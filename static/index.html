@@ -35,6 +35,8 @@
         <div class="dropdown-divider"></div>
         <button class="dropdown-item" id="menu-scheduled" data-i18n="nav.scheduled_transfers">Scheduled</button>
         <button class="dropdown-item" id="menu-settings" data-i18n="nav.settings">Settings</button>
+        <button class="dropdown-item" id="menu-about" data-i18n="nav.about">About</button>
+        <div class="dropdown-divider"></div>
         <button class="dropdown-item danger" id="menu-logout" data-i18n="nav.logout">Log out</button>
       </div>
     </div>
@@ -493,8 +495,34 @@
       </div>
 
       <div class="actions">
-        <button id="settings-cancel" class="btn-ghost" data-i18n="modals.settings.cancel">Cancel</button>
+        <button id="settings-cancel" class="secondary" data-i18n="modals.settings.cancel">Cancel</button>
         <button id="settings-save" class="primary" data-i18n="modals.settings.save">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- About Modal -->
+  <div class="modal-backdrop hidden" id="about-modal">
+    <div class="modal">
+      <div class="modal-header-row">
+        <h2 id="about-modal-title" data-i18n="modals.about.title">About LiteSync</h2>
+        <button id="about-modal-dismiss" class="modal-close-btn" title="Close" aria-label="Close">✕</button>
+      </div>
+
+      <div class="about-modal-body">
+        <div class="about-brand-row">
+          <img src="/assets/icons/logo.svg" alt="" class="app-logo" />
+          <span class="brand-text" data-i18n="nav.brand">LiteSync</span>
+        </div>
+        <div class="modal-field">
+          <div class="modal-label" data-i18n="modals.about.version">Version</div>
+          <div id="about-version" class="about-version-value">v0.1.0-beta</div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <a id="about-check-updates" href="https://github.com/avayadhakal/LiteSync/releases" target="_blank" rel="noopener noreferrer" class="secondary" data-i18n="modals.about.check_updates">Check for updates</a>
+        <button id="about-modal-close" class="primary" data-i18n="modals.about.close">Close</button>
       </div>
     </div>
   </div>

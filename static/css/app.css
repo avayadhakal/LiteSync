@@ -1593,7 +1593,12 @@ tr.task-row:hover { background: rgba(255, 255, 255, 0.05); }
   justify-content: flex-end;
 }
 
-#scheduled-modal-close {
+#scheduled-modal-close,
+#settings-cancel,
+#about-check-updates,
+.actions .secondary,
+button.secondary,
+a.secondary {
   background: var(--scheduled-btn-bg, var(--panel-alt, #1e222b));
   color: var(--scheduled-btn-text, var(--text, #e6e8eb));
   border: 1px solid var(--scheduled-btn-border, var(--border, #2a2f3a));
@@ -1603,10 +1608,19 @@ tr.task-row:hover { background: rgba(255, 255, 255, 0.05); }
   font-weight: 500;
   cursor: pointer;
   line-height: 1.4;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
   transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, filter 0.15s ease;
 }
 
-#scheduled-modal-close:hover {
+#scheduled-modal-close:hover,
+#settings-cancel:hover,
+#about-check-updates:hover,
+.actions .secondary:hover,
+button.secondary:hover,
+a.secondary:hover {
   background-color: #252a36;
   border-color: rgba(255, 255, 255, 0.2);
   color: #ffffff;
@@ -2255,7 +2269,7 @@ body.single-pane #source-pane {
 }
 .dropdown-divider {
   height: 1px;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--border);
   margin: 4px 0;
 }
 .dropdown-item {
@@ -2360,6 +2374,14 @@ body.single-pane #source-pane {
 [data-theme="light"] #gear-btn {
   background: rgba(0, 0, 0, 0.05);
   border-color: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .dropdown-menu {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+[data-theme="light"] .dropdown-divider {
+  background: var(--border, #c1c9d2);
 }
 
 [data-theme="light"] .segmented-control button {
@@ -2538,12 +2560,22 @@ body.single-pane #source-pane {
   background-color: var(--panel, #f5f6f8);
   border-color: var(--border, #c1c9d2);
 }
-[data-theme="light"] #scheduled-modal-close {
+[data-theme="light"] #scheduled-modal-close,
+[data-theme="light"] #settings-cancel,
+[data-theme="light"] #about-check-updates,
+[data-theme="light"] .actions .secondary,
+[data-theme="light"] button.secondary,
+[data-theme="light"] a.secondary {
   background: var(--panel-alt, #eaedf1);
   color: var(--text, #212529);
   border: 1px solid var(--border, #c1c9d2);
 }
-[data-theme="light"] #scheduled-modal-close:hover {
+[data-theme="light"] #scheduled-modal-close:hover,
+[data-theme="light"] #settings-cancel:hover,
+[data-theme="light"] #about-check-updates:hover,
+[data-theme="light"] .actions .secondary:hover,
+[data-theme="light"] button.secondary:hover,
+[data-theme="light"] a.secondary:hover {
   background: #dde1e7;
   border-color: #adb5bd;
   color: #000000;
@@ -2841,18 +2873,77 @@ select.modal-select:focus {
 }
 
 :root:not([data-theme="light"]) #scheduled-modal-close,
+:root:not([data-theme="light"]) #settings-cancel,
+:root:not([data-theme="light"]) #about-check-updates,
+:root:not([data-theme="light"]) .actions .secondary,
+:root:not([data-theme="light"]) button.secondary,
+:root:not([data-theme="light"]) a.secondary,
 [data-theme="dark"] #scheduled-modal-close,
-.dark #scheduled-modal-close {
+[data-theme="dark"] #settings-cancel,
+[data-theme="dark"] #about-check-updates,
+[data-theme="dark"] .actions .secondary,
+[data-theme="dark"] button.secondary,
+[data-theme="dark"] a.secondary,
+.dark #scheduled-modal-close,
+.dark #settings-cancel,
+.dark #about-check-updates,
+.dark .actions .secondary,
+.dark button.secondary,
+.dark a.secondary {
   background: var(--panel-alt, #1e222b);
   color: var(--text, #e6e8eb);
   border: 1px solid var(--border, #2a2f3a);
 }
 
 :root:not([data-theme="light"]) #scheduled-modal-close:hover,
+:root:not([data-theme="light"]) #settings-cancel:hover,
+:root:not([data-theme="light"]) #about-check-updates:hover,
+:root:not([data-theme="light"]) .actions .secondary:hover,
+:root:not([data-theme="light"]) button.secondary:hover,
+:root:not([data-theme="light"]) a.secondary:hover,
 [data-theme="dark"] #scheduled-modal-close:hover,
-.dark #scheduled-modal-close:hover {
+[data-theme="dark"] #settings-cancel:hover,
+[data-theme="dark"] #about-check-updates:hover,
+[data-theme="dark"] .actions .secondary:hover,
+[data-theme="dark"] button.secondary:hover,
+[data-theme="dark"] a.secondary:hover,
+.dark #scheduled-modal-close:hover,
+.dark #settings-cancel:hover,
+.dark #about-check-updates:hover,
+.dark .actions .secondary:hover,
+.dark button.secondary:hover,
+.dark a.secondary:hover {
   background: #252a36;
   border-color: rgba(255, 255, 255, 0.2);
   color: #ffffff;
 }
+
+:root:not([data-theme="light"]) .dropdown-divider,
+[data-theme="dark"] .dropdown-divider,
+.dark .dropdown-divider {
+  background: var(--border, #2a2f3a);
+}
+
+/* About Modal */
+.about-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 16px 0 20px;
+}
+
+.about-brand-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.about-version-value {
+  color: var(--text);
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+  user-select: text;
+}
+
+
 

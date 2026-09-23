@@ -284,7 +284,7 @@ docker compose ps
 
 ## Docker Image
 
-The published LiteSync image is:
+The published LiteSync image is available on Docker Hub:
 
 ```text
 avayadhakal/litesync:latest
@@ -302,6 +302,23 @@ Docker automatically selects the appropriate image architecture for supported sy
 linux/amd64
 linux/arm64
 ```
+
+### Image Tags & Version Pinning
+
+Images are published with both `:latest` and version-specific tags matching the project's git release tags:
+
+* `avayadhakal/litesync:latest` — Tracks the most recent release
+* `avayadhakal/litesync:<version>` — Pinned release build (e.g. `avayadhakal/litesync:0.1.0-beta`)
+
+Users who prefer version stability (avoiding unintentional updates whenever running `docker compose pull`) can pin the image tag in `docker-compose.yml`:
+
+```yaml
+services:
+  litesync:
+    image: avayadhakal/litesync:0.1.0-beta
+```
+
+The version displayed in the web application's Settings modal reflects the version string baked into that specific container image at build time. Users can cross-reference this display against published tags on Docker Hub to confirm which release build is actively running.
 
 ---
 

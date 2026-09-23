@@ -5,6 +5,7 @@
     "logged_in_as": "Logged in as {username}",
     "scheduled_transfers": "Scheduled",
     "settings": "Settings",
+    "about": "About",
     "logout": "Log out",
     "brand": "LiteSync"
   },
@@ -157,6 +158,12 @@
       "conf_pwd": "Confirm new password",
       "cancel": "Cancel",
       "save": "Save Changes"
+    },
+    "about": {
+      "title": "About LiteSync",
+      "version": "Version",
+      "check_updates": "Check for updates",
+      "close": "Close"
     }
   },
   "messages": {

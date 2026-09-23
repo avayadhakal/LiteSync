@@ -107,6 +107,7 @@ if [[ "${SCRIPT_DIR}" != "${INSTALL_DIR}" ]]; then
     log "Staging application code into ${INSTALL_DIR}..."
     cp -r "${SCRIPT_DIR}/app" "${SCRIPT_DIR}/static" "${INSTALL_DIR}/"
     cp "${SCRIPT_DIR}/requirements.txt" "${SCRIPT_DIR}/config.example.toml" "${INSTALL_DIR}/"
+    [[ -f "${SCRIPT_DIR}/VERSION" ]] && cp "${SCRIPT_DIR}/VERSION" "${INSTALL_DIR}/"
     # Drop any stale bytecode that may have come along from a dev machine.
     find "${INSTALL_DIR}/app" -name '__pycache__' -type d -prune -exec rm -rf {} +
 fi

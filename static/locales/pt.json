@@ -5,6 +5,7 @@
     "logged_in_as": "Conectado como {username}",
     "scheduled_transfers": "Agendado",
     "settings": "Configurações",
+    "about": "Sobre",
     "logout": "Sair",
     "brand": "LiteSync"
   },
@@ -157,6 +158,12 @@
       "conf_pwd": "Confirmar senha",
       "cancel": "Cancelar",
       "save": "Salvar Alterações"
+    },
+    "about": {
+      "title": "Sobre o LiteSync",
+      "version": "Versão",
+      "check_updates": "Verificar atualizações",
+      "close": "Fechar"
     }
   },
   "messages": {

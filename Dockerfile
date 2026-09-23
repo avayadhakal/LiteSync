@@ -13,7 +13,7 @@ RUN groupadd -r litesync && useradd -r -g litesync -m -d /app litesync
 WORKDIR /app
 
 # Copy application code and configuration template
-COPY requirements.txt config.example.toml ./
+COPY requirements.txt config.example.toml VERSION ./
 COPY app ./app
 COPY static ./static
 

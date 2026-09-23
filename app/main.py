@@ -15,6 +15,7 @@ from app.browse import router as browse_router
 from app.transfers import db
 from app.transfers.routes import router as tasks_router
 from app.transfers.scheduler import reconcile_on_startup, run_scheduler, shutdown_runner
+from app.version import get_app_version
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
@@ -70,6 +71,12 @@ async def security_headers(request: Request, call_next):
 app.include_router(auth_router)
 app.include_router(browse_router)
 app.include_router(tasks_router)
+
+
+@app.get("/api/version")
+async def app_version():
+    return {"version": get_app_version()}
+
 
 app.mount("/css", StaticFiles(directory=STATIC_DIR / "css"), name="css")
 app.mount("/js", StaticFiles(directory=STATIC_DIR / "js"), name="js")

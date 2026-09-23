@@ -217,11 +217,11 @@ Download a release archive:
 ```sh
 cd /tmp
 
-curl -L https://gitea.avayahome.xyz/avaya/LiteSync/archive/v0.1.0-alpha.tar.gz \
-  -o litesync-v0.1.0-alpha.tar.gz
+curl -L  https://codeload.github.com/avayadhakal/LiteSync/tar.gz/refs/tags/v0.1.0-beta \
+  -o LiteSync-0.1.0-beta.tar.gz
 
-tar -xzf litesync-v0.1.0-alpha.tar.gz
-cd LiteSync-v0.1.0-alpha
+tar -xzf LiteSync-0.1.0-beta.tar.gz
+cd LiteSync-0.1.0-beta
 
 sudo bash install.sh
 ```

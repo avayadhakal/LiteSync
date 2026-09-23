@@ -1,31 +1,21 @@
 services:
   litesync:
-    build: .
-    image: litesync:latest
+    image: avayadhakal/litesync:latest
+    container_name: litesync
     restart: unless-stopped
+    # Run as host user to ensure permission to write to host mounts
+    user: "1000:1000"
     ports:
       - "8000:8000"
     volumes:
-      # The persistent volume for LiteSync's database, task logs, and temporary files.
-      - litesync_data:/data
+      # Use a local folder instead of a docker named volume so the host user owns it
+      - ./data:/data
       # Mount your configuration file into the container.
-      # Create a config.toml on your host (e.g. copied from config.example.toml)
-      # and mount it here. The application does not hot-reload, so restarts are required for config changes.
       - ./config.toml:/data/config.toml:ro
-      # ----------------------------------------------------------------------------------
-      # HOST DIRECTORY MOUNTS (CRITICAL)
-      # ----------------------------------------------------------------------------------
-      # Map host directories to container paths here, and ensure the container paths are listed
-      # in the LITESYNC_ALLOWED_ROOTS environment variable below.
-      #
-      # The left side (before the colon) is the path on your host machine.
-      # The right side (after the colon) is the path inside the container.
-      #
+      # Host storage mounts (Host Path : Container Path)
       # Examples:
       # - /mnt/movies:/movies       
       # - /home/user/dl:/downloads  
-      #
-      # - /path/to/host/dir:/container/path
     environment:
       # Optional: set the web port (default: 8000). If you change the host-side port in "ports:" above
       # (e.g. "9000:8000"), set LITESYNC_PORT to match your host port (9000) for CSRF validation.
@@ -34,11 +24,5 @@ services:
       # - LITESYNC_MAX_UPLOAD_SIZE_MB=10240
       # The container-side paths from the volumes section MUST be listed here,
       # separated by colons (:). This overrides any allowed_roots in config.toml.
-      #
-      # Example matching the commented volumes above:
-      # - LITESYNC_ALLOWED_ROOTS=/movies:/downloads
-      - LITESYNC_ALLOWED_ROOTS=
-
-volumes:
-  litesync_data:
-    # This creates a named volume managed by Docker for persistent application data.
+      # Ensure you include all directories you want the browser to access.
+      - LITESYNC_ALLOWED_ROOTS=/mnt/movies:/home/user/dl

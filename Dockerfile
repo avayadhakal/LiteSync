@@ -21,7 +21,7 @@ COPY static ./static
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Ensure the /data directory exists and belongs to the litesync user
-RUN mkdir -p /data && chown -R litesync:litesync /data /app
+RUN mkdir -p /data && chown -R litesync:litesync /data /app && chmod 755 /app
 
 # Switch to the non-root user
 USER litesync

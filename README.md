@@ -413,32 +413,6 @@ For the detailed component structure and transfer flow, see the [Architecture Do
 
 ---
 
-## Project Structure
-
-The main application is organized around the following areas:
-
-```text
-app/
-├── main.py
-├── auth.py
-├── config.py
-├── fsops.py
-├── browse/
-├── transfers/
-└── ...
-
-data/
-├── litesync.db
-├── tasks/
-└── tmp/
-
-docs/
-├── architecture.md
-└── screenshots/
-```
-
----
-
 ## Security
 
 LiteSync is intended to be used on a trusted Linux system and should not be exposed directly to the public internet without appropriate network controls.

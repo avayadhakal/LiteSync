@@ -30,16 +30,47 @@ LiteSync has both a Python test suite (using pytest) and a Node-based JavaScript
 
 **Python Tests:**
 ```bash
-pytest tests/
+pytest tests/test_version.py tests/test_change_password.py tests/test_config.py tests/test_csrf.py
 ```
 
 **JavaScript Tests:**
-Ensure you have Node.js installed, then run the tests directly:
+Ensure you have Node.js installed, then run the frontend unit tests directly:
 ```bash
+node tests/test_settings_version_frontend.js
+node tests/test_scheduled_frontend.js
+node tests/test_editor_frontend.js
 node tests/test_selection.js
 node tests/test_layout.js
 node tests/test_filename_visibility.js
 ```
+
+## Versioning & Release Workflow
+
+LiteSync enforces a single source of truth for application versioning:
+
+- **`VERSION` File:** The file `VERSION` at the repository root contains the canonical release version string (e.g. `0.1.0-beta`).
+- **Zero Hardcoded Versions:** Never hardcode version strings in Python files, frontend JavaScript, HTML templates, or styles. The backend reads `VERSION` once at startup via `app/version.py` (with graceful fallback to `"dev"` if missing or unreadable), exposes it through `/api/version` and `/api/whoami`, and the frontend displays it dynamically in the About modal.
+- **Releasing a New Version:**
+  1. Update the version string in the root `VERSION` file (e.g. `0.2.0`).
+  2. Commit the change:
+     ```bash
+     git add VERSION
+     git commit -m "chore(release): bump version to 0.2.0"
+     ```
+  3. Create a matching git tag:
+     ```bash
+     git tag v0.2.0
+     ```
+  4. Push the commit and tags to the remote repository:
+     ```bash
+     git push origin main --tags
+     ```
+  5. Build and publish Docker images tagged with both the version and `:latest`:
+     ```bash
+     docker build -t avayadhakal/litesync:0.2.0 -t avayadhakal/litesync:latest .
+     docker push avayadhakal/litesync:0.2.0
+     docker push avayadhakal/litesync:latest
+     ```
 
 ## Architectural Philosophy
 

@@ -17,6 +17,7 @@ Minimal-overhead Linux web app for dual-pane local directory browsing and backgr
 │   ├── main.py               # FastAPI app, static mounts, routers, startup poller/reconciliation
 │   ├── config.py             # Loads config.toml and overrides from environment variables (LITESYNC_PORT, LITESYNC_ALLOWED_ORIGINS, LITESYNC_MAX_UPLOAD_SIZE_MB) -> Settings object
 │   ├── auth.py               # bcrypt password hashing, signed cookies, login/lockout logic
+│   ├── version.py            # Single-source version resolver and loader (reads root VERSION)
 │   ├── fsops.py              # resolve_safe_path(), list_directory() — path validation
 │   ├── browse/               # Browser and upload subsystem
 │   │   ├── __init__.py
@@ -54,6 +55,7 @@ Minimal-overhead Linux web app for dual-pane local directory browsing and backgr
 │       ├── uploads.js        # Multipart streaming upload client
 │       ├── utils.js          # Formatting and helper utilities
 │       └── modals/           # Modal dialog controllers
+│           ├── about.js          # About LiteSync modal dialog controller
 │           ├── editor.js
 │           ├── item-details.js
 │           ├── mkdir-rename-delete.js
@@ -85,7 +87,8 @@ Minimal-overhead Linux web app for dual-pane local directory browsing and backgr
 ├── CHANGELOG.md              # Version history and notable changes
 ├── CONTRIBUTING.md           # Developer guidelines and setup
 ├── LICENSE                   # MIT License
-└── README.md
+├── README.md
+└── VERSION                   # Single source of truth for release version string
 ```
 
 ## 3. Database Schema (SQLite)
@@ -136,7 +139,8 @@ CREATE TABLE users (
 | POST | `/api/login` | Authenticates credentials and sets secure session cookie. |
 | POST | `/api/change-password` | Updates user password in SQLite/memory and invalidates old sessions across devices. |
 | POST | `/api/logout` | Clears user session cookie. |
-| GET | `/api/whoami`, `/api/roots` | Session context & configured root validation. |
+| GET | `/api/whoami`, `/api/roots` | Session context (username, version) & configured root validation. |
+| GET | `/api/version` | Returns `{version: "<string>"}` loaded from single-source root `VERSION` file. |
 | GET | `/api/browse?path=<abs>` | Returns `{path, parent, entries}`. Filters out-of-root symlinks. |
 | GET | `/api/download/link?path=<abs>&disposition=<attachment\|inline>` | Generates signed HMAC download URL with optional inline disposition. |
 | GET/HEAD | `/api/download?path=<abs>&expires=<ts>&signature=<hmac>&disposition=<attachment\|inline>` | Streaming & download endpoint supporting HTTP Range requests, safe MIME allowlist, and nosniff protection. |
@@ -223,6 +227,24 @@ CREATE TABLE users (
    - Because no OS subprocess or worker thread has been allocated, the cancel handler strictly bypasses process signaling (`terminate_task` and `terminate_paused_task`), preventing errors or false signals against nonexistent PIDs.
    - SQLite lock serialization ensures race-free behavior even if a cancellation request arrives simultaneously with wake-cycle promotion.
 
+### Application Versioning Subsystem (Single Source of Truth)
+
+1. **Single Source of Truth (`VERSION`):**
+   - A single text file at repository root (`VERSION`) holds the canonical release version string (e.g., `0.1.0-beta`), matching git release tags (`v<version>`).
+   - No version strings are hardcoded anywhere else in application code, templates, or styles.
+2. **Startup-Cached Resolution (`app/version.py`):**
+   - Loaded once at module import/startup via `Path(__file__).resolve().parent.parent / "VERSION"`.
+   - Strips whitespace/newlines and holds the value in memory (`APP_VERSION`), eliminating repeated per-request filesystem I/O.
+3. **Resilient Fallback:**
+   - If the `VERSION` file is missing, empty, or unreadable (e.g., during ad-hoc testing or incomplete checkouts), `get_version()` gracefully falls back to `"dev"` without raising unhandled exceptions or impeding server startup.
+4. **Multi-Deployment Alignment:**
+   - **Docker:** `Dockerfile` explicitly runs `COPY VERSION .`, placing `/app/VERSION` adjacent to the `app/` package.
+   - **Systemd Service:** `install.sh` copies `VERSION` into `$INSTALL_DIR/VERSION`.
+   - **Local Development:** Direct execution natively resolves `VERSION` from the repository root.
+5. **API & Consumer Exposure:**
+   - `GET /api/version`: Dedicated endpoint returning `{"version": APP_VERSION}`.
+   - `GET /api/whoami`: Augmented with a `"version"` key for consumers already calling session validation.
+
 ## 5. Frontend Architecture (Vanilla HTML/CSS/JS)
 
 ### Client-Side Internationalization (i18n)
@@ -248,6 +270,14 @@ CREATE TABLE users (
 * **Modals:** Reusable styling (`.modal-backdrop`, `.modal`). Dedicated popups for Mkdir, Rename, Delete, Item Details, and Confirmations.
 * **Toasts (`.toast-stack`):** Top-right fixed position. Auto-dismiss (4s) or click-to-dismiss. Slide-in animations.
 * **Activity Log (SQLite):** Persistent across browsers and reloads. Color-coded by severity. Failed and interrupted transfer entries feature a "Retry" action that closes the log view, reconstructs the original selection and destination states, and pre-fills the standard Transfer confirmation modal for manual review and submission.
+
+### Settings, Navigation & About Modal
+
+* **Header Dropdown Menu (`#gear-menu`):** Popover containing the user banner (`#menu-user-banner`), divider, **Scheduled Transfers** (`#menu-scheduled`), **Settings** (`#menu-settings`), and **About** (`#menu-about`), cleanly separated from **Log out** (`#menu-logout`) via a visual divider (`.dropdown-divider`).
+* **Theme-Adaptive Dropdown Divider (`.dropdown-divider`):** Uses the `var(--border)` design token across themes (resolving to `#2a2f3a` in dark mode and `#c1c9d2` in light mode), avoiding unstyled blank gaps in light mode while maintaining crisp contrast.
+* **Settings Modal (`#settings-modal`, `static/js/modals/settings.js`):** Focuses cleanly on user preferences (language selection, light/dark theme switching, password changes, and hidden files toggle). The modal footer contains only standard action buttons ("Cancel" and "Save Changes").
+* **Dedicated About Modal (`#about-modal`, `static/js/modals/about.js`):** Displays application branding, current runtime version string dynamically resolved via `/api/version` (cached in memory after the initial fetch), and an external outbound link to the GitHub releases page (`https://github.com/avayadhakal/LiteSync/releases`).
+* **Secondary Button Styling Alignment (`.secondary`):** Action buttons requiring secondary prominence across modals (`#settings-cancel`, `#about-check-updates`, `#scheduled-modal-close`, and `.actions .secondary`) strictly share unified styling tokens (`background: var(--panel-alt)`, `border: 1px solid var(--border)`, 8px border-radius, standard typography), guaranteeing consistent contrast and hover feedback in both dark and light modes.
 
 ### Uploads & Active Transfers UI
 

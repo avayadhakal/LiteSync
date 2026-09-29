@@ -34,6 +34,15 @@
     "filter_logs": "Filtrar registros...",
     "clear_log": "Limpiar registro"
   },
+  "bookmarks": {
+    "title": "Marcadores",
+    "hint": "Las carpetas fijadas aparecerán aquí"
+  },
+  "panel": {
+    "toggle": "Alternar panel lateral",
+    "collapse": "Contraer panel",
+    "expand": "Expandir panel"
+  },
   "modals": {
     "transfer": {
       "title": "Transferir elementos",

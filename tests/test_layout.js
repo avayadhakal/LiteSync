@@ -47,6 +47,8 @@ class MockElement {
   appendChild(child) {
     this.children.push(child);
   }
+  setAttribute(k, v) { this[k] = String(v); this.dataset[k.replace(/^data-/, '')] = String(v); }
+  getAttribute(k) { return this[k] || this.dataset[k.replace(/^data-/, '')] || null; }
   closest(selector) { return null; }
   remove() {}
 }
@@ -62,6 +64,9 @@ const mockDocument = {
   },
   createElement(tag) {
     return new MockElement(null, tag);
+  },
+  createDocumentFragment() {
+    return new MockElement(null, 'fragment');
   },
   querySelectorAll() {
     return [];
@@ -95,6 +100,9 @@ global.window = { location: { href: '' }, isSecureContext: true };
 global.navigator = { clipboard: { writeText: async () => {} } };
 global.fetch = async (path, opts) => {
   apiCalls.push({ path, opts });
+  if (path.startsWith('/locales/')) {
+    return { ok: true, status: 200, json: async () => ({ panes: { select_root: '(select a root)' } }) };
+  }
   if (path.startsWith('/api/browse')) {
     const p = new URL('http://localhost' + path).searchParams.get('path');
     if (p === '/not-found' || p === '/') throw new Error('Not found');

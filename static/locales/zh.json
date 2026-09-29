@@ -34,6 +34,15 @@
     "filter_logs": "筛选日志...",
     "clear_log": "清除日志"
   },
+  "bookmarks": {
+    "title": "书签",
+    "hint": "固定的文件夹将显示在此处"
+  },
+  "panel": {
+    "toggle": "切换侧边栏",
+    "collapse": "折叠面板",
+    "expand": "展开面板"
+  },
   "modals": {
     "transfer": {
       "title": "传输项目",

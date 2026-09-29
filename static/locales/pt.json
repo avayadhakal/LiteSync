@@ -34,6 +34,15 @@
     "filter_logs": "Filtrar...",
     "clear_log": "Limpar Registro"
   },
+  "bookmarks": {
+    "title": "Favoritos",
+    "hint": "Pastas fixadas aparecerão aqui"
+  },
+  "panel": {
+    "toggle": "Alternar painel lateral",
+    "collapse": "Recolher painel",
+    "expand": "Expandir painel"
+  },
   "modals": {
     "transfer": {
       "title": "Transferir",

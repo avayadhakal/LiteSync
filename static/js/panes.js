@@ -209,6 +209,8 @@ export function updateSelectionUI() {
   if (viewBtn) viewBtn.classList.toggle('hidden', !hasSel);
   if (clearBtn) clearBtn.classList.toggle('hidden', !hasSel);
   if (inlineGroup) inlineGroup.classList.toggle('hidden', !hasSel);
+  const selectionBar = el('selection-bar');
+  if (selectionBar) selectionBar.classList.toggle('hidden', !hasSel);
 
   // Refresh the preview popover contents if it's open.
   const preview = el('selection-preview');

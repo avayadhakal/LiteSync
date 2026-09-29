@@ -401,6 +401,7 @@ export async function loadHistory() {
 
     state.tasks = incoming;
     renderActiveTransfers();
+    updateRightPanelIndicator();
 
     // Completion watcher: fast same-filesystem moves can finish before the
     // SSE stream ever attaches (task goes queued -> succeeded inside the
@@ -497,29 +498,109 @@ export   function confirmStyled(title, message, okLabel = I18n.t('modals.confirm
 
 // --- Resizable splitters (CSS variable architecture) ---
 
-export   function initResizers() {
+// --- Resizable splitters (CSS variable architecture) ---
+
+export function updateRightPanelIndicator() {
+  const tasks = state.tasks || [];
+  const activeCount = tasks.filter((t) => ACTIVE_STATUSES.has(t.status)).length;
+  const indicator = el('collapsed-op-indicator');
+  const countEl = el('collapsed-op-count');
+  const navBadge = el('nav-panel-badge');
+
+  if (indicator) {
+    if (activeCount > 0) {
+      indicator.classList.remove('hidden');
+      if (countEl) countEl.textContent = activeCount > 1 ? String(activeCount) : '';
+      indicator.title = `${activeCount} operation${activeCount > 1 ? 's' : ''} in progress`;
+    } else {
+      indicator.classList.add('hidden');
+    }
+  }
+
+  if (navBadge) {
+    navBadge.classList.toggle('hidden', activeCount === 0);
+  }
+}
+
+export function setRightPanelCollapsed(collapsed) {
+  const rightPanel = el('right-panel');
+  const toggleBtn = el('btn-toggle-right-panel');
+  if (!rightPanel) return;
+
+  if (collapsed) {
+    rightPanel.classList.add('collapsed');
+    document.body.classList.add('right-panel-collapsed');
+    if (toggleBtn) toggleBtn.classList.add('active');
+    localStorage.setItem('litesync_right_panel_collapsed', 'true');
+  } else {
+    rightPanel.classList.remove('collapsed');
+    document.body.classList.remove('right-panel-collapsed');
+    if (toggleBtn) toggleBtn.classList.remove('active');
+    localStorage.setItem('litesync_right_panel_collapsed', 'false');
+  }
+  updateRightPanelIndicator();
+}
+
+export function toggleRightPanel() {
+  const rightPanel = el('right-panel');
+  if (!rightPanel) return;
+  const isCollapsed = rightPanel.classList.contains('collapsed');
+  setRightPanelCollapsed(!isCollapsed);
+}
+
+export function initMobileAccordions() {
+  const bookmarksBtn = el('bookmarks-collapse-btn');
+  const operationsBtn = el('operations-collapse-btn');
+  const bookmarksSection = el('bookmarks-section');
+  const operationsSection = el('operations-section');
+
+  if (bookmarksBtn && bookmarksSection) {
+    bookmarksBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      bookmarksSection.classList.toggle('collapsed');
+    });
+  }
+
+  if (operationsBtn && operationsSection) {
+    operationsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      operationsSection.classList.toggle('collapsed');
+    });
+  }
+}
+
+export function initResizers() {
   const root = document.documentElement;
   const clamp = (val, min, max) => Math.min(Math.max(val, min), max);
 
   // Initialize from LocalStorage or Defaults
   try {
     const dualRatio = parseFloat(localStorage.getItem('litesync_dual_pane_ratio')) || 50;
-    const bottomRatio = parseFloat(localStorage.getItem('litesync_bottom_pane_ratio')) || 30;
-    
     const clampedDual = clamp(dualRatio, 15, 85);
-    const clampedBottom = clamp(bottomRatio, 15, 85);
-
     root.style.setProperty('--left-width', `${clampedDual}%`);
     root.style.setProperty('--top-height', `${clampedDual}%`);
-    root.style.setProperty('--bottom-height', `${clampedBottom}vh`);
+
+    const savedBookmarksRatio = parseFloat(localStorage.getItem('litesync_bookmarks_height_ratio')) || 60;
+    root.style.setProperty('--bookmarks-height', `${clamp(savedBookmarksRatio, 20, 80)}%`);
+
+    const winW = typeof window !== 'undefined' ? window.innerWidth : 1200;
+    const minRightW = 260;
+    const maxRightW = Math.max(minRightW, winW * 0.40);
+    const defaultRightW = clamp(winW * 0.25, minRightW, maxRightW);
+    const savedRightW = parseFloat(localStorage.getItem('litesync_right_panel_width'));
+    const initialRightW = savedRightW ? clamp(savedRightW, minRightW, maxRightW) : defaultRightW;
+    root.style.setProperty('--right-panel-width', `${initialRightW}px`);
   } catch (e) {
     // Ignore localStorage errors and fallback to CSS defaults if needed
   }
 
   const drag = (handle, onMove, onEnd) => {
+    if (!handle) return;
     handle.addEventListener('pointerdown', (e) => {
       e.preventDefault();
-      e.target.setPointerCapture(e.pointerId);
+      if (e.target.setPointerCapture && e.pointerId) {
+        e.target.setPointerCapture(e.pointerId);
+      }
       handle.classList.add('splitter-dragging');
       const move = (ev) => onMove(ev);
       const up = (ev) => {
@@ -527,7 +608,7 @@ export   function initResizers() {
         handle.removeEventListener('pointermove', move);
         handle.removeEventListener('pointerup', up);
         handle.removeEventListener('pointercancel', up);
-        if (e.target.hasPointerCapture(e.pointerId)) {
+        if (e.target.releasePointerCapture && e.pointerId && e.target.hasPointerCapture && e.target.hasPointerCapture(e.pointerId)) {
           e.target.releasePointerCapture(e.pointerId);
         }
         if (onEnd) onEnd();
@@ -538,39 +619,66 @@ export   function initResizers() {
     });
   };
 
+  // 1. Dual pane divider (Source vs Dest)
   const panesEl = document.querySelector('.panes');
+  const vSplitter = el('vertical-splitter');
   let lastDualPct = null;
-  drag(el('vertical-splitter'), (e) => {
-    // Desktop (row): drag adjusts left pane width.
-    // Mobile (column): drag adjusts top pane height.
-    if (getComputedStyle(panesEl).flexDirection === 'column') {
-      const rect = panesEl.getBoundingClientRect();
-      const pct = ((e.clientY - rect.top) / rect.height) * 100;
-      lastDualPct = clamp(pct, 15, 85);
-      root.style.setProperty('--top-height', `${lastDualPct}%`);
-    } else {
-      const pct = (e.clientX / window.innerWidth) * 100;
-      lastDualPct = clamp(pct, 15, 85);
-      root.style.setProperty('--left-width', `${lastDualPct}%`);
-    }
-  }, () => {
-    if (lastDualPct !== null) {
-      localStorage.setItem('litesync_dual_pane_ratio', lastDualPct);
-    }
-  });
+  if (vSplitter && panesEl) {
+    drag(vSplitter, (e) => {
+      if (getComputedStyle(panesEl).flexDirection === 'column') {
+        const rect = panesEl.getBoundingClientRect();
+        const pct = ((e.clientY - rect.top) / rect.height) * 100;
+        lastDualPct = clamp(pct, 15, 85);
+        root.style.setProperty('--top-height', `${lastDualPct}%`);
+      } else {
+        const rect = panesEl.getBoundingClientRect();
+        const pct = ((e.clientX - rect.left) / rect.width) * 100;
+        lastDualPct = clamp(pct, 15, 85);
+        root.style.setProperty('--left-width', `${lastDualPct}%`);
+      }
+    }, () => {
+      if (lastDualPct !== null) {
+        localStorage.setItem('litesync_dual_pane_ratio', lastDualPct);
+      }
+    });
+  }
 
-  const historyEl = document.querySelector('.history');
-  let lastBottomPct = null;
-  drag(el('horizontal-splitter'), (e) => {
-    const height = historyEl.getBoundingClientRect().bottom - e.clientY;
-    const pct = (height / window.innerHeight) * 100;
-    lastBottomPct = clamp(pct, 15, 85);
-    root.style.setProperty('--bottom-height', `${lastBottomPct}vh`);
-  }, () => {
-    if (lastBottomPct !== null) {
-      localStorage.setItem('litesync_bottom_pane_ratio', lastBottomPct);
-    }
-  });
+  // 2. Right panel horizontal resizing divider
+  const rightSplitter = el('right-panel-splitter');
+  let lastRightWidth = null;
+  if (rightSplitter) {
+    drag(rightSplitter, (e) => {
+      const winW = window.innerWidth;
+      const minW = 260;
+      const maxW = Math.max(minW, winW * 0.40);
+      const newWidth = clamp(winW - e.clientX, minW, maxW);
+      lastRightWidth = newWidth;
+      root.style.setProperty('--right-panel-width', `${newWidth}px`);
+    }, () => {
+      if (lastRightWidth !== null) {
+        localStorage.setItem('litesync_right_panel_width', lastRightWidth);
+      }
+    });
+  }
+
+  // 3. Right panel vertical splitter (Bookmarks vs Operations)
+  const rightHSplitter = el('right-panel-h-splitter');
+  const rightPanelEl = el('right-panel');
+  let lastBookmarksPct = null;
+  if (rightHSplitter && rightPanelEl) {
+    drag(rightHSplitter, (e) => {
+      const rect = rightPanelEl.getBoundingClientRect();
+      if (rect.height > 0) {
+        const pct = ((e.clientY - rect.top) / rect.height) * 100;
+        lastBookmarksPct = clamp(pct, 20, 80);
+        root.style.setProperty('--bookmarks-height', `${lastBookmarksPct}%`);
+      }
+    }, () => {
+      if (lastBookmarksPct !== null) {
+        localStorage.setItem('litesync_bookmarks_height_ratio', lastBookmarksPct);
+      }
+    });
+  }
 }
 
 // --- Init ---
@@ -849,6 +957,54 @@ async function init() {
   });
 
   initResizers();
+
+  // Right panel collapsible controls
+  const btnTogglePanel = el('btn-toggle-right-panel');
+  if (btnTogglePanel) {
+    btnTogglePanel.addEventListener('click', () => toggleRightPanel());
+  }
+
+  const btnCollapsePanel = el('right-panel-collapse-btn');
+  if (btnCollapsePanel) {
+    btnCollapsePanel.addEventListener('click', (e) => {
+      e.stopPropagation();
+      setRightPanelCollapsed(true);
+    });
+  }
+
+  const btnExpandPanel = el('right-panel-expand-btn');
+  if (btnExpandPanel) {
+    btnExpandPanel.addEventListener('click', (e) => {
+      e.stopPropagation();
+      setRightPanelCollapsed(false);
+    });
+  }
+
+  const collapsedStrip = el('panel-collapsed-strip');
+  if (collapsedStrip) {
+    collapsedStrip.addEventListener('click', (e) => {
+      const rp = el('right-panel');
+      if (rp && rp.classList.contains('collapsed')) {
+        setRightPanelCollapsed(false);
+      }
+    });
+  }
+
+  // Restore right panel collapsed state from localStorage
+  const isRightPanelCollapsed = localStorage.getItem('litesync_right_panel_collapsed') === 'true';
+  setRightPanelCollapsed(isRightPanelCollapsed);
+
+  initMobileAccordions();
+
+  const bookmarkEntries = document.querySelectorAll('.bookmark-item');
+  bookmarkEntries.forEach((item) => {
+    item.addEventListener('click', () => {
+      const p = item.getAttribute('data-path');
+      if (p) {
+        loadPane('source', p, true).catch(() => {});
+      }
+    });
+  });
 
   el('transfer-btn').addEventListener('click', openConfirmModal);
   el('confirm-cancel').addEventListener('click', closeConfirmModal);

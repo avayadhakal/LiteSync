@@ -34,6 +34,15 @@
     "filter_logs": "Filtrer les journaux...",
     "clear_log": "Effacer le journal"
   },
+  "bookmarks": {
+    "title": "Favoris",
+    "hint": "Les dossiers épinglés apparaîtront ici"
+  },
+  "panel": {
+    "toggle": "Basculer le panneau latéral",
+    "collapse": "Réduire le panneau",
+    "expand": "Agrandir le panneau"
+  },
   "modals": {
     "transfer": {
       "title": "Transférer des éléments",

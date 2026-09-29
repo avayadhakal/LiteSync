@@ -1,5 +1,5 @@
 import { I18n } from './i18n.js';
-import { confirmStyled, loadHistory } from './app.js';
+import { confirmStyled, loadHistory, updateRightPanelIndicator } from './app.js';
 import { getPrimaryTitle } from './modals/transfer.js';
 import { onTaskFinished } from './app.js';
 import { api, toastSuccess, toastError } from './api.js';
@@ -207,6 +207,7 @@ export function updateCardControlsInPlace(task) {
 }
 
 export function renderActiveTransfers() {
+  updateRightPanelIndicator();
   if (state.historyTab !== 'active') return;
   const activeContainer = el('active-transfers-container');
 

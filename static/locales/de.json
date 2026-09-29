@@ -34,6 +34,15 @@
     "filter_logs": "Protokolle filtern...",
     "clear_log": "Protokoll löschen"
   },
+  "bookmarks": {
+    "title": "Lesezeichen",
+    "hint": "Angeheftete Ordner werden hier angezeigt"
+  },
+  "panel": {
+    "toggle": "Seitenleiste umschalten",
+    "collapse": "Seitenleiste einklappen",
+    "expand": "Seitenleiste ausklappen"
+  },
   "modals": {
     "transfer": {
       "title": "Elemente übertragen",

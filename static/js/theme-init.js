@@ -9,3 +9,7 @@
 if (localStorage.getItem('litesync-dual-pane') !== 'true') {
   document.body.classList.add('single-pane');
 }
+
+if (localStorage.getItem('litesync_right_panel_collapsed') === 'true') {
+  document.body.classList.add('right-panel-collapsed');
+}

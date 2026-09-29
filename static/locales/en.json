@@ -34,6 +34,15 @@
     "filter_logs": "Filter logs...",
     "clear_log": "Clear Log"
   },
+  "bookmarks": {
+    "title": "Bookmarks",
+    "hint": "Pinned folders will appear here"
+  },
+  "panel": {
+    "toggle": "Toggle Side Panel",
+    "collapse": "Collapse panel",
+    "expand": "Expand panel"
+  },
   "modals": {
     "transfer": {
       "title": "Transfer items",

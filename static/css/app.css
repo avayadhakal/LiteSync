@@ -25,6 +25,10 @@
   --radius-lg: 12px;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 
+  /* Splitter Theme Tokens (Dark Mode Default) */
+  --splitter-bar: rgba(255, 255, 255, 0.4);
+  --splitter-bar-active: #ffffff;
+
   /* Scheduled Transfers Modal Theme Tokens (Dark Mode Default) */
   --scheduled-modal-bg: var(--bg, #0f1115);
   --scheduled-modal-border: var(--border, #2a2f3a);
@@ -206,6 +210,7 @@ input[type="text"], input[type="password"], input[type="search"], select.modal-s
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+  position: relative;
 }
 
 .panes {
@@ -224,6 +229,76 @@ input[type="text"], input[type="password"], input[type="search"], select.modal-s
   container-type: inline-size;
 }
 
+/* Splitters / Resizing handles */
+.splitter-v, .splitter-h {
+  flex: none;
+  background: transparent;
+  z-index: 20;
+  touch-action: none;
+  user-select: none;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.splitter-v {
+  width: 12px;
+  cursor: col-resize;
+  margin: 0 -6px;
+}
+.splitter-h {
+  height: 12px;
+  cursor: row-resize;
+  margin: -6px 0;
+}
+
+.splitter-v::before, .splitter-h::before {
+  content: "";
+  position: absolute;
+  background: var(--border);
+  transition: background 0.2s ease;
+}
+.splitter-v::before {
+  width: 1px;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.splitter-h::before {
+  height: 1px;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.splitter-v::after, .splitter-h::after {
+  content: "";
+  position: absolute;
+  background: var(--splitter-bar, rgba(255, 255, 255, 0.4));
+  border-radius: 2px;
+  transition: background 0.2s ease;
+  z-index: 1;
+}
+.splitter-v::after {
+  width: 4px;
+  height: 32px;
+}
+.splitter-h::after {
+  height: 4px;
+  width: 32px;
+}
+
+.splitter-v:hover::before, .splitter-v.splitter-dragging::before, .splitter-dragging.splitter-v::before,
+.splitter-h:hover::before, .splitter-h.splitter-dragging::before, .splitter-dragging.splitter-h::before {
+  background: var(--accent);
+}
+.splitter-v:hover::after, .splitter-v.splitter-dragging::after, .splitter-dragging.splitter-v::after,
+.splitter-h:hover::after, .splitter-h.splitter-dragging::after, .splitter-dragging.splitter-h::after {
+  background: var(--splitter-bar-active, #ffffff);
+}
+
 /* Responsive columns: hide Modified column first when pane gets narrow */
 @container (max-width: 440px) {
   .entry .mtime,
@@ -232,20 +307,37 @@ input[type="text"], input[type="password"], input[type="search"], select.modal-s
   }
 }
 
-/* Selection bar at bottom of file pane area */
+/* Selection bar at bottom-right of file pane area */
 .selection-bar {
-  flex: none;
-  min-height: 48px;
-  background: var(--panel);
-  border-top: 1px solid var(--border);
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  z-index: 30;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  padding: 6px 16px;
-  z-index: 20;
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  padding: 4px 10px;
+  pointer-events: auto;
 }
 .selection-bar.hidden {
   display: none !important;
+}
+
+.selection-bar .selection-inline {
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+/* Ensure the last rows of file pane list can scroll completely into view above the floating bar */
+.pane-body {
+  scroll-padding-bottom: 64px;
+}
+.file-panes-area.has-selection .pane-body {
+  padding-bottom: 64px;
 }
 
 /* Desktop: side-by-side panes and right side panel */
@@ -337,27 +429,111 @@ input[type="text"], input[type="password"], input[type="search"], select.modal-s
 @media (max-width: 768px) {
   .main-layout {
     flex-direction: column;
-    overflow-y: auto;
+    overflow: hidden;
     height: calc(100vh - var(--header-h));
+    display: flex;
   }
   .file-panes-area {
-    flex: none;
-    height: auto;
-    min-height: 360px;
+    flex: 1 1 0;
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
   }
   .panes {
     flex-direction: column;
-    min-height: 300px;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
   }
-  #source-pane { height: var(--top-height, 50%); flex: none; }
-  #dest-pane { flex: 1 1 0; min-height: 0; }
-  .splitter-v { width: auto; height: 8px; cursor: row-resize; }
-  .splitter-v::before { width: auto; height: 1px; top: 50%; bottom: auto; left: 0; right: 0; margin-top: -0.5px; }
-  .splitter-v::after { width: 32px; height: 4px; }
+  #source-pane {
+    height: var(--top-height, 50%);
+    flex: none;
+    min-height: 60px;
+    max-height: calc(100% - 60px);
+  }
+  body.single-pane #source-pane {
+    height: 100% !important;
+    max-height: 100% !important;
+    flex: 1 !important;
+  }
+  #dest-pane {
+    flex: 1 1 0;
+    min-height: 60px;
+  }
 
-  #right-panel-splitter,
-  #right-panel-h-splitter {
-    display: none !important;
+  /* All mobile splitters are horizontal resize handles with at least 44px touch target */
+  .splitter-v,
+  .splitter-h {
+    width: 100% !important;
+    height: 44px !important;
+    margin: -22px 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    top: auto;
+    bottom: auto;
+    flex: none;
+    cursor: row-resize !important;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 25;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    background: transparent;
+  }
+
+  .splitter-v::before,
+  .splitter-h::before {
+    content: "";
+    position: absolute;
+    width: 100% !important;
+    height: 1px !important;
+    left: 0 !important;
+    right: 0 !important;
+    top: 50% !important;
+    bottom: auto !important;
+    transform: translateY(-50%) !important;
+    background: var(--border);
+    transition: background 0.2s ease;
+  }
+
+  .splitter-v::after,
+  .splitter-h::after {
+    content: "";
+    position: absolute;
+    width: 36px !important;
+    height: 4px !important;
+    border-radius: 2px;
+    left: 50% !important;
+    top: 50% !important;
+    bottom: auto !important;
+    right: auto !important;
+    transform: translate(-50%, -50%) !important;
+    background: var(--splitter-bar);
+    transition: background 0.2s ease;
+    z-index: 1;
+  }
+
+  .splitter-v:hover::before,
+  .splitter-v.splitter-dragging::before,
+  .splitter-dragging.splitter-v::before,
+  .splitter-h:hover::before,
+  .splitter-h.splitter-dragging::before,
+  .splitter-dragging.splitter-h::before {
+    background: var(--accent);
+  }
+
+  .splitter-v:hover::after,
+  .splitter-v.splitter-dragging::after,
+  .splitter-dragging.splitter-v::after,
+  .splitter-h:hover::after,
+  .splitter-h.splitter-dragging::after,
+  .splitter-dragging.splitter-h::after {
+    background: var(--splitter-bar-active);
   }
 
   #right-panel {
@@ -365,6 +541,10 @@ input[type="text"], input[type="password"], input[type="search"], select.modal-s
     border-left: none;
     border-top: 1px solid var(--border);
     flex: none;
+    height: auto;
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
   }
   .panel-collapsed-strip {
     display: none !important;
@@ -372,6 +552,9 @@ input[type="text"], input[type="password"], input[type="search"], select.modal-s
   .right-panel-content {
     display: flex;
     flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: visible;
     width: 100%;
   }
 
@@ -383,7 +566,23 @@ input[type="text"], input[type="password"], input[type="search"], select.modal-s
   }
 
   #bookmarks-section {
-    height: auto !important;
+    height: var(--mobile-bookmarks-height, 160px);
+    min-height: 80px;
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-bottom: 1px solid var(--border);
+  }
+  .bookmarks-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+  #bookmarks-section.collapsed {
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
     flex: none;
     border-bottom: 1px solid var(--border);
   }
@@ -395,15 +594,68 @@ input[type="text"], input[type="password"], input[type="search"], select.modal-s
   }
 
   #operations-section {
-    height: auto !important;
+    height: var(--mobile-activity-height, 180px);
+    min-height: 100px;
     flex: none;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
     padding: 8px 0;
+  }
+  .operations-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+  #operations-section.collapsed {
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+    flex: none;
+    padding: 0;
+  }
+  #operations-section.collapsed .tabs-bar {
+    height: 44px;
+    margin-bottom: 0;
+    border-bottom: none;
   }
   #operations-section.collapsed #operations-body {
     display: none !important;
   }
   #operations-section.collapsed .accordion-arrow {
     transform: rotate(-90deg);
+  }
+
+  /* When sections are collapsed, hide the adjacent dividers */
+  .main-layout:has(#bookmarks-section.collapsed) #right-panel-splitter,
+  .main-layout.bookmarks-collapsed #right-panel-splitter {
+    display: none !important;
+  }
+  .main-layout:has(#operations-section.collapsed) #right-panel-h-splitter,
+  .main-layout.operations-collapsed #right-panel-h-splitter,
+  .right-panel:has(#operations-section.collapsed) #right-panel-h-splitter,
+  .right-panel.operations-collapsed #right-panel-h-splitter {
+    display: none !important;
+  }
+
+  /* Unify accordion collapse buttons */
+  #bookmarks-collapse-btn,
+  #operations-collapse-btn {
+    background: transparent;
+    border: none;
+    padding: 6px 8px;
+    color: var(--text-dim);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    transition: color 0.15s ease, background 0.15s ease;
+  }
+  #bookmarks-collapse-btn:hover,
+  #operations-collapse-btn:hover {
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.08);
   }
 
   .accordion-arrow {
@@ -929,14 +1181,10 @@ input[type="text"], input[type="password"], input[type="search"], select.modal-s
 .panel-section-header .section-title {
   display: flex;
   align-items: center;
-  gap: 8px;
   font-weight: 600;
   font-size: 13px;
   letter-spacing: 0.02em;
   color: var(--text);
-}
-.panel-section-header .bookmark-icon {
-  font-size: 14px;
 }
 .panel-section-header .section-actions {
   display: flex;
@@ -944,14 +1192,20 @@ input[type="text"], input[type="password"], input[type="search"], select.modal-s
   gap: 8px;
 }
 .panel-section-header .icon-btn {
+  background: transparent;
+  border: none;
   padding: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--text-dim);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: color 0.15s ease, background 0.15s ease;
 }
 .panel-section-header .icon-btn:hover {
   color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 /* Bookmarks content */
@@ -977,6 +1231,12 @@ input[type="text"], input[type="password"], input[type="search"], select.modal-s
   transition: background 0.15s ease;
   font-size: 13px;
   font-family: ui-monospace, monospace;
+  background-image: none !important;
+}
+.bookmark-item.entry .name::before,
+.bookmark-item .name::before {
+  display: none !important;
+  content: none !important;
 }
 .bookmark-item:hover {
   background: rgba(255, 255, 255, 0.05);
@@ -986,6 +1246,10 @@ input[type="text"], input[type="password"], input[type="search"], select.modal-s
   height: 18px;
   flex: none;
   opacity: 0.8;
+}
+.bookmarks-list:not(:empty) + .bookmarks-empty-hint,
+.bookmarks-list:not(:empty) ~ .bookmarks-empty-hint {
+  display: none !important;
 }
 .bookmarks-empty-hint {
   padding: 12px 16px;
@@ -2620,6 +2884,10 @@ body.single-pane #source-pane {
   --success: #198754;
   --warn: #ffc107;
 
+  /* Splitter Theme Tokens (Light Mode) */
+  --splitter-bar: rgba(0, 0, 0, 0.2);
+  --splitter-bar-active: rgba(0, 0, 0, 0.5);
+
   /* Scheduled Transfers Modal Theme Tokens (Light Mode) */
   --scheduled-card-bg: #ffffff;
   --scheduled-card-border: rgba(0, 0, 0, 0.08);
@@ -2722,8 +2990,10 @@ body.single-pane #source-pane {
 }
 [data-theme="light"] .splitter-v:hover::after,
 [data-theme="light"] .splitter-dragging.splitter-v::after,
+[data-theme="light"] .splitter-v.splitter-dragging::after,
 [data-theme="light"] .splitter-h:hover::after,
-[data-theme="light"] .splitter-dragging.splitter-h::after {
+[data-theme="light"] .splitter-dragging.splitter-h::after,
+[data-theme="light"] .splitter-h.splitter-dragging::after {
   background: rgba(0, 0, 0, 0.5);
 }
 [data-theme="light"] .card-path,

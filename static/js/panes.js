@@ -190,18 +190,24 @@ export function paneSelection(which) {
 }
 
 export function updateSelectionUI() {
-  // Only the source pane drives the Transfer button; show its count.
-  const count = state.selection.size;
-  el('transfer-btn').disabled = !(count > 0 && (state.dest.path || state.singlePane));
+  const srcCount = state.selection ? state.selection.size : 0;
+  const destCount = (!state.singlePane && state.destSelection) ? state.destSelection.size : 0;
+  const totalCount = srcCount + destCount;
+  const count = totalCount;
+  const hasSel = totalCount > 0;
 
-  // Inline selection summary in the .controls footer. Hiding the whole badge
-  // wrapper (not just its children) prevents an empty-pill artifact at 0 selected
-  // and collapses the nested popover's anchor automatically.
+  // Only the source pane drives the Transfer button
+  const transferBtn = el('transfer-btn');
+  if (transferBtn) {
+    transferBtn.disabled = !(srcCount > 0 && (state.dest.path || state.singlePane));
+  }
+
+  // Inline selection summary in the floating selection bar
   const countEl = el('selection-inline-count');
   const viewBtn = el('selection-view-btn');
   const clearBtn = el('selection-clear-btn');
   const inlineGroup = el('selection-inline');
-  const hasSel = count > 0;
+
   if (countEl) {
     countEl.textContent = hasSel ? I18n.t('panes.selected_count', { count }) : '';
     countEl.classList.toggle('hidden', !hasSel);
@@ -211,6 +217,9 @@ export function updateSelectionUI() {
   if (inlineGroup) inlineGroup.classList.toggle('hidden', !hasSel);
   const selectionBar = el('selection-bar');
   if (selectionBar) selectionBar.classList.toggle('hidden', !hasSel);
+
+  const filePanesArea = el('file-panes-area');
+  if (filePanesArea) filePanesArea.classList.toggle('has-selection', hasSel);
 
   // Refresh the preview popover contents if it's open.
   const preview = el('selection-preview');
@@ -298,10 +307,12 @@ export function renderSelectionPreview() {
   const list = el('selection-preview-list');
   const countEl = el('selection-preview-count');
   if (!list || !countEl) return;
-  const sources = state.selection.toTransferSources();
-  countEl.textContent = I18n.t('panes.selected_count', { count: sources.length });
+  const srcSources = state.selection ? state.selection.toTransferSources() : [];
+  const destSources = (!state.singlePane && state.destSelection) ? state.destSelection.toTransferSources() : [];
+  const allSources = [...srcSources, ...destSources];
+  countEl.textContent = I18n.t('panes.selected_count', { count: allSources.length });
   list.innerHTML = '';
-  for (const item of sources) {
+  for (const item of allSources) {
     const li = document.createElement('li');
     if (typeof item === 'string') {
       li.textContent = item;
@@ -412,6 +423,29 @@ export function bindPaneDelegation(paneId, which) {
     if (row && row.classList.contains('dir')) {
       if (!isActionDialogEligible(e)) return;
       loadPane(which, row.getAttribute('data-path'));
+      return;
+    }
+
+    if (row && !row.classList.contains('dir')) {
+      const rowCb = row.querySelector('input[type="checkbox"]');
+      if (rowCb) {
+        rowCb.checked = !rowCb.checked;
+        const path = row.getAttribute('data-path');
+        const sel = paneSelection(which);
+        const rowIndex = parseInt(row.getAttribute('data-index') ?? '-1', 10);
+        if (rowCb.checked) {
+          sel.select(path);
+        } else {
+          sel.unselect(path);
+        }
+        applySingleRowCheckbox(row, rowCb, which);
+        if (rowIndex >= 0) lastClickedIndex.set(which, rowIndex);
+        updateSelectionUI();
+        if (typeof updateTransferMethodUI === 'function' && el('confirm-modal') && !el('confirm-modal').classList.contains('hidden')) {
+          updateTransferMethodUI();
+        }
+      }
+      return;
     }
   });
 

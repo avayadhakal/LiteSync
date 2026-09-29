@@ -18,7 +18,8 @@ assert.ok(htmlContent.includes('id="bookmarks-section"'), 'bookmarks-section mus
 assert.ok(htmlContent.includes('id="right-panel-h-splitter"'), 'right-panel-h-splitter must exist in index.html');
 assert.ok(htmlContent.includes('id="operations-section"'), 'operations-section must exist in index.html');
 assert.ok(htmlContent.includes('id="panel-collapsed-strip"'), 'panel-collapsed-strip must exist in index.html');
-assert.ok(htmlContent.includes('id="btn-toggle-right-panel"'), 'btn-toggle-right-panel must exist in index.html');
+assert.ok(!htmlContent.includes('id="btn-toggle-right-panel"'), 'btn-toggle-right-panel must NOT exist in index.html');
+assert.ok(!htmlContent.includes('⭐'), 'Star icon must NOT exist in Bookmarks header');
 assert.ok(htmlContent.includes('id="right-panel-collapse-btn"'), 'right-panel-collapse-btn must exist in index.html');
 assert.ok(htmlContent.includes('id="right-panel-expand-btn"'), 'right-panel-expand-btn must exist in index.html');
 assert.ok(htmlContent.includes('id="collapsed-op-indicator"'), 'collapsed-op-indicator must exist in index.html');
@@ -40,11 +41,26 @@ console.log('✓ HTML Layout Structure Verification Passed');
 assert.ok(cssContent.includes('.main-layout'), '.main-layout must be styled');
 assert.ok(cssContent.includes('.file-panes-area'), '.file-panes-area must be styled');
 assert.ok(cssContent.includes('.selection-bar'), '.selection-bar must be styled');
+assert.ok(cssContent.includes('position: absolute'), 'selection-bar must be positioned absolutely in file-panes-area');
+assert.ok(cssContent.includes('.splitter-v') && cssContent.includes('col-resize'), '.splitter-v must have col-resize');
+assert.ok(cssContent.includes('.splitter-h') && cssContent.includes('row-resize'), '.splitter-h must have row-resize');
+assert.ok(cssContent.includes('touch-action: none'), 'Mobile resize handles must have touch-action: none to prevent scrolling');
+assert.ok(cssContent.includes('height: 44px'), 'Mobile resize handles must have 44px touch target');
+assert.ok(cssContent.includes('.bookmark-item .name::before') || cssContent.includes('.bookmark-item.entry .name::before'), 'bookmark items must suppress pseudo-element icon');
+assert.ok(cssContent.includes('.bookmarks-list:not(:empty)'), 'empty hint must be hidden when bookmarks exist');
 assert.ok(cssContent.includes('#right-panel'), '#right-panel must be styled');
 assert.ok(cssContent.includes('#bookmarks-section'), '#bookmarks-section must be styled');
 assert.ok(cssContent.includes('#operations-section'), '#operations-section must be styled');
 assert.ok(cssContent.includes('.panel-collapsed-strip'), '.panel-collapsed-strip must be styled');
 assert.ok(cssContent.includes('@container (max-width: 440px)'), 'Container query or narrow pane rule for hiding modified column must exist');
+assert.ok(cssContent.includes('width: 100% !important;'), '#right-panel-splitter must have width: 100% on mobile');
+assert.ok(cssContent.includes('.file-panes-area') && cssContent.includes('flex: 1 1 0;'), '.file-panes-area must be flex: 1 1 0 on mobile');
+assert.ok(cssContent.includes('bookmarks-collapsed') && cssContent.includes('#right-panel-splitter'), 'Divider above bookmarks must hide when bookmarks collapsed');
+assert.ok(cssContent.includes('operations-collapsed') && cssContent.includes('#right-panel-h-splitter'), 'Divider between bookmarks and operations must hide when operations collapsed');
+assert.ok(!cssContent.includes('#vertical-splitter {\n    display: none !important;'), '#vertical-splitter must NOT be hidden in mobile media query');
+assert.ok(cssContent.includes('--splitter-bar: rgba(0, 0, 0, 0.2);'), 'Light mode must define original gray --splitter-bar token');
+assert.ok(cssContent.includes('--splitter-bar-active: rgba(0, 0, 0, 0.5);'), 'Light mode must define dark gray --splitter-bar-active token');
+assert.ok(cssContent.includes('[data-theme="light"] .splitter-v::after') && cssContent.includes('background: rgba(0, 0, 0, 0.2);'), 'Light mode grab bar must use original gray');
 
 console.log('✓ CSS Layout Rules Verification Passed');
 
@@ -72,7 +88,9 @@ class MockElement {
     this.tagName = tagName.toUpperCase();
     this.classList = new MockClassList();
     this.dataset = {};
-    this.style = {};
+    this.style = {
+      setProperty: (k, v) => { this.style[k] = String(v); }
+    };
     this.value = '';
     this.textContent = '';
     this.title = '';
@@ -85,9 +103,14 @@ class MockElement {
     if (!this._listeners[event]) this._listeners[event] = [];
     this._listeners[event].push(fn);
   }
+  removeEventListener(event, fn) {
+    if (this._listeners[event]) {
+      this._listeners[event] = this._listeners[event].filter(f => f !== fn);
+    }
+  }
   dispatchEvent(event) {
     if (this._listeners[event.type]) {
-      this._listeners[event.type].forEach(fn => fn(event));
+      [...this._listeners[event.type]].forEach(fn => fn(event));
     }
   }
   click() {
@@ -197,20 +220,32 @@ async function testRightPanelLogic() {
 
   console.log('✓ In-Progress Operations Indicator Passed');
 
-  // Test 7: Selection bar visibility
+  // Test 7: Selection bar visibility (Source and Destination selections)
+  state.singlePane = false;
   state.selection.clear();
+  state.destSelection.clear();
   updateSelectionUI();
   const selBar = mockDocument.getElementById('selection-bar');
   assert.strictEqual(selBar.classList.contains('hidden'), true, 'Selection bar should be hidden when 0 items selected');
 
   state.selection.select('/test.txt');
   updateSelectionUI();
-  assert.strictEqual(selBar.classList.contains('hidden'), false, 'Selection bar should be visible when items are selected');
+  assert.strictEqual(selBar.classList.contains('hidden'), false, 'Selection bar should be visible when source items are selected');
 
   // Even when right-panel is collapsed, selection bar remains visible
   setRightPanelCollapsed(true);
   updateSelectionUI();
   assert.strictEqual(selBar.classList.contains('hidden'), false, 'Selection bar must remain visible when right-panel is collapsed');
+
+  // When selection is only in destination pane (Dual mode)
+  state.selection.clear();
+  state.destSelection.select('/dest_test.txt');
+  updateSelectionUI();
+  assert.strictEqual(selBar.classList.contains('hidden'), false, 'Selection bar must be visible when items are selected in destination pane');
+
+  state.destSelection.clear();
+  updateSelectionUI();
+  assert.strictEqual(selBar.classList.contains('hidden'), true, 'Selection bar must hide when all selections are cleared');
 
   console.log('✓ Selection Bar Relocation & Visibility Passed');
 
@@ -225,6 +260,112 @@ async function testRightPanelLogic() {
   assert.strictEqual(mockLocalStorage.getItem('litesync_right_panel_collapsed'), 'true', 'Dual mode preserves right panel collapsed state');
 
   console.log('✓ Single and Dual Mode Preservation Passed');
+
+  // Test 9: Horizontal and Vertical Resizers wiring
+  const { initResizers, initMobileAccordions } = await import('../static/js/app.js');
+  initResizers();
+  assert.ok(mockDocument.documentElement.style['--left-width'], 'dual pane ratio CSS var initialized');
+  assert.ok(mockDocument.documentElement.style['--bookmarks-height'], 'bookmarks height CSS var initialized');
+  assert.ok(mockDocument.documentElement.style['--right-panel-width'], 'right panel width CSS var initialized');
+  assert.ok(mockDocument.documentElement.style['--mobile-bookmarks-height'], 'mobile bookmarks height CSS var initialized');
+  assert.ok(mockDocument.documentElement.style['--mobile-activity-height'], 'mobile activity height CSS var initialized');
+
+  console.log('✓ Horizontal & Vertical Resizers Initialized Successfully');
+
+  // Test 10: Mobile drag behavior simulation
+  global.window.innerWidth = 500;
+  const rightSplitter = mockDocument.getElementById('right-panel-splitter');
+  const rightHSplitter = mockDocument.getElementById('right-panel-h-splitter');
+  const mainEl = mockDocument.getElementById('main-layout');
+  const bookmarksSection = mockDocument.getElementById('bookmarks-section');
+  const operationsSection = mockDocument.getElementById('operations-section');
+  
+  mainEl.getBoundingClientRect = () => ({ top: 0, height: 600, left: 0, width: 500 });
+  bookmarksSection.getBoundingClientRect = () => ({ top: 260, bottom: 420, height: 160 });
+  operationsSection.getBoundingClientRect = () => ({ top: 420, bottom: 600, height: 180 });
+
+  // Dragging Divider 1 (rightSplitter) UP from 260 to 220 makes Bookmarks taller (420 - 220 = 200px)
+  rightSplitter.dispatchEvent({ type: 'pointerdown', preventDefault: () => {}, target: rightSplitter, pointerId: 1 });
+  rightSplitter.dispatchEvent({ type: 'pointermove', clientY: 220, target: rightSplitter, pointerId: 1 });
+  rightSplitter.dispatchEvent({ type: 'pointerup', target: rightSplitter, pointerId: 1 });
+  assert.strictEqual(mockDocument.documentElement.style['--mobile-bookmarks-height'], '200px', 'Mobile drag Divider 1 UP sets --mobile-bookmarks-height to 200px');
+  assert.strictEqual(mockLocalStorage.getItem('litesync_mobile_bookmarks_height'), '200', 'Mobile drag stores bookmarks height in localStorage');
+
+  // Dragging Divider 1 DOWN from 220 to 320 makes Bookmarks shorter (420 - 320 = 100px)
+  rightSplitter.dispatchEvent({ type: 'pointerdown', preventDefault: () => {}, target: rightSplitter, pointerId: 1 });
+  rightSplitter.dispatchEvent({ type: 'pointermove', clientY: 320, target: rightSplitter, pointerId: 1 });
+  rightSplitter.dispatchEvent({ type: 'pointerup', target: rightSplitter, pointerId: 1 });
+  assert.strictEqual(mockDocument.documentElement.style['--mobile-bookmarks-height'], '100px', 'Mobile drag Divider 1 DOWN sets --mobile-bookmarks-height to 100px');
+
+  // Dragging Divider 2 (rightHSplitter) when Bookmarks is expanded (resizes Bookmarks vs Activity)
+  rightHSplitter.dispatchEvent({ type: 'pointerdown', preventDefault: () => {}, target: rightHSplitter, pointerId: 2 });
+  rightHSplitter.dispatchEvent({ type: 'pointermove', clientY: 400, target: rightHSplitter, pointerId: 2 });
+  rightHSplitter.dispatchEvent({ type: 'pointerup', target: rightHSplitter, pointerId: 2 });
+  // bRect.top=260, clientY=400 -> newBH = 400-260 = 140px, newOpsH = 340-140 = 200px
+  assert.strictEqual(mockDocument.documentElement.style['--mobile-bookmarks-height'], '140px', 'Divider 2 resizes Bookmarks height');
+  assert.strictEqual(mockDocument.documentElement.style['--mobile-activity-height'], '200px', 'Divider 2 resizes Activity height');
+
+  // Dragging Divider 2 when Bookmarks is collapsed (resizes Activity vs File List)
+  bookmarksSection.classList.add('collapsed');
+  rightHSplitter.dispatchEvent({ type: 'pointerdown', preventDefault: () => {}, target: rightHSplitter, pointerId: 2 });
+  rightHSplitter.dispatchEvent({ type: 'pointermove', clientY: 450, target: rightHSplitter, pointerId: 2 });
+  rightHSplitter.dispatchEvent({ type: 'pointerup', target: rightHSplitter, pointerId: 2 });
+  // opsRect.bottom=600, clientY=450 -> newOpsH = 600 - 450 = 150px
+  assert.strictEqual(mockDocument.documentElement.style['--mobile-activity-height'], '150px', 'Divider 2 with collapsed Bookmarks resizes Activity');
+  bookmarksSection.classList.remove('collapsed');
+
+  console.log('✓ Mobile Vertical Resizing Drag Simulation Passed');
+
+  // Test 11: Mobile accordion collapsing and tracking classes
+  initMobileAccordions();
+  const bCollapseBtn = mockDocument.getElementById('bookmarks-collapse-btn');
+  const oCollapseBtn = mockDocument.getElementById('operations-collapse-btn');
+  const rightPanel = mockDocument.getElementById('right-panel');
+
+  bCollapseBtn.click();
+  assert.strictEqual(bookmarksSection.classList.contains('collapsed'), true, 'Bookmarks should be collapsed');
+  assert.strictEqual(mainEl.classList.contains('bookmarks-collapsed'), true, 'main-layout should have bookmarks-collapsed');
+  assert.strictEqual(rightPanel.classList.contains('bookmarks-collapsed'), true, 'right-panel should have bookmarks-collapsed');
+
+  oCollapseBtn.click();
+  assert.strictEqual(operationsSection.classList.contains('collapsed'), true, 'Operations should be collapsed');
+  assert.strictEqual(mainEl.classList.contains('operations-collapsed'), true, 'main-layout should have operations-collapsed');
+  assert.strictEqual(rightPanel.classList.contains('operations-collapsed'), true, 'right-panel should have operations-collapsed');
+
+  // Uncollapse both
+  bCollapseBtn.click();
+  assert.strictEqual(bookmarksSection.classList.contains('collapsed'), false, 'Bookmarks should be expanded');
+  assert.strictEqual(mainEl.classList.contains('bookmarks-collapsed'), false, 'main-layout should not have bookmarks-collapsed');
+
+  oCollapseBtn.click();
+  assert.strictEqual(operationsSection.classList.contains('collapsed'), false, 'Operations should be expanded');
+  assert.strictEqual(mainEl.classList.contains('operations-collapsed'), false, 'main-layout should not have operations-collapsed');
+
+  console.log('✓ Mobile Accordion Collapsing and Tracking Passed');
+
+  // Test 12: Mobile Dual-mode Source ↔ Destination Splitter Dragging
+  const panesEl = mockDocument.getElementById('panes');
+  const vSplitter = mockDocument.getElementById('vertical-splitter');
+  panesEl.getBoundingClientRect = () => ({ top: 0, height: 400, left: 0, width: 500 });
+
+  // Switch getComputedStyle mock to column for panesEl
+  global.getComputedStyle = (elem) => {
+    if (elem === panesEl) return { flexDirection: 'column' };
+    return { flexDirection: 'row' };
+  };
+
+  // Drag vSplitter from 200 to 140 (35% of 400)
+  vSplitter.dispatchEvent({ type: 'pointerdown', preventDefault: () => {}, target: vSplitter, pointerId: 3 });
+  vSplitter.dispatchEvent({ type: 'pointermove', clientY: 140, target: vSplitter, pointerId: 3 });
+  vSplitter.dispatchEvent({ type: 'pointerup', target: vSplitter, pointerId: 3 });
+
+  assert.strictEqual(mockDocument.documentElement.style['--top-height'], '35%', 'Mobile drag vSplitter sets --top-height to 35%');
+  assert.strictEqual(mockLocalStorage.getItem('litesync_dual_pane_ratio'), '35', 'Mobile drag stores dual_pane_ratio in localStorage');
+
+  // Reset getComputedStyle mock
+  global.getComputedStyle = () => ({ flexDirection: 'row' });
+
+  console.log('✓ Mobile Dual-Mode Source ↔ Destination Splitter Dragging Passed');
 
   console.log('\nAll LiteSync Right Panel Unit & Layout Tests Passed Successfully!');
 }

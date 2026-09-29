@@ -553,18 +553,26 @@ export function initMobileAccordions() {
   const operationsBtn = el('operations-collapse-btn');
   const bookmarksSection = el('bookmarks-section');
   const operationsSection = el('operations-section');
+  const mainEl = el('main-layout');
+  const rightPanel = el('right-panel');
 
-  if (bookmarksBtn && bookmarksSection) {
+  if (bookmarksBtn && bookmarksSection && !bookmarksBtn._accordionBound) {
+    bookmarksBtn._accordionBound = true;
     bookmarksBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      bookmarksSection.classList.toggle('collapsed');
+      const isCollapsed = bookmarksSection.classList.toggle('collapsed');
+      if (mainEl) mainEl.classList.toggle('bookmarks-collapsed', isCollapsed);
+      if (rightPanel) rightPanel.classList.toggle('bookmarks-collapsed', isCollapsed);
     });
   }
 
-  if (operationsBtn && operationsSection) {
+  if (operationsBtn && operationsSection && !operationsBtn._accordionBound) {
+    operationsBtn._accordionBound = true;
     operationsBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      operationsSection.classList.toggle('collapsed');
+      const isCollapsed = operationsSection.classList.toggle('collapsed');
+      if (mainEl) mainEl.classList.toggle('operations-collapsed', isCollapsed);
+      if (rightPanel) rightPanel.classList.toggle('operations-collapsed', isCollapsed);
     });
   }
 }
@@ -582,6 +590,15 @@ export function initResizers() {
 
     const savedBookmarksRatio = parseFloat(localStorage.getItem('litesync_bookmarks_height_ratio')) || 60;
     root.style.setProperty('--bookmarks-height', `${clamp(savedBookmarksRatio, 20, 80)}%`);
+
+    const savedMobileBookmarksH = parseFloat(localStorage.getItem('litesync_mobile_bookmarks_height')) || 160;
+    root.style.setProperty('--mobile-bookmarks-height', `${clamp(savedMobileBookmarksH, 80, 500)}px`);
+
+    const savedMobileActivityH = parseFloat(localStorage.getItem('litesync_mobile_activity_height')) || 180;
+    root.style.setProperty('--mobile-activity-height', `${clamp(savedMobileActivityH, 100, 500)}px`);
+
+    const savedMobileFileRatio = parseFloat(localStorage.getItem('litesync_mobile_file_height_ratio')) || 45;
+    root.style.setProperty('--mobile-file-height', `${clamp(savedMobileFileRatio, 20, 70)}%`);
 
     const winW = typeof window !== 'undefined' ? window.innerWidth : 1200;
     const minRightW = 260;
@@ -643,20 +660,39 @@ export function initResizers() {
     });
   }
 
-  // 2. Right panel horizontal resizing divider
+  // 2. Right panel divider (Horizontal on desktop, Vertical between File list and Bookmarks on mobile)
   const rightSplitter = el('right-panel-splitter');
   let lastRightWidth = null;
+  let lastMobileBookmarksH = null;
   if (rightSplitter) {
     drag(rightSplitter, (e) => {
-      const winW = window.innerWidth;
-      const minW = 260;
-      const maxW = Math.max(minW, winW * 0.40);
-      const newWidth = clamp(winW - e.clientX, minW, maxW);
-      lastRightWidth = newWidth;
-      root.style.setProperty('--right-panel-width', `${newWidth}px`);
+      if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+        const bookmarksEl = el('bookmarks-section');
+        const mainEl = el('main-layout');
+        if (!bookmarksEl || !mainEl) return;
+        const bRect = bookmarksEl.getBoundingClientRect();
+        const mRect = mainEl.getBoundingClientRect();
+        const maxH = Math.max(80, (mRect.height || 600) - 120 - 44);
+        const newH = Math.round(clamp(bRect.bottom - e.clientY, 80, maxH));
+        lastMobileBookmarksH = newH;
+        root.style.setProperty('--mobile-bookmarks-height', `${newH}px`);
+      } else {
+        const winW = typeof window !== 'undefined' ? window.innerWidth : 1200;
+        const minW = 260;
+        const maxW = Math.max(minW, winW * 0.40);
+        const newWidth = clamp(winW - e.clientX, minW, maxW);
+        lastRightWidth = newWidth;
+        root.style.setProperty('--right-panel-width', `${newWidth}px`);
+      }
     }, () => {
-      if (lastRightWidth !== null) {
-        localStorage.setItem('litesync_right_panel_width', lastRightWidth);
+      if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+        if (lastMobileBookmarksH !== null) {
+          localStorage.setItem('litesync_mobile_bookmarks_height', lastMobileBookmarksH);
+        }
+      } else {
+        if (lastRightWidth !== null) {
+          localStorage.setItem('litesync_right_panel_width', lastRightWidth);
+        }
       }
     });
   }
@@ -665,17 +701,56 @@ export function initResizers() {
   const rightHSplitter = el('right-panel-h-splitter');
   const rightPanelEl = el('right-panel');
   let lastBookmarksPct = null;
+  let lastMobileBookmarksH2 = null;
+  let lastMobileActivityH = null;
   if (rightHSplitter && rightPanelEl) {
     drag(rightHSplitter, (e) => {
-      const rect = rightPanelEl.getBoundingClientRect();
-      if (rect.height > 0) {
-        const pct = ((e.clientY - rect.top) / rect.height) * 100;
-        lastBookmarksPct = clamp(pct, 20, 80);
-        root.style.setProperty('--bookmarks-height', `${lastBookmarksPct}%`);
+      if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+        const bookmarksEl = el('bookmarks-section');
+        const opsEl = el('operations-section');
+        const mainEl = el('main-layout');
+        if (!opsEl || !mainEl) return;
+        const opsRect = opsEl.getBoundingClientRect();
+        const mRect = mainEl.getBoundingClientRect();
+
+        const isBookmarksCollapsed = bookmarksEl && bookmarksEl.classList.contains('collapsed');
+        if (isBookmarksCollapsed) {
+          const maxOpsH = Math.max(100, (mRect.height || 600) - 120 - 44);
+          const newOpsH = Math.round(clamp(opsRect.bottom - e.clientY, 100, maxOpsH));
+          lastMobileActivityH = newOpsH;
+          root.style.setProperty('--mobile-activity-height', `${newOpsH}px`);
+        } else if (bookmarksEl) {
+          const bRect = bookmarksEl.getBoundingClientRect();
+          const totalH = (bRect.height || 160) + (opsRect.height || 180);
+          const minB = 80;
+          const minOps = 100;
+          const newBH = Math.round(clamp(e.clientY - bRect.top, minB, totalH - minOps));
+          const newOpsH = totalH - newBH;
+          lastMobileBookmarksH2 = newBH;
+          lastMobileActivityH = newOpsH;
+          root.style.setProperty('--mobile-bookmarks-height', `${newBH}px`);
+          root.style.setProperty('--mobile-activity-height', `${newOpsH}px`);
+        }
+      } else {
+        const rect = rightPanelEl.getBoundingClientRect();
+        if (rect.height > 0) {
+          const pct = ((e.clientY - rect.top) / rect.height) * 100;
+          lastBookmarksPct = clamp(pct, 20, 80);
+          root.style.setProperty('--bookmarks-height', `${lastBookmarksPct}%`);
+        }
       }
     }, () => {
-      if (lastBookmarksPct !== null) {
-        localStorage.setItem('litesync_bookmarks_height_ratio', lastBookmarksPct);
+      if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+        if (lastMobileBookmarksH2 !== null) {
+          localStorage.setItem('litesync_mobile_bookmarks_height', lastMobileBookmarksH2);
+        }
+        if (lastMobileActivityH !== null) {
+          localStorage.setItem('litesync_mobile_activity_height', lastMobileActivityH);
+        }
+      } else {
+        if (lastBookmarksPct !== null) {
+          localStorage.setItem('litesync_bookmarks_height_ratio', lastBookmarksPct);
+        }
       }
     });
   }
@@ -1016,16 +1091,20 @@ async function init() {
   });
   initScheduledModal();
 
-  // Inline Clear button: wipe the source selection and refresh checks.
+  // Inline Clear button: wipe the selection and refresh checks.
   el('selection-clear-btn').addEventListener('click', () => {
-    if (state.selection.size === 0) return;
-    state.selection.clear();
+    const hasSrcSel = state.selection && state.selection.size > 0;
+    const hasDestSel = state.destSelection && state.destSelection.size > 0;
+    if (!hasSrcSel && !hasDestSel) return;
+    if (state.selection) state.selection.clear();
+    if (state.destSelection) state.destSelection.clear();
     closeSelectionPreview();
     updateSelectionUI();
-  if (typeof updateTransferMethodUI === 'function' && el('confirm-modal') && !el('confirm-modal').classList.contains('hidden')) {
-    updateTransferMethodUI();
-  }
+    if (typeof updateTransferMethodUI === 'function' && el('confirm-modal') && !el('confirm-modal').classList.contains('hidden')) {
+      updateTransferMethodUI();
+    }
     renderPane('source');
+    if (!state.singlePane) renderPane('dest');
     toastSuccess(I18n.t('messages.selection_cleared'));
   });
 

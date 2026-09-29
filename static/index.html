@@ -27,13 +27,6 @@
       </div>
     </div>
     <div class="nav-right" style="position: relative;">
-      <button id="btn-toggle-right-panel" class="icon-btn" aria-label="Toggle Side Panel" data-i18n-title="panel.toggle" title="Toggle Side Panel">
-        <svg class="ui-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <rect x="3" y="3" width="18" height="18" rx="2"/>
-          <path d="M15 3v18"/>
-        </svg>
-        <span id="nav-panel-badge" class="nav-badge hidden"></span>
-      </button>
       <button id="gear-btn" class="icon-btn" aria-label="Settings and more" data-i18n-title="nav.settings" aria-haspopup="true">
         <div class="ui-icon" style="width: 20px; height: 20px; background-color: currentColor; -webkit-mask: url('/assets/icons/gear.svg') no-repeat center / contain; mask: url('/assets/icons/gear.svg') no-repeat center / contain;"></div>
       </button>
@@ -126,7 +119,6 @@
         <section class="bookmarks-section" id="bookmarks-section">
           <div class="panel-section-header">
             <div class="section-title">
-              <span class="bookmark-icon">⭐</span>
               <span class="panel-section-label" data-i18n="bookmarks.title">Bookmarks</span>
             </div>
             <div class="section-actions">
@@ -142,20 +134,20 @@
           </div>
           <div class="bookmarks-body" id="bookmarks-body">
             <div class="bookmarks-list">
-              <div class="bookmark-item entry" data-path="/mnt/ssd">
+              <div class="bookmark-item" data-path="/mnt/ssd">
                 <img src="/assets/icons/folder.svg" class="ui-icon" alt="Folder" />
                 <span class="name">/mnt/ssd</span>
               </div>
-              <div class="bookmark-item entry" data-path="/mnt/hdd2/movies">
+              <div class="bookmark-item" data-path="/mnt/hdd2/movies">
                 <img src="/assets/icons/folder.svg" class="ui-icon" alt="Folder" />
                 <span class="name">/mnt/hdd2/movies</span>
               </div>
-              <div class="bookmark-item entry" data-path="/mnt/backup">
+              <div class="bookmark-item" data-path="/mnt/backup">
                 <img src="/assets/icons/folder.svg" class="ui-icon" alt="Folder" />
                 <span class="name">/mnt/backup</span>
               </div>
             </div>
-            <div class="bookmarks-empty-hint">
+            <div class="bookmarks-empty-hint" id="bookmarks-empty-hint">
               <span class="empty-hint-text" data-i18n="bookmarks.hint">Pinned folders will appear here</span>
             </div>
           </div>

@@ -27,6 +27,7 @@ assert.ok(htmlContent.includes('id="collapsed-op-indicator"'), 'collapsed-op-ind
 // Test 2: Bookmarks placeholder entries
 assert.ok(htmlContent.includes('/mnt/ssd'), 'Bookmarks placeholder must contain sample folder /mnt/ssd');
 assert.ok(htmlContent.includes('/mnt/hdd2/movies'), 'Bookmarks placeholder must contain sample folder /mnt/hdd2/movies');
+assert.ok(htmlContent.includes('tabindex="0"'), 'Bookmarks placeholder items must have tabindex="0" for keyboard focus');
 assert.ok(htmlContent.includes('data-i18n="bookmarks.hint"'), 'Bookmarks placeholder must have hint');
 
 // Test 3: Operations & Activity Log tabs in right panel
@@ -61,6 +62,26 @@ assert.ok(!cssContent.includes('#vertical-splitter {\n    display: none !importa
 assert.ok(cssContent.includes('--splitter-bar: rgba(0, 0, 0, 0.2);'), 'Light mode must define original gray --splitter-bar token');
 assert.ok(cssContent.includes('--splitter-bar-active: rgba(0, 0, 0, 0.5);'), 'Light mode must define dark gray --splitter-bar-active token');
 assert.ok(cssContent.includes('[data-theme="light"] .splitter-v::after') && cssContent.includes('background: rgba(0, 0, 0, 0.2);'), 'Light mode grab bar must use original gray');
+
+// Test 5: Activity Log & Panel Color Validation
+assert.ok(cssContent.includes('.activity-card') && cssContent.includes('flex-direction: column;'), 'activity-card must use 2-row column layout in base CSS');
+assert.ok(cssContent.includes('.badge') && cssContent.includes('white-space: nowrap;') && cssContent.includes('flex-shrink: 0;'), 'badge must be nowrap and flex-shrink: 0');
+assert.ok(cssContent.includes('.activity-primary-line') && cssContent.includes('white-space: normal;') && cssContent.includes('word-break: break-word;'), 'activity-primary-line must wrap without truncation');
+assert.ok(cssContent.includes('.log-meta') && cssContent.includes('justify-content: space-between;') && cssContent.includes('width: 100%;'), 'log-meta must space timestamp and actions across row 2');
+assert.ok(cssContent.includes('.card-top') && cssContent.includes('flex-wrap: wrap;'), 'card-top must wrap to prevent overflow');
+assert.ok(cssContent.includes('.card-title') && cssContent.includes('white-space: normal;') && cssContent.includes('word-break: break-word;'), 'card-title must wrap without truncation');
+assert.ok(cssContent.includes('#right-panel') && cssContent.includes('background: var(--bg);'), 'right-panel must match file pane var(--bg)');
+assert.ok(cssContent.includes('.panel-section-header') && cssContent.includes('background: var(--bg);'), 'panel-section-header must match var(--bg)');
+assert.ok(cssContent.includes('.tabs-bar') && cssContent.includes('background: var(--bg);'), 'tabs-bar must match var(--bg)');
+assert.ok(!cssContent.includes('/* Stack the Activity Log Rows */'), 'mobile activity card overrides should be removed in favor of shared base styles');
+
+// Test 6: Bookmark Theme Highlights Validation
+assert.ok(cssContent.includes('.bookmark-item:hover') && cssContent.includes('background: rgba(255, 255, 255, 0.05);'), 'Dark theme bookmark hover must remain unchanged');
+assert.ok(cssContent.includes('[data-theme="light"] .bookmark-item:hover'), 'Light theme bookmark must have hover highlight');
+assert.ok(cssContent.includes('[data-theme="light"] .bookmark-item:active'), 'Light theme bookmark must have active/click highlight');
+assert.ok(cssContent.includes('[data-theme="light"] .bookmark-item:focus'), 'Light theme bookmark must have keyboard focus highlight');
+assert.ok(cssContent.includes('[data-theme="light"] .entry:hover'), 'Light theme file row must have matching hover highlight');
+assert.ok(cssContent.includes('background: rgba(0, 0, 0, 0.05);'), 'Light theme bookmark and file row highlight must use rgba(0, 0, 0, 0.05)');
 
 console.log('✓ CSS Layout Rules Verification Passed');
 

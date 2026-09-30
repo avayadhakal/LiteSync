@@ -1079,6 +1079,12 @@ async function init() {
         loadPane('source', p, true).catch(() => {});
       }
     });
+    item.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        item.click();
+      }
+    });
   });
 
   el('transfer-btn').addEventListener('click', openConfirmModal);

@@ -584,6 +584,7 @@ input[type="text"], input[type="password"], input[type="search"], select.modal-s
     min-height: 0;
     overflow-y: auto;
   }
+  html.mobile-bookmarks-collapsed #bookmarks-section,
   #bookmarks-section.collapsed {
     height: 44px !important;
     min-height: 44px !important;
@@ -591,9 +592,11 @@ input[type="text"], input[type="password"], input[type="search"], select.modal-s
     flex: none;
     border-bottom: 1px solid var(--border);
   }
+  html.mobile-bookmarks-collapsed #bookmarks-section #bookmarks-body,
   #bookmarks-section.collapsed #bookmarks-body {
     display: none !important;
   }
+  html.mobile-bookmarks-collapsed #bookmarks-section .accordion-arrow,
   #bookmarks-section.collapsed .accordion-arrow {
     transform: rotate(-90deg);
   }
@@ -612,6 +615,8 @@ input[type="text"], input[type="password"], input[type="search"], select.modal-s
     min-height: 0;
     overflow-y: auto;
   }
+
+  html.mobile-operations-collapsed #operations-section,
   #operations-section.collapsed {
     height: 44px !important;
     min-height: 44px !important;
@@ -619,23 +624,28 @@ input[type="text"], input[type="password"], input[type="search"], select.modal-s
     flex: none;
     padding: 0;
   }
+  html.mobile-operations-collapsed #operations-section .tabs-bar,
   #operations-section.collapsed .tabs-bar {
     height: 44px;
     margin-bottom: 0;
     border-bottom: none;
   }
+  html.mobile-operations-collapsed #operations-section #operations-body,
   #operations-section.collapsed #operations-body {
     display: none !important;
   }
+  html.mobile-operations-collapsed #operations-section .accordion-arrow,
   #operations-section.collapsed .accordion-arrow {
     transform: rotate(-90deg);
   }
 
   /* When sections are collapsed, hide the adjacent dividers */
+  html.mobile-bookmarks-collapsed #right-panel-splitter,
   .main-layout:has(#bookmarks-section.collapsed) #right-panel-splitter,
   .main-layout.bookmarks-collapsed #right-panel-splitter {
     display: none !important;
   }
+  html.mobile-operations-collapsed #right-panel-h-splitter,
   .main-layout:has(#operations-section.collapsed) #right-panel-h-splitter,
   .main-layout.operations-collapsed #right-panel-h-splitter,
   .right-panel:has(#operations-section.collapsed) #right-panel-h-splitter,
@@ -1039,6 +1049,7 @@ input[type="text"], input[type="password"], input[type="search"], select.modal-s
   font-weight: 600;
   color: var(--text);
   white-space: nowrap;
+  flex-shrink: 0;
 }
 .selection-inline .btn-sm {
   padding: 4px 10px;
@@ -1142,26 +1153,55 @@ input[type="text"], input[type="password"], input[type="search"], select.modal-s
     padding: 8px 12px;
   }
   .controls .spacer { display: none; }
-  /* Row 2: badge on the left, Transfer pinned to the right. */
-  .selection-inline { margin-right: auto; }
-  .selection-inline-count { font-size: 11px; }
-  #transfer-btn { margin-left: auto; flex: none; }
 
-  /* Mobile popover: viewport-fixed bottom sheet — can never be clipped by the
-     action-bar wrap or the badge's containing block. Clears the history panel.
-     isolation: auto on the wrapper lets the fixed popover's z-index compete at
-     the root level so it paints opaquely above the action bar. */
-  .selection-inline { isolation: auto; }
-  .selection-preview {
-    position: fixed;
-    left: 16px;
+  /* Mobile floating selection bar pill proportions & safe-area padding */
+  .selection-bar {
+    bottom: max(16px, calc(8px + env(safe-area-inset-bottom, 0px)));
     right: 16px;
-    bottom: calc(var(--bottom-height, 280px) + 12px);
-    width: auto;
-    max-width: calc(100vw - 32px);
+    max-width: calc(100% - 32px);
+    padding: 4px 10px;
+  }
+  .selection-bar .selection-inline {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: auto !important;
+    justify-content: flex-start !important;
+    flex-wrap: nowrap;
+  }
+  .selection-bar .selection-inline-count {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .selection-bar .btn-sm {
+    padding: 4px 10px;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+  .selection-bar #transfer-btn {
+    font-size: 15px;
+    padding: 8px 18px;
+    font-weight: 600;
+    margin: 0;
+    flex-shrink: 0;
+  }
+
+  .selection-preview {
+    position: absolute;
+    bottom: calc(100% + 10px);
+    right: 0;
+    left: auto;
+    width: min(480px, calc(100vw - 32px));
     max-height: 50vh;
     z-index: 1000;
-    background: var(--panel-alt); /* explicitly opaque */
+    background: var(--panel-alt);
     opacity: 1;
   }
 }
@@ -1170,6 +1210,7 @@ input[type="text"], input[type="password"], input[type="search"], select.modal-s
   font-size: 15px;
   padding: 8px 18px;
   font-weight: 600;
+  flex-shrink: 0;
 }
 
 /* Panel section header (Bookmarks header) */
@@ -2679,29 +2720,6 @@ body.single-pane #source-pane {
   .pane-header, .tabs-bar {
     flex-wrap: wrap;
   }
-  
-  .selection-inline {
-    display: flex;
-    justify-content: space-between;
-    order: -1;
-    width: 100%;
-    margin-bottom: 12px;
-    padding: 8px 12px;
-    align-items: center;
-    min-height: auto;
-  }
-  
-  .selection-inline button {
-    padding: 4px 12px;
-    font-size: 13px;
-  }
-  
-  #transfer-btn {
-    flex: none;
-    margin-top: 0;
-    padding: 6px 16px !important;
-    font-size: 13px !important;
-  }
 }
 .text-danger { color: var(--danger); }
 .mt-1 { margin-top: 4px; }
@@ -2740,11 +2758,19 @@ body.single-pane #source-pane {
 /* MOBILE TOUCH TARGET OVERRIDES */
 @media (max-width: 768px) {
   header {
-    padding: 0 16px;
+    padding-left: 16px;
+    padding-right: 16px;
   }
-  .nav-right .btn-logout {
-    min-height: var(--hit-action-mobile);
-    padding: 10px 16px;
+  #gear-btn {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    margin: 0;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
   .pane-actions .icon-btn {
     min-width: var(--hit-action-mobile);

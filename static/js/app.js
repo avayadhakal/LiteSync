@@ -548,21 +548,69 @@ export function toggleRightPanel() {
   setRightPanelCollapsed(!isCollapsed);
 }
 
+export function setMobileBookmarksCollapsed(collapsed, save = true) {
+  const bookmarksSection = el('bookmarks-section');
+  const mainEl = el('main-layout');
+  const rightPanel = el('right-panel');
+  const root = document.documentElement;
+
+  if (bookmarksSection) bookmarksSection.classList.toggle('collapsed', collapsed);
+  if (mainEl) mainEl.classList.toggle('bookmarks-collapsed', collapsed);
+  if (rightPanel) rightPanel.classList.toggle('bookmarks-collapsed', collapsed);
+  if (root) root.classList.toggle('mobile-bookmarks-collapsed', collapsed);
+
+  if (save) {
+    try {
+      localStorage.setItem('litesync_mobile_bookmarks_collapsed', collapsed ? 'true' : 'false');
+    } catch (e) {}
+  }
+}
+
+export function setMobileOperationsCollapsed(collapsed, save = true) {
+  const operationsSection = el('operations-section');
+  const mainEl = el('main-layout');
+  const rightPanel = el('right-panel');
+  const root = document.documentElement;
+
+  if (operationsSection) operationsSection.classList.toggle('collapsed', collapsed);
+  if (mainEl) mainEl.classList.toggle('operations-collapsed', collapsed);
+  if (rightPanel) rightPanel.classList.toggle('operations-collapsed', collapsed);
+  if (root) root.classList.toggle('mobile-operations-collapsed', collapsed);
+
+  if (save) {
+    try {
+      localStorage.setItem('litesync_mobile_operations_collapsed', collapsed ? 'true' : 'false');
+      localStorage.setItem('litesync_mobile_activity_collapsed', collapsed ? 'true' : 'false');
+    } catch (e) {}
+  }
+}
+
 export function initMobileAccordions() {
   const bookmarksBtn = el('bookmarks-collapse-btn');
   const operationsBtn = el('operations-collapse-btn');
   const bookmarksSection = el('bookmarks-section');
   const operationsSection = el('operations-section');
-  const mainEl = el('main-layout');
-  const rightPanel = el('right-panel');
+
+  // Restore stored state
+  try {
+    const isBookmarksCollapsed = localStorage.getItem('litesync_mobile_bookmarks_collapsed') === 'true';
+    if (isBookmarksCollapsed) {
+      setMobileBookmarksCollapsed(true, false);
+    }
+
+    const isOperationsCollapsed = localStorage.getItem('litesync_mobile_operations_collapsed') === 'true' ||
+      localStorage.getItem('litesync_mobile_activity_collapsed') === 'true';
+    if (isOperationsCollapsed) {
+      setMobileOperationsCollapsed(true, false);
+    }
+  } catch (e) {}
 
   if (bookmarksBtn && bookmarksSection && !bookmarksBtn._accordionBound) {
     bookmarksBtn._accordionBound = true;
     bookmarksBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      const isCollapsed = bookmarksSection.classList.toggle('collapsed');
-      if (mainEl) mainEl.classList.toggle('bookmarks-collapsed', isCollapsed);
-      if (rightPanel) rightPanel.classList.toggle('bookmarks-collapsed', isCollapsed);
+      const isCollapsed = !bookmarksSection.classList.contains('collapsed');
+      setMobileBookmarksCollapsed(isCollapsed, true);
     });
   }
 
@@ -570,9 +618,8 @@ export function initMobileAccordions() {
     operationsBtn._accordionBound = true;
     operationsBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      const isCollapsed = operationsSection.classList.toggle('collapsed');
-      if (mainEl) mainEl.classList.toggle('operations-collapsed', isCollapsed);
-      if (rightPanel) rightPanel.classList.toggle('operations-collapsed', isCollapsed);
+      const isCollapsed = !operationsSection.classList.contains('collapsed');
+      setMobileOperationsCollapsed(isCollapsed, true);
     });
   }
 }

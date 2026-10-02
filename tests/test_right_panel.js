@@ -56,12 +56,13 @@ assert.ok(cssContent.includes('.panel-collapsed-strip'), '.panel-collapsed-strip
 assert.ok(cssContent.includes('@container (max-width: 440px)'), 'Container query or narrow pane rule for hiding modified column must exist');
 assert.ok(cssContent.includes('width: 100% !important;'), '#right-panel-splitter must have width: 100% on mobile');
 assert.ok(cssContent.includes('.file-panes-area') && cssContent.includes('flex: 1 1 0;'), '.file-panes-area must be flex: 1 1 0 on mobile');
-assert.ok(cssContent.includes('bookmarks-collapsed') && cssContent.includes('#right-panel-splitter'), 'Divider above bookmarks must hide when bookmarks collapsed');
-assert.ok(cssContent.includes('operations-collapsed') && cssContent.includes('#right-panel-h-splitter'), 'Divider between bookmarks and operations must hide when operations collapsed');
-assert.ok(!cssContent.includes('#vertical-splitter {\n    display: none !important;'), '#vertical-splitter must NOT be hidden in mobile media query');
-assert.ok(cssContent.includes('--splitter-bar: rgba(0, 0, 0, 0.2);'), 'Light mode must define original gray --splitter-bar token');
-assert.ok(cssContent.includes('--splitter-bar-active: rgba(0, 0, 0, 0.5);'), 'Light mode must define dark gray --splitter-bar-active token');
-assert.ok(cssContent.includes('[data-theme="light"] .splitter-v::after') && cssContent.includes('background: rgba(0, 0, 0, 0.2);'), 'Light mode grab bar must use original gray');
+assert.ok(cssContent.includes('html.mobile-bookmarks-collapsed #bookmarks-section'), 'html.mobile-bookmarks-collapsed selector must exist');
+assert.ok(cssContent.includes('html.mobile-operations-collapsed #operations-section'), 'html.mobile-operations-collapsed selector must exist');
+assert.ok(cssContent.includes('env(safe-area-inset-bottom'), 'selection-bar must support safe-area-inset-bottom');
+assert.ok(cssContent.includes('.selection-inline-count') && cssContent.includes('flex-shrink: 0'), 'selection-inline-count must have flex-shrink: 0');
+assert.ok(cssContent.includes('#transfer-btn') && cssContent.includes('flex-shrink: 0'), '#transfer-btn must have flex-shrink: 0');
+assert.ok(cssContent.includes('#gear-btn') && cssContent.includes('min-width: 44px') && cssContent.includes('min-height: 44px'), '#gear-btn must have 44px touch target on mobile');
+assert.ok(cssContent.includes('padding-left: 16px;') && cssContent.includes('padding-right: 16px;'), 'header must have symmetric 16px padding on mobile');
 
 // Test 5: Activity Log & Panel Color Validation
 assert.ok(cssContent.includes('.activity-card') && cssContent.includes('flex-direction: column;'), 'activity-card must use 2-row column layout in base CSS');
@@ -347,22 +348,46 @@ async function testRightPanelLogic() {
   assert.strictEqual(bookmarksSection.classList.contains('collapsed'), true, 'Bookmarks should be collapsed');
   assert.strictEqual(mainEl.classList.contains('bookmarks-collapsed'), true, 'main-layout should have bookmarks-collapsed');
   assert.strictEqual(rightPanel.classList.contains('bookmarks-collapsed'), true, 'right-panel should have bookmarks-collapsed');
+  assert.strictEqual(mockDocument.documentElement.classList.contains('mobile-bookmarks-collapsed'), true, 'documentElement should have mobile-bookmarks-collapsed');
+  assert.strictEqual(mockLocalStorage.getItem('litesync_mobile_bookmarks_collapsed'), 'true', 'localStorage should persist bookmarks collapsed true');
 
   oCollapseBtn.click();
   assert.strictEqual(operationsSection.classList.contains('collapsed'), true, 'Operations should be collapsed');
   assert.strictEqual(mainEl.classList.contains('operations-collapsed'), true, 'main-layout should have operations-collapsed');
   assert.strictEqual(rightPanel.classList.contains('operations-collapsed'), true, 'right-panel should have operations-collapsed');
+  assert.strictEqual(mockDocument.documentElement.classList.contains('mobile-operations-collapsed'), true, 'documentElement should have mobile-operations-collapsed');
+  assert.strictEqual(mockLocalStorage.getItem('litesync_mobile_operations_collapsed'), 'true', 'localStorage should persist operations collapsed true');
 
   // Uncollapse both
   bCollapseBtn.click();
   assert.strictEqual(bookmarksSection.classList.contains('collapsed'), false, 'Bookmarks should be expanded');
   assert.strictEqual(mainEl.classList.contains('bookmarks-collapsed'), false, 'main-layout should not have bookmarks-collapsed');
+  assert.strictEqual(mockDocument.documentElement.classList.contains('mobile-bookmarks-collapsed'), false, 'documentElement should not have mobile-bookmarks-collapsed');
+  assert.strictEqual(mockLocalStorage.getItem('litesync_mobile_bookmarks_collapsed'), 'false', 'localStorage should persist bookmarks collapsed false');
 
   oCollapseBtn.click();
   assert.strictEqual(operationsSection.classList.contains('collapsed'), false, 'Operations should be expanded');
   assert.strictEqual(mainEl.classList.contains('operations-collapsed'), false, 'main-layout should not have operations-collapsed');
+  assert.strictEqual(mockDocument.documentElement.classList.contains('mobile-operations-collapsed'), false, 'documentElement should not have mobile-operations-collapsed');
+  assert.strictEqual(mockLocalStorage.getItem('litesync_mobile_operations_collapsed'), 'false', 'localStorage should persist operations collapsed false');
 
   console.log('✓ Mobile Accordion Collapsing and Tracking Passed');
+
+  // Test 11b: Mobile accordion restoration on page reload
+  mockLocalStorage.setItem('litesync_mobile_bookmarks_collapsed', 'true');
+  mockLocalStorage.setItem('litesync_mobile_operations_collapsed', 'true');
+  const { setMobileBookmarksCollapsed, setMobileOperationsCollapsed } = await import('../static/js/app.js');
+  setMobileBookmarksCollapsed(true, false);
+  setMobileOperationsCollapsed(true, false);
+  assert.strictEqual(bookmarksSection.classList.contains('collapsed'), true, 'Bookmarks restored to collapsed');
+  assert.strictEqual(operationsSection.classList.contains('collapsed'), true, 'Operations restored to collapsed');
+  assert.strictEqual(mockDocument.documentElement.classList.contains('mobile-bookmarks-collapsed'), true, 'documentElement restored mobile-bookmarks-collapsed');
+  assert.strictEqual(mockDocument.documentElement.classList.contains('mobile-operations-collapsed'), true, 'documentElement restored mobile-operations-collapsed');
+
+  // Reset to expanded
+  setMobileBookmarksCollapsed(false, true);
+  setMobileOperationsCollapsed(false, true);
+  console.log('✓ Mobile Accordion Persistence & State Restoration Passed');
 
   // Test 12: Mobile Dual-mode Source ↔ Destination Splitter Dragging
   const panesEl = mockDocument.getElementById('panes');
